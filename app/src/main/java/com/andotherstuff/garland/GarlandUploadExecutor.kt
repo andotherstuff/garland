@@ -17,7 +17,7 @@ data class UploadExecutionResult(
     val message: String,
 )
 
-class GarlandUploadExecutor(
+open class GarlandUploadExecutor(
     private val store: LocalDocumentStoreImpl,
     private val client: OkHttpClient = OkHttpClient(),
     private val gson: Gson = Gson(),
@@ -29,7 +29,7 @@ class GarlandUploadExecutor(
         gson: Gson = Gson(),
     ) : this(LocalDocumentStoreImpl(context.applicationContext.filesDir.resolve("garland-documents")), client, gson)
 
-    fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
+    open fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
         val raw = store.readUploadPlan(documentId)
             ?: return UploadExecutionResult(false, 0, 0, false, "No upload plan found")
         val response = gson.fromJson(raw, WritePlanEnvelope::class.java)

@@ -16,6 +16,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var store: LocalDocumentStore
     private lateinit var uploadExecutor: GarlandUploadExecutor
     private lateinit var downloadExecutor: GarlandDownloadExecutor
+    private lateinit var syncExecutor: GarlandSyncExecutor
     private var privateKeyHex: String? = null
     private var preparedDocumentId: String? = null
 
@@ -27,6 +28,7 @@ class MainActivity : AppCompatActivity() {
         store = LocalDocumentStore(applicationContext)
         uploadExecutor = GarlandUploadExecutor(applicationContext)
         downloadExecutor = GarlandDownloadExecutor(applicationContext)
+        syncExecutor = GarlandSyncExecutor(applicationContext)
 
         bindDefaults()
         binding.statusText.text = getString(R.string.app_boot_status)
@@ -104,6 +106,32 @@ class MainActivity : AppCompatActivity() {
 
         binding.refreshDocumentsButton.setOnClickListener {
             refreshDocumentList(preparedDocumentId)
+        }
+
+        binding.syncDocumentsButton.setOnClickListener {
+            binding.statusText.text = getString(R.string.sync_documents_running)
+            val relays = currentRelays()
+            session.saveRelays(relays)
+            thread {
+                val result = runCatching { syncExecutor.syncPendingDocuments(relays) }
+                runOnUiThread {
+                    binding.statusText.text = result.fold(
+                        onSuccess = {
+                            selectDocument(store.readRecord(preparedDocumentId.orEmpty()) ?: store.latestDocument(), false)
+                            getString(
+                                R.string.sync_documents_result,
+                                it.successfulDocuments,
+                                it.attemptedDocuments,
+                                it.message,
+                            )
+                        },
+                        onFailure = {
+                            refreshDocumentList(preparedDocumentId)
+                            getString(R.string.sync_documents_error, it.message ?: "unknown error")
+                        }
+                    )
+                }
+            }
         }
 
         binding.retryUploadButton.setOnClickListener {
