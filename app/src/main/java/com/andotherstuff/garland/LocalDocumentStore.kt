@@ -22,6 +22,8 @@ class LocalDocumentStore(private val context: Context) {
 
     fun readRecord(documentId: String): LocalDocumentRecord? = impl.readRecord(documentId)
 
+    fun latestDocument(): LocalDocumentRecord? = impl.latestDocument()
+
     fun createDocument(displayName: String, mimeType: String): LocalDocumentRecord = impl.createDocument(displayName, mimeType)
 
     fun upsertPreparedDocument(
@@ -62,6 +64,12 @@ class LocalDocumentStoreImpl(private val baseDir: File) {
             ?.mapNotNull { readRecord(it.nameWithoutExtension) }
             ?.sortedBy { it.displayName.lowercase() }
             ?: emptyList()
+    }
+
+    fun latestDocument(): LocalDocumentRecord? {
+        return metaDir.listFiles { file -> file.extension == "json" }
+            ?.mapNotNull { readRecord(it.nameWithoutExtension) }
+            ?.maxByOrNull { it.updatedAt }
     }
 
     fun readRecord(documentId: String): LocalDocumentRecord? {

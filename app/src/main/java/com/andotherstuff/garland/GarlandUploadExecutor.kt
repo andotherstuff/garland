@@ -88,7 +88,12 @@ class GarlandUploadExecutor(
             )
         }
 
-        store.updateUploadStatus(documentId, "relay-published")
+        val relayStatus = if (relayResult.successfulRelays == relayResult.attemptedRelays) {
+            "relay-published"
+        } else {
+            "relay-published-partial"
+        }
+        store.updateUploadStatus(documentId, relayStatus)
         return UploadExecutionResult(
             success = true,
             attemptedShares = uploads.size,

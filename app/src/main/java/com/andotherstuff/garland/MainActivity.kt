@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
         bindDefaults()
         binding.statusText.text = getString(R.string.app_boot_status)
         privateKeyHex = session.loadPrivateKeyHex()
+        bindLatestDocument()
 
         binding.deriveButton.setOnClickListener {
             val response = JSONObject(
@@ -75,6 +76,7 @@ class MainActivity : AppCompatActivity() {
                     uploadPlanJson = response.toString(),
                 )
                 preparedDocumentId = documentId
+                updateActiveDocument(store.readRecord(documentId))
                 getString(
                     R.string.upload_prepared,
                     documentId,
@@ -82,6 +84,7 @@ class MainActivity : AppCompatActivity() {
                 )
             } else {
                 preparedDocumentId = null
+                updateActiveDocument(null)
                 getString(R.string.upload_prepare_error, response.optString("error"))
             }
         }
@@ -101,6 +104,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     binding.statusText.text = result.fold(
                         onSuccess = {
+                            updateActiveDocument(store.readRecord(documentId))
                             getString(
                                 R.string.upload_result,
                                 it.uploadedShares,
@@ -109,6 +113,7 @@ class MainActivity : AppCompatActivity() {
                             )
                         },
                         onFailure = {
+                            updateActiveDocument(store.readRecord(documentId))
                             getString(R.string.upload_execution_error, it.message ?: "unknown error")
                         }
                     )
@@ -142,5 +147,19 @@ class MainActivity : AppCompatActivity() {
         binding.serverOneInput.setText(blossomServers[0])
         binding.serverTwoInput.setText(blossomServers[1])
         binding.serverThreeInput.setText(blossomServers[2])
+    }
+
+    private fun bindLatestDocument() {
+        val latest = store.latestDocument()
+        preparedDocumentId = latest?.documentId
+        updateActiveDocument(latest)
+    }
+
+    private fun updateActiveDocument(record: LocalDocumentRecord?) {
+        binding.activeDocumentText.text = if (record == null) {
+            getString(R.string.active_document_none)
+        } else {
+            getString(R.string.active_document_loaded, record.displayName, record.uploadStatus)
+        }
     }
 }

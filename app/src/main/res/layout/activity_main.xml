@@ -38,6 +38,16 @@
         android:textColor="@color/garland_muted"
         android:textSize="16sp" />
 
+    <TextView
+        android:id="@+id/activeDocumentText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="@string/active_document_none"
+        android:textColor="@color/garland_ink"
+        android:textSize="14sp" />
+
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

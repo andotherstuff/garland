@@ -1,5 +1,6 @@
 package com.andotherstuff.garland
 
+import okhttp3.OkHttpClient
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
@@ -25,11 +26,14 @@ class NostrRelayPublisherTest {
         server.start()
 
         val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
-        val publisher = NostrRelayPublisher()
+        val client = OkHttpClient()
+        val publisher = NostrRelayPublisher(client = client)
 
         val result = publisher.publish(listOf(relayUrl), sampleEvent())
 
         assertEquals(1, result.successfulRelays)
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
         server.shutdown()
     }
 
@@ -46,12 +50,15 @@ class NostrRelayPublisherTest {
         server.start()
 
         val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
-        val publisher = NostrRelayPublisher()
+        val client = OkHttpClient()
+        val publisher = NostrRelayPublisher(client = client)
 
         val result = publisher.publish(listOf(relayUrl), sampleEvent())
 
         assertEquals(0, result.successfulRelays)
         assertFalse(result.message.isBlank())
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
         server.shutdown()
     }
 

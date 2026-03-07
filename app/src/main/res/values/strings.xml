@@ -6,6 +6,8 @@
     <string name="derive_button">Load identity</string>
     <string name="identity_loaded">Identity loaded\n%s</string>
     <string name="identity_error">Import failed: %s</string>
+    <string name="active_document_none">No prepared document loaded yet.</string>
+    <string name="active_document_loaded">Active document: %1$s (%2$s)</string>
     <string name="relay_defaults_label">Default relays</string>
     <string name="blossom_defaults_label">Default Blossom servers</string>
     <string name="manual_upload_label">Manual Garland upload prep</string>

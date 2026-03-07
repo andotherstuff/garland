@@ -25,4 +25,17 @@ class LocalDocumentStoreTest {
         assertNotNull(store.readUploadPlan("doc123"))
         assertEquals("upload-plan-ready", store.readRecord("doc123")?.uploadStatus)
     }
+
+    @Test
+    fun returnsMostRecentlyUpdatedDocument() {
+        val tempDir = Files.createTempDirectory("garland-store-latest-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+
+        val first = store.createDocument("first.txt", "text/plain")
+        Thread.sleep(5)
+        val second = store.createDocument("second.txt", "text/plain")
+
+        assertEquals(second.documentId, store.latestDocument()?.documentId)
+        assertEquals(first.documentId, store.readRecord(first.documentId)?.documentId)
+    }
 }
