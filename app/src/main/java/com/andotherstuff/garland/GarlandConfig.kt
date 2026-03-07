@@ -44,6 +44,22 @@ object GarlandConfig {
         """.trimIndent().replace("\n", "")
     }
 
+    fun buildRecoverReadRequestJson(
+        privateKeyHex: String,
+        documentId: String,
+        blockIndex: Int,
+        encryptedBlock: ByteArray,
+    ): String {
+        return """
+            {
+              "private_key_hex":"${escapeJson(privateKeyHex)}",
+              "document_id":"${escapeJson(documentId)}",
+              "block_index":$blockIndex,
+              "encrypted_block_b64":"${Base64.getEncoder().encodeToString(encryptedBlock)}"
+            }
+        """.trimIndent().replace("\n", "")
+    }
+
     private fun escapeJson(value: String): String {
         return value
             .replace("\\", "\\\\")

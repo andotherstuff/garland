@@ -1,12 +1,12 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use hkdf::Hkdf;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::crypto::{BlossomServer, prepare_replication_upload};
-use crate::nostr_event::{SignedEvent, UnsignedEvent, sign_custom_event};
+use crate::crypto::{decrypt_block, prepare_replication_upload, BlossomServer};
+use crate::nostr_event::{sign_custom_event, SignedEvent, UnsignedEvent};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrepareWriteRequest {
@@ -16,6 +16,14 @@ pub struct PrepareWriteRequest {
     pub created_at: u64,
     pub content_b64: String,
     pub servers: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoverReadRequest {
+    pub private_key_hex: String,
+    pub document_id: String,
+    pub block_index: u32,
+    pub encrypted_block_b64: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,7 +77,19 @@ pub enum WritePlanError {
     ContentTooLarge,
 }
 
-pub fn prepare_single_block_write(request: &PrepareWriteRequest) -> Result<PreparedWritePlan, WritePlanError> {
+#[derive(Debug, Error)]
+pub enum ReadRecoveryError {
+    #[error("encrypted block is not valid base64")]
+    InvalidBlockBase64,
+    #[error("private key hex is invalid")]
+    InvalidPrivateKey,
+    #[error("crypto step failed: {0}")]
+    Crypto(String),
+}
+
+pub fn prepare_single_block_write(
+    request: &PrepareWriteRequest,
+) -> Result<PreparedWritePlan, WritePlanError> {
     let content = STANDARD
         .decode(&request.content_b64)
         .map_err(|_| WritePlanError::InvalidContentBase64)?;
@@ -90,7 +110,11 @@ pub fn prepare_single_block_write(request: &PrepareWriteRequest) -> Result<Prepa
     ));
     let file_key = derive_file_key(&private_key_bytes, &document_id)?;
     let nonce = random_nonce();
-    let servers: Vec<BlossomServer> = request.servers.iter().map(|url| BlossomServer::new(url)).collect();
+    let servers: Vec<BlossomServer> = request
+        .servers
+        .iter()
+        .map(|url| BlossomServer::new(url))
+        .collect();
     let replication = prepare_replication_upload(file_key, 0, nonce, &content, &servers)
         .map_err(|err| WritePlanError::Crypto(err.to_string()))?;
 
@@ -114,7 +138,8 @@ pub fn prepare_single_block_write(request: &PrepareWriteRequest) -> Result<Prepa
             servers: request.servers.clone(),
         }],
     };
-    let manifest_json = serde_json::to_string(&manifest).map_err(|_| WritePlanError::ManifestSerialization)?;
+    let manifest_json =
+        serde_json::to_string(&manifest).map_err(|_| WritePlanError::ManifestSerialization)?;
     let commit_event = sign_custom_event(
         &request.private_key_hex,
         &UnsignedEvent {
@@ -144,16 +169,55 @@ pub fn prepare_single_block_write(request: &PrepareWriteRequest) -> Result<Prepa
     })
 }
 
+pub fn recover_single_block_read(
+    request: &RecoverReadRequest,
+) -> Result<Vec<u8>, ReadRecoveryError> {
+    let encrypted_block = STANDARD
+        .decode(&request.encrypted_block_b64)
+        .map_err(|_| ReadRecoveryError::InvalidBlockBase64)?;
+    let private_key_bytes = decode_private_key_read(&request.private_key_hex)?;
+    let file_key = derive_file_key_read(&private_key_bytes, &request.document_id)?;
+
+    decrypt_block(&file_key, request.block_index, &encrypted_block)
+        .map_err(|err| ReadRecoveryError::Crypto(err.to_string()))
+}
+
 fn decode_private_key(private_key_hex: &str) -> Result<[u8; 32], WritePlanError> {
     let bytes = hex::decode(private_key_hex).map_err(|_| WritePlanError::InvalidPrivateKey)?;
-    bytes.try_into().map_err(|_| WritePlanError::InvalidPrivateKey)
+    bytes
+        .try_into()
+        .map_err(|_| WritePlanError::InvalidPrivateKey)
+}
+
+fn decode_private_key_read(private_key_hex: &str) -> Result<[u8; 32], ReadRecoveryError> {
+    let bytes = hex::decode(private_key_hex).map_err(|_| ReadRecoveryError::InvalidPrivateKey)?;
+    bytes
+        .try_into()
+        .map_err(|_| ReadRecoveryError::InvalidPrivateKey)
 }
 
 fn derive_file_key(private_key: &[u8; 32], document_id: &str) -> Result<[u8; 32], WritePlanError> {
     let hk = Hkdf::<Sha256>::new(None, private_key);
     let mut file_key = [0_u8; 32];
-    hk.expand(format!("garland-mvp:file:{}", document_id).as_bytes(), &mut file_key)
-        .map_err(|err| WritePlanError::Crypto(err.to_string()))?;
+    hk.expand(
+        format!("garland-mvp:file:{}", document_id).as_bytes(),
+        &mut file_key,
+    )
+    .map_err(|err| WritePlanError::Crypto(err.to_string()))?;
+    Ok(file_key)
+}
+
+fn derive_file_key_read(
+    private_key: &[u8; 32],
+    document_id: &str,
+) -> Result<[u8; 32], ReadRecoveryError> {
+    let hk = Hkdf::<Sha256>::new(None, private_key);
+    let mut file_key = [0_u8; 32];
+    hk.expand(
+        format!("garland-mvp:file:{}", document_id).as_bytes(),
+        &mut file_key,
+    )
+    .map_err(|err| ReadRecoveryError::Crypto(err.to_string()))?;
     Ok(file_key)
 }
 

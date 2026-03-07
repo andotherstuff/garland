@@ -29,4 +29,18 @@ class GarlandConfigTest {
         assertTrue(json.contains("\"content_b64\":\"aGVsbG8=\""))
         assertEquals(3, "https://".toRegex().findAll(json).count())
     }
+
+    @Test
+    fun buildsRecoverReadJson() {
+        val json = GarlandConfig.buildRecoverReadRequestJson(
+            privateKeyHex = "deadbeef",
+            documentId = "doc123",
+            blockIndex = 0,
+            encryptedBlock = "hello".toByteArray(),
+        )
+
+        assertTrue(json.contains("\"private_key_hex\":\"deadbeef\""))
+        assertTrue(json.contains("\"document_id\":\"doc123\""))
+        assertTrue(json.contains("\"encrypted_block_b64\":\"aGVsbG8=\""))
+    }
 }

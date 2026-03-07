@@ -87,7 +87,12 @@ class GarlandDocumentsProvider : DocumentsProvider() {
     }
 
     override fun queryRecentDocuments(rootId: String?, projection: Array<out String>?): Cursor {
-        return MatrixCursor(resolveDocumentProjection(projection))
+        val result = MatrixCursor(resolveDocumentProjection(projection))
+        store.listDocuments()
+            .sortedByDescending { it.updatedAt }
+            .take(5)
+            .forEach { includeRecord(result, it) }
+        return result
     }
 
     override fun querySearchDocuments(
@@ -95,7 +100,18 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         query: String?,
         projection: Array<out String>?
     ): Cursor {
-        return MatrixCursor(resolveDocumentProjection(projection))
+        val result = MatrixCursor(resolveDocumentProjection(projection))
+        val needle = query.orEmpty().trim().lowercase()
+        if (needle.isBlank()) return result
+
+        store.listDocuments()
+            .filter {
+                it.displayName.lowercase().contains(needle) ||
+                    it.uploadStatus.lowercase().contains(needle) ||
+                    it.mimeType.lowercase().contains(needle)
+            }
+            .forEach { includeRecord(result, it) }
+        return result
     }
 
     override fun isChildDocument(parentDocumentId: String?, documentId: String?): Boolean {
@@ -135,7 +151,10 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             .add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, record.documentId)
             .add(DocumentsContract.Document.COLUMN_MIME_TYPE, record.mimeType)
             .add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, "${record.displayName} [${record.uploadStatus}]")
-            .add(DocumentsContract.Document.COLUMN_FLAGS, DocumentsContract.Document.FLAG_SUPPORTS_DELETE)
+            .add(
+                DocumentsContract.Document.COLUMN_FLAGS,
+                DocumentsContract.Document.FLAG_SUPPORTS_DELETE or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
+            )
             .add(DocumentsContract.Document.COLUMN_ICON, R.drawable.ic_garland_mark)
             .add(DocumentsContract.Document.COLUMN_SIZE, record.sizeBytes)
             .add(DocumentsContract.Document.COLUMN_LAST_MODIFIED, record.updatedAt)

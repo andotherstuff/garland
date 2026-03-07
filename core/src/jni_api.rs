@@ -1,10 +1,13 @@
-use jni::JNIEnv;
+use base64::Engine as _;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
+use jni::JNIEnv;
 use serde::{Deserialize, Serialize};
 
 use crate::identity::derive_nostr_identity;
-use crate::mvp_write::{PrepareWriteRequest, prepare_single_block_write};
+use crate::mvp_write::{
+    prepare_single_block_write, recover_single_block_read, PrepareWriteRequest, RecoverReadRequest,
+};
 
 #[derive(Serialize)]
 struct IdentityResponse {
@@ -21,6 +24,13 @@ struct WritePlanResponse {
     error: Option<String>,
 }
 
+#[derive(Serialize)]
+struct ReadRecoveryResponse {
+    ok: bool,
+    content_b64: Option<String>,
+    error: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct PrepareWriteJson {
     private_key_hex: String,
@@ -29,6 +39,14 @@ struct PrepareWriteJson {
     created_at: u64,
     content_b64: String,
     servers: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct RecoverReadJson {
+    private_key_hex: String,
+    document_id: String,
+    block_index: u32,
+    encrypted_block_b64: String,
 }
 
 #[unsafe(no_mangle)]
@@ -115,9 +133,56 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_prepareSingle
         },
     };
 
+    let payload = serde_json::to_string(&response)
+        .unwrap_or_else(|err| format!("{{\"ok\":false,\"plan\":null,\"error\":\"{}\"}}", err));
+
+    env.new_string(payload)
+        .expect("JNI should allocate response string")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_recoverSingleBlockRead(
+    mut env: JNIEnv,
+    _class: JClass,
+    request_json: JString,
+) -> jstring {
+    let request_json: String = env
+        .get_string(&request_json)
+        .map(|value| value.into())
+        .unwrap_or_default();
+
+    let response = match serde_json::from_str::<RecoverReadJson>(&request_json) {
+        Ok(request) => {
+            let request = RecoverReadRequest {
+                private_key_hex: request.private_key_hex,
+                document_id: request.document_id,
+                block_index: request.block_index,
+                encrypted_block_b64: request.encrypted_block_b64,
+            };
+            match recover_single_block_read(&request) {
+                Ok(content) => ReadRecoveryResponse {
+                    ok: true,
+                    content_b64: Some(base64::engine::general_purpose::STANDARD.encode(content)),
+                    error: None,
+                },
+                Err(error) => ReadRecoveryResponse {
+                    ok: false,
+                    content_b64: None,
+                    error: Some(error.to_string()),
+                },
+            }
+        }
+        Err(error) => ReadRecoveryResponse {
+            ok: false,
+            content_b64: None,
+            error: Some(format!("invalid request json: {}", error)),
+        },
+    };
+
     let payload = serde_json::to_string(&response).unwrap_or_else(|err| {
         format!(
-            "{{\"ok\":false,\"plan\":null,\"error\":\"{}\"}}",
+            "{{\"ok\":false,\"content_b64\":null,\"error\":\"{}\"}}",
             err
         )
     });

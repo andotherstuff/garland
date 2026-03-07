@@ -9,15 +9,21 @@ pub mod packaging;
 mod tests {
     use pretty_assertions::assert_eq;
 
-    use crate::crypto::{decrypt_block, encrypt_block, prepare_replication_upload, BlossomServer, REPLICATION_FACTOR};
+    use crate::crypto::{
+        decrypt_block, encrypt_block, prepare_replication_upload, BlossomServer, REPLICATION_FACTOR,
+    };
     use crate::identity::derive_nostr_identity;
-    use crate::mvp_write::{prepare_single_block_write, PrepareWriteRequest};
+    use crate::mvp_write::{
+        prepare_single_block_write, recover_single_block_read, PrepareWriteRequest,
+        RecoverReadRequest,
+    };
     use crate::nostr_event::{sign_custom_event, UnsignedEvent};
     use crate::packaging::{frame_content, unframe_content, BLOCK_SIZE, FRAME_SIZE};
 
     #[test]
     fn derives_known_nip06_vector() {
-        let mnemonic = "leader monkey parrot ring guide accident before fence cannon height naive bean";
+        let mnemonic =
+            "leader monkey parrot ring guide accident before fence cannon height naive bean";
         let identity = derive_nostr_identity(mnemonic, "").expect("identity should derive");
 
         assert_eq!(
@@ -43,7 +49,10 @@ mod tests {
         let frame = frame_content(content).expect("frame should build");
 
         assert_eq!(frame.len(), FRAME_SIZE);
-        assert_eq!(u32::from_be_bytes(frame[..4].try_into().unwrap()), content.len() as u32);
+        assert_eq!(
+            u32::from_be_bytes(frame[..4].try_into().unwrap()),
+            content.len() as u32
+        );
 
         let recovered = unframe_content(&frame).expect("frame should decode");
         assert_eq!(recovered, content);
@@ -128,7 +137,8 @@ mod tests {
     #[test]
     fn prepares_single_block_write_contract() {
         let request = PrepareWriteRequest {
-            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a".into(),
+            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
+                .into(),
             display_name: "note.txt".into(),
             mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
@@ -151,5 +161,33 @@ mod tests {
         assert_eq!(plan.commit_event.id_hex.len(), 64);
         assert_eq!(plan.commit_event.sig_hex.len(), 128);
         assert_eq!(plan.manifest.document_id.len(), 64);
+    }
+
+    #[test]
+    fn recovers_single_block_write_content() {
+        let request = PrepareWriteRequest {
+            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
+                .into(),
+            display_name: "note.txt".into(),
+            mime_type: "text/plain".into(),
+            created_at: 1_701_907_200,
+            content_b64: "aGVsbG8=".into(),
+            servers: vec![
+                "https://cdn.nostrcheck.me".into(),
+                "https://blossom.nostr.build".into(),
+                "https://blossom.yakihonne.com".into(),
+            ],
+        };
+
+        let plan = prepare_single_block_write(&request).expect("write plan should build");
+        let recovered = recover_single_block_read(&RecoverReadRequest {
+            private_key_hex: request.private_key_hex,
+            document_id: plan.manifest.document_id,
+            block_index: 0,
+            encrypted_block_b64: plan.uploads[0].body_b64.clone(),
+        })
+        .expect("content should recover");
+
+        assert_eq!(recovered, b"hello");
     }
 }

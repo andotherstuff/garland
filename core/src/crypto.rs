@@ -4,7 +4,7 @@ use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::packaging::{BLOCK_SIZE, frame_content, unframe_content};
+use crate::packaging::{frame_content, unframe_content, BLOCK_SIZE};
 
 type HmacSha256 = Hmac<Sha256>;
 type ChaCha20Cipher = chacha20::ChaCha20;
@@ -57,7 +57,8 @@ pub fn encrypt_block(
     nonce: &[u8; 12],
     content: &[u8],
 ) -> Result<Vec<u8>, CryptoError> {
-    let plaintext = frame_content(content).map_err(|err| CryptoError::Packaging(err.to_string()))?;
+    let plaintext =
+        frame_content(content).map_err(|err| CryptoError::Packaging(err.to_string()))?;
     let (enc_key, mac_key) = derive_block_keys(file_key, block_index)?;
 
     let mut ciphertext = plaintext;
@@ -65,7 +66,8 @@ pub fn encrypt_block(
         .map_err(|_| CryptoError::InvalidBlockLength)?;
     cipher.apply_keystream(&mut ciphertext);
 
-    let mut mac = HmacSha256::new_from_slice(&mac_key).map_err(|_| CryptoError::AuthenticationFailed)?;
+    let mut mac =
+        HmacSha256::new_from_slice(&mac_key).map_err(|_| CryptoError::AuthenticationFailed)?;
     mac.update(nonce);
     mac.update(&ciphertext);
     let tag = mac.finalize().into_bytes();
@@ -86,15 +88,19 @@ pub fn decrypt_block(
         return Err(CryptoError::InvalidBlockLength);
     }
 
-    let nonce: [u8; 12] = encrypted_block[..12].try_into().map_err(|_| CryptoError::InvalidBlockLength)?;
+    let nonce: [u8; 12] = encrypted_block[..12]
+        .try_into()
+        .map_err(|_| CryptoError::InvalidBlockLength)?;
     let ciphertext = &encrypted_block[12..BLOCK_SIZE - 32];
     let tag = &encrypted_block[BLOCK_SIZE - 32..];
     let (enc_key, mac_key) = derive_block_keys(file_key, block_index)?;
 
-    let mut mac = HmacSha256::new_from_slice(&mac_key).map_err(|_| CryptoError::AuthenticationFailed)?;
+    let mut mac =
+        HmacSha256::new_from_slice(&mac_key).map_err(|_| CryptoError::AuthenticationFailed)?;
     mac.update(&nonce);
     mac.update(ciphertext);
-    mac.verify_slice(tag).map_err(|_| CryptoError::AuthenticationFailed)?;
+    mac.verify_slice(tag)
+        .map_err(|_| CryptoError::AuthenticationFailed)?;
 
     let mut plaintext = ciphertext.to_vec();
     let mut cipher = ChaCha20Cipher::new_from_slices(&enc_key, &nonce)
@@ -132,7 +138,10 @@ pub fn prepare_replication_upload(
     })
 }
 
-fn derive_block_keys(file_key: &[u8; 32], block_index: u32) -> Result<([u8; 32], [u8; 32]), CryptoError> {
+fn derive_block_keys(
+    file_key: &[u8; 32],
+    block_index: u32,
+) -> Result<([u8; 32], [u8; 32]), CryptoError> {
     let hk = Hkdf::<Sha256>::new(None, file_key);
     let mut block_key = [0_u8; 32];
     let mut enc_key = [0_u8; 32];

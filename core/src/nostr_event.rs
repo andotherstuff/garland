@@ -1,6 +1,6 @@
-use k256::Secp256k1;
 use k256::elliptic_curve::FieldBytes;
 use k256::schnorr::{Signature, SigningKey};
+use k256::Secp256k1;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use signature::hazmat::PrehashSigner;
@@ -35,15 +35,20 @@ pub enum NostrEventError {
     SigningFailed,
 }
 
-pub fn sign_custom_event(private_key_hex: &str, event: &UnsignedEvent) -> Result<SignedEvent, NostrEventError> {
-    let private_key_vec = hex::decode(private_key_hex).map_err(|_| NostrEventError::InvalidPrivateKey)?;
+pub fn sign_custom_event(
+    private_key_hex: &str,
+    event: &UnsignedEvent,
+) -> Result<SignedEvent, NostrEventError> {
+    let private_key_vec =
+        hex::decode(private_key_hex).map_err(|_| NostrEventError::InvalidPrivateKey)?;
     let private_key_bytes: [u8; 32] = private_key_vec
         .as_slice()
         .try_into()
         .map_err(|_| NostrEventError::InvalidPrivateKey)?;
 
-    let signing_key = SigningKey::from_bytes(FieldBytes::<Secp256k1>::from_slice(&private_key_bytes))
-        .map_err(|_| NostrEventError::InvalidPrivateKey)?;
+    let signing_key =
+        SigningKey::from_bytes(FieldBytes::<Secp256k1>::from_slice(&private_key_bytes))
+            .map_err(|_| NostrEventError::InvalidPrivateKey)?;
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
     let event_data = serde_json::json!([
@@ -54,7 +59,8 @@ pub fn sign_custom_event(private_key_hex: &str, event: &UnsignedEvent) -> Result
         event.tags,
         event.content,
     ]);
-    let serialized = serde_json::to_vec(&event_data).map_err(|_| NostrEventError::SerializationFailed)?;
+    let serialized =
+        serde_json::to_vec(&event_data).map_err(|_| NostrEventError::SerializationFailed)?;
     let id = Sha256::digest(&serialized);
     let signature: Signature = signing_key
         .sign_prehash(&id)

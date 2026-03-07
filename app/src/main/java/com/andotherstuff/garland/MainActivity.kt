@@ -1,8 +1,12 @@
 package com.andotherstuff.garland
 
 import android.os.Bundle
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.andotherstuff.garland.databinding.ActivityMainBinding
+import com.google.android.material.button.MaterialButton
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
@@ -11,6 +15,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var session: GarlandSessionStore
     private lateinit var store: LocalDocumentStore
     private lateinit var uploadExecutor: GarlandUploadExecutor
+    private lateinit var downloadExecutor: GarlandDownloadExecutor
     private var privateKeyHex: String? = null
     private var preparedDocumentId: String? = null
 
@@ -21,6 +26,7 @@ class MainActivity : AppCompatActivity() {
         session = GarlandSessionStore(applicationContext)
         store = LocalDocumentStore(applicationContext)
         uploadExecutor = GarlandUploadExecutor(applicationContext)
+        downloadExecutor = GarlandDownloadExecutor(applicationContext)
 
         bindDefaults()
         binding.statusText.text = getString(R.string.app_boot_status)
@@ -75,16 +81,13 @@ class MainActivity : AppCompatActivity() {
                     content = binding.contentInput.text?.toString().orEmpty().toByteArray(),
                     uploadPlanJson = response.toString(),
                 )
-                preparedDocumentId = documentId
-                updateActiveDocument(store.readRecord(documentId))
+                selectDocument(store.readRecord(documentId), false)
                 getString(
                     R.string.upload_prepared,
                     documentId,
                     plan.getJSONArray("uploads").length()
                 )
             } else {
-                preparedDocumentId = null
-                updateActiveDocument(null)
                 getString(R.string.upload_prepare_error, response.optString("error"))
             }
         }
@@ -96,28 +99,89 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            binding.statusText.text = getString(R.string.upload_running, documentId)
-            val relays = currentRelays()
-            session.saveRelays(relays)
+            executeUpload(documentId, getString(R.string.upload_running, documentId))
+        }
+
+        binding.refreshDocumentsButton.setOnClickListener {
+            refreshDocumentList(preparedDocumentId)
+        }
+
+        binding.retryUploadButton.setOnClickListener {
+            val documentId = preparedDocumentId
+            if (documentId.isNullOrBlank()) {
+                binding.statusText.text = getString(R.string.upload_requires_prepared_document)
+                return@setOnClickListener
+            }
+
+            executeUpload(documentId, getString(R.string.upload_retry_running, documentId))
+        }
+
+        binding.deleteDocumentButton.setOnClickListener {
+            val document = preparedDocumentId?.let { store.readRecord(it) }
+            if (document == null) {
+                binding.statusText.text = getString(R.string.document_delete_requires_selection)
+                return@setOnClickListener
+            }
+
+            store.deleteDocument(document.documentId)
+            clearDocumentInputs()
+            selectDocument(store.latestDocument(), false)
+            binding.statusText.text = getString(R.string.document_deleted, document.displayName)
+        }
+
+        binding.restoreDocumentButton.setOnClickListener {
+            val documentId = preparedDocumentId
+            if (documentId.isNullOrBlank()) {
+                binding.statusText.text = getString(R.string.document_delete_requires_selection)
+                return@setOnClickListener
+            }
+            val privateKey = privateKeyHex
+            if (privateKey.isNullOrBlank()) {
+                binding.statusText.text = getString(R.string.restore_requires_identity)
+                return@setOnClickListener
+            }
+
+            binding.statusText.text = getString(R.string.restore_running, documentId)
             thread {
-                val result = runCatching { uploadExecutor.executeDocumentUpload(documentId, relays) }
+                val result = runCatching { downloadExecutor.restoreDocument(documentId, privateKey) }
                 runOnUiThread {
                     binding.statusText.text = result.fold(
                         onSuccess = {
-                            updateActiveDocument(store.readRecord(documentId))
-                            getString(
-                                R.string.upload_result,
-                                it.uploadedShares,
-                                it.attemptedShares,
-                                it.message
-                            )
+                            selectDocument(store.readRecord(documentId), false)
+                            getString(R.string.restore_result, it.restoredBytes, it.message)
                         },
                         onFailure = {
-                            updateActiveDocument(store.readRecord(documentId))
-                            getString(R.string.upload_execution_error, it.message ?: "unknown error")
+                            selectDocument(store.readRecord(documentId), false)
+                            getString(R.string.restore_error, it.message ?: "unknown error")
                         }
                     )
                 }
+            }
+        }
+    }
+
+    private fun executeUpload(documentId: String, runningText: String) {
+        binding.statusText.text = runningText
+        val relays = currentRelays()
+        session.saveRelays(relays)
+        thread {
+            val result = runCatching { uploadExecutor.executeDocumentUpload(documentId, relays) }
+            runOnUiThread {
+                binding.statusText.text = result.fold(
+                    onSuccess = {
+                        selectDocument(store.readRecord(documentId), false)
+                        getString(
+                            R.string.upload_result,
+                            it.uploadedShares,
+                            it.attemptedShares,
+                            it.message
+                        )
+                    },
+                    onFailure = {
+                        selectDocument(store.readRecord(documentId), false)
+                        getString(R.string.upload_execution_error, it.message ?: "unknown error")
+                    }
+                )
             }
         }
     }
@@ -150,9 +214,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindLatestDocument() {
-        val latest = store.latestDocument()
-        preparedDocumentId = latest?.documentId
-        updateActiveDocument(latest)
+        selectDocument(store.latestDocument(), false)
     }
 
     private fun updateActiveDocument(record: LocalDocumentRecord?) {
@@ -160,6 +222,70 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.active_document_none)
         } else {
             getString(R.string.active_document_loaded, record.displayName, record.uploadStatus)
+        }
+    }
+
+    private fun selectDocument(record: LocalDocumentRecord?, announce: Boolean) {
+        preparedDocumentId = record?.documentId
+        updateActiveDocument(record)
+        loadDocumentIntoInputs(record)
+        refreshDocumentList(record?.documentId)
+        if (announce && record != null) {
+            binding.statusText.text = getString(R.string.document_selected, record.displayName, record.uploadStatus)
+        }
+    }
+
+    private fun loadDocumentIntoInputs(record: LocalDocumentRecord?) {
+        if (record == null) {
+            clearDocumentInputs()
+            return
+        }
+
+        binding.fileNameInput.setText(record.displayName)
+        binding.mimeTypeInput.setText(record.mimeType)
+        val content = runCatching { store.contentFile(record.documentId).readBytes().toString(Charsets.UTF_8) }
+            .getOrElse { "" }
+        binding.contentInput.setText(content)
+    }
+
+    private fun clearDocumentInputs() {
+        binding.fileNameInput.setText("")
+        binding.mimeTypeInput.setText("")
+        binding.contentInput.setText("")
+    }
+
+    private fun refreshDocumentList(selectedDocumentId: String?) {
+        val records = store.listDocuments().sortedByDescending { it.updatedAt }
+        binding.documentListContainer.removeAllViews()
+        if (records.isEmpty()) {
+            val emptyView = TextView(this).apply {
+                text = getString(R.string.document_list_empty)
+            }
+            binding.documentListContainer.addView(emptyView)
+            return
+        }
+
+        records.forEach { record ->
+            val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).also { params ->
+                    params.bottomMargin = (8 * resources.displayMetrics.density).toInt()
+                }
+                isAllCaps = false
+                text = buildString {
+                    if (record.documentId == selectedDocumentId) {
+                        append("* ")
+                    }
+                    append(record.displayName)
+                    append(" [")
+                    append(record.uploadStatus)
+                    append("]")
+                }
+                setOnClickListener { selectDocument(record, true) }
+            }
+            binding.documentListContainer.addView(button)
         }
     }
 }

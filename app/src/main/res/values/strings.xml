@@ -8,6 +8,20 @@
     <string name="identity_error">Import failed: %s</string>
     <string name="active_document_none">No prepared document loaded yet.</string>
     <string name="active_document_loaded">Active document: %1$s (%2$s)</string>
+    <string name="local_documents_label">Local Garland documents</string>
+    <string name="refresh_documents_button">Refresh</string>
+    <string name="retry_upload_button">Retry upload</string>
+    <string name="delete_document_button">Delete</string>
+    <string name="restore_document_button">Restore from remote</string>
+    <string name="document_list_empty">No local Garland documents yet.</string>
+    <string name="document_selected">Selected %1$s (%2$s)</string>
+    <string name="document_deleted">Deleted %s</string>
+    <string name="document_delete_requires_selection">Select a document first.</string>
+    <string name="restore_requires_identity">Load the document identity before restore.</string>
+    <string name="restore_running">Restoring %s from Garland servers</string>
+    <string name="restore_result">Restored %1$d bytes
+%2$s</string>
+    <string name="restore_error">Restore failed: %s</string>
     <string name="relay_defaults_label">Default relays</string>
     <string name="blossom_defaults_label">Default Blossom servers</string>
     <string name="manual_upload_label">Manual Garland upload prep</string>
@@ -20,4 +34,5 @@
     <string name="upload_running">Uploading shares for %s</string>
     <string name="upload_result">Uploaded %1$d/%2$d shares\n%3$s</string>
     <string name="upload_execution_error">Upload failed: %s</string>
+    <string name="upload_retry_running">Retrying upload for %s</string>
 </resources>
