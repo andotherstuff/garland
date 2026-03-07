@@ -255,6 +255,8 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.active_document_details_none)
         } else {
             val summary = GarlandPlanInspector.summarize(store.readUploadPlan(record.documentId))
+            val localBytes = runCatching { store.contentFile(record.documentId).takeIf { it.exists() }?.length() ?: 0L }
+                .getOrDefault(0L)
             val detailText = if (summary == null) {
                 getString(R.string.active_document_details_none)
             } else {
@@ -268,10 +270,20 @@ class MainActivity : AppCompatActivity() {
                     summary.sha256Hex.take(12),
                 )
             }
+            val storageText = getString(
+                R.string.active_document_storage,
+                localBytes,
+                if (summary == null) "missing" else "ready",
+            )
+            val serverText = summary?.servers
+                ?.takeIf { it.isNotEmpty() }
+                ?.joinToString(", ") { it.removePrefix("https://").removePrefix("wss://") }
+                ?.let { getString(R.string.active_document_servers, it) }
+                .orEmpty()
             val diagnosticText = record.lastSyncMessage?.takeIf { it.isNotBlank() }
                 ?.let { getString(R.string.active_document_diagnostic, it) }
                 .orEmpty()
-            listOf(detailText, diagnosticText)
+            listOf(detailText, storageText, serverText, diagnosticText)
                 .filter { it.isNotBlank() }
                 .joinToString("\n")
         }

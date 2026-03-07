@@ -23,6 +23,7 @@ class GarlandUploadExecutorTest {
             MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                    webSocket.close(1000, null)
                 }
             })
         )
@@ -65,6 +66,7 @@ class GarlandUploadExecutorTest {
         assertEquals(3, result.uploadedShares)
         assertEquals("relay-published", store.readRecord(document.documentId)?.uploadStatus)
 
+        client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
         server.shutdown()
@@ -82,6 +84,7 @@ class GarlandUploadExecutorTest {
             MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                    webSocket.close(1000, null)
                 }
             })
         )
@@ -125,6 +128,7 @@ class GarlandUploadExecutorTest {
         assertEquals("relay-published-partial", store.readRecord(document.documentId)?.uploadStatus)
         assertTrue(store.readRecord(document.documentId)?.lastSyncMessage?.contains("failed:") == true)
 
+        client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
         server.shutdown()

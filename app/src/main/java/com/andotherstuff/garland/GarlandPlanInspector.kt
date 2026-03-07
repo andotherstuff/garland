@@ -10,6 +10,7 @@ data class GarlandPlanSummary(
     val blockCount: Int,
     val serverCount: Int,
     val sha256Hex: String,
+    val servers: List<String>,
 )
 
 object GarlandPlanInspector {
@@ -26,6 +27,7 @@ object GarlandPlanInspector {
             blockCount = manifest.blocks.size,
             serverCount = manifest.blocks.firstOrNull()?.servers?.size ?: 0,
             sha256Hex = manifest.sha256Hex,
+            servers = manifest.blocks.flatMap { it.servers }.distinct(),
         )
     }
 }

@@ -13,6 +13,8 @@
 %2$s • %3$d bytes • %4$d block(s) • %5$d server(s)
 sha256 %6$s</string>
     <string name="active_document_diagnostic">Last result: %s</string>
+    <string name="active_document_storage">Local bytes: %1$d • plan: %2$s</string>
+    <string name="active_document_servers">Servers: %s</string>
     <string name="local_documents_label">Local Garland documents</string>
     <string name="refresh_documents_button">Refresh</string>
     <string name="sync_documents_button">Sync pending</string>
