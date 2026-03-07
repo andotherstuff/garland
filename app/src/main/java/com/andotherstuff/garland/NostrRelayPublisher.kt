@@ -15,7 +15,14 @@ data class RelayPublishResult(
     val attemptedRelays: Int,
     val successfulRelays: Int,
     val failedRelays: List<String>,
+    val relayOutcomes: List<RelayEndpointOutcome>,
     val message: String,
+)
+
+data class RelayEndpointOutcome(
+    val relayUrl: String,
+    val accepted: Boolean,
+    val reason: String?,
 )
 
 private data class RelayAttemptResult(
@@ -32,13 +39,15 @@ class NostrRelayPublisher(
     fun publish(relayUrls: List<String>, event: SignedRelayEvent): RelayPublishResult {
         val normalizedRelays = relayUrls.map { it.trim() }.filter { it.isNotEmpty() }
         if (normalizedRelays.isEmpty()) {
-            return RelayPublishResult(0, 0, emptyList(), "No relays configured")
+            return RelayPublishResult(0, 0, emptyList(), emptyList(), "No relays configured")
         }
 
         var successfulRelays = 0
         val failures = mutableListOf<String>()
+        val outcomes = mutableListOf<RelayEndpointOutcome>()
         normalizedRelays.forEach { relayUrl ->
             val result = publishToRelay(relayUrl, event)
+            outcomes += RelayEndpointOutcome(relayUrl, result.accepted, result.reason)
             if (result.accepted) {
                 successfulRelays += 1
             } else {
@@ -52,7 +61,7 @@ class NostrRelayPublisher(
             "Published to $successfulRelays/${normalizedRelays.size} relays; failed: ${failures.joinToString()}"
         }
 
-        return RelayPublishResult(normalizedRelays.size, successfulRelays, failures, message)
+        return RelayPublishResult(normalizedRelays.size, successfulRelays, failures, outcomes, message)
     }
 
     private fun publishToRelay(relayUrl: String, event: SignedRelayEvent): RelayAttemptResult {

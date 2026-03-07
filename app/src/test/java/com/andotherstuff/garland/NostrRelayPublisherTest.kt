@@ -9,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 class NostrRelayPublisherTest {
     @Test
@@ -32,9 +33,7 @@ class NostrRelayPublisherTest {
         val result = publisher.publish(listOf(relayUrl), sampleEvent())
 
         assertEquals(1, result.successfulRelays)
-        client.dispatcher.executorService.shutdown()
-        client.connectionPool.evictAll()
-        server.shutdown()
+        closeTestResources(client, server)
     }
 
     @Test
@@ -57,9 +56,15 @@ class NostrRelayPublisherTest {
 
         assertEquals(0, result.successfulRelays)
         assertFalse(result.message.isBlank())
+        closeTestResources(client, server)
+    }
+
+    private fun closeTestResources(client: OkHttpClient, server: MockWebServer) {
+        client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
+        client.dispatcher.executorService.awaitTermination(1, TimeUnit.SECONDS)
         client.connectionPool.evictAll()
-        server.shutdown()
+        runCatching { server.shutdown() }
     }
 
     private fun sampleEvent(): SignedRelayEvent {

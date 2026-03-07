@@ -65,6 +65,10 @@ class GarlandUploadExecutorTest {
         assertTrue(result.success)
         assertEquals(3, result.uploadedShares)
         assertEquals("relay-published", store.readRecord(document.documentId)?.uploadStatus)
+        val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+        assertEquals(3, diagnostics?.uploads?.size)
+        assertEquals(1, diagnostics?.relays?.size)
+        assertEquals("ok", diagnostics?.relays?.first()?.status)
 
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
@@ -127,6 +131,9 @@ class GarlandUploadExecutorTest {
         assertTrue(result.message.contains("failed:"))
         assertEquals("relay-published-partial", store.readRecord(document.documentId)?.uploadStatus)
         assertTrue(store.readRecord(document.documentId)?.lastSyncMessage?.contains("failed:") == true)
+        val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+        assertEquals(2, diagnostics?.relays?.size)
+        assertTrue(diagnostics?.relays?.any { it.status == "failed" } == true)
 
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
@@ -191,6 +198,7 @@ class GarlandUploadExecutorTest {
         assertTrue(result.success)
         assertEquals(6, result.uploadedShares)
         assertEquals("relay-published", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals(6, DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)?.uploads?.size)
 
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()

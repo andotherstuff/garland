@@ -12,6 +12,10 @@
     <string name="active_document_details">Doc %1$s
 %2$s • %3$d bytes • %4$d block(s) • %5$d server(s)
 sha256 %6$s</string>
+    <string name="active_document_diagnostics_label">Diagnostics</string>
+    <string name="active_document_diagnostics_none">Select a document to inspect diagnostics.</string>
+    <string name="active_document_uploads_label">Uploads</string>
+    <string name="active_document_relays_label">Relays</string>
     <string name="active_document_diagnostic">Last result: %s</string>
     <string name="active_document_storage">Local bytes: %1$d • plan: %2$s</string>
     <string name="active_document_servers">Servers: %s</string>
@@ -26,11 +30,13 @@ sha256 %6$s</string>
     <string name="document_deleted">Deleted %s</string>
     <string name="document_delete_requires_selection">Select a document first.</string>
     <string name="sync_documents_running">Syncing pending Garland documents</string>
+    <string name="sync_documents_queued">Queued pending Garland sync in background.</string>
     <string name="sync_documents_result">Synced %1$d/%2$d documents
 %3$s</string>
     <string name="sync_documents_error">Sync failed: %s</string>
     <string name="restore_requires_identity">Load the document identity before restore.</string>
     <string name="restore_running">Restoring %s from Garland servers</string>
+    <string name="restore_queued">Queued restore for %s in background.</string>
     <string name="restore_result">Restored %1$d bytes
 %2$s</string>
     <string name="restore_error">Restore failed: %s</string>
@@ -44,6 +50,7 @@ sha256 %6$s</string>
     <string name="upload_prepare_error">Upload prep failed: %s</string>
     <string name="upload_requires_prepared_document">Prepare a document before uploading shares.</string>
     <string name="upload_running">Uploading shares for %s</string>
+    <string name="upload_queued">Queued Garland upload for %s in background.</string>
     <string name="upload_result">Uploaded %1$d/%2$d shares\n%3$s</string>
     <string name="upload_execution_error">Upload failed: %s</string>
     <string name="upload_retry_running">Retrying upload for %s</string>

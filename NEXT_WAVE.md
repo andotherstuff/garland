@@ -51,6 +51,6 @@ This file tracks the next integration wave after the current Garland MVP.
 - [x] Add Rust tests for multi-block write/recover
 - [x] Expose multi-block JNI APIs
 - [x] Update Android executors for block iteration
-- [ ] Add WorkManager-based pending sync
+- [x] Add WorkManager-based pending sync
 - [ ] Add instrumentation tests for the provider flow
 - [ ] Add per-document diagnostics UI

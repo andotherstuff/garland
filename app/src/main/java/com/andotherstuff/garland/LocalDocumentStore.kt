@@ -13,6 +13,7 @@ data class LocalDocumentRecord(
     val updatedAt: Long,
     val uploadStatus: String,
     val lastSyncMessage: String? = null,
+    val lastSyncDetailsJson: String? = null,
 )
 
 class LocalDocumentStore(private val context: Context) {
@@ -46,6 +47,13 @@ class LocalDocumentStore(private val context: Context) {
     fun listDocumentIdsWithUploadPlans(): List<String> = impl.listDocumentIdsWithUploadPlans()
 
     fun updateUploadStatus(documentId: String, status: String, message: String? = null) = impl.updateUploadStatus(documentId, status, message)
+
+    fun updateUploadDiagnostics(
+        documentId: String,
+        status: String,
+        message: String? = null,
+        diagnosticsJson: String? = null,
+    ) = impl.updateUploadDiagnostics(documentId, status, message, diagnosticsJson)
 
     fun deleteDocument(documentId: String) = impl.deleteDocument(documentId)
 }
@@ -128,6 +136,7 @@ class LocalDocumentStoreImpl(private val baseDir: File) {
                 updatedAt = System.currentTimeMillis(),
                 uploadStatus = "local-ready",
                 lastSyncMessage = null,
+                lastSyncDetailsJson = null,
             )
         )
     }
@@ -149,12 +158,22 @@ class LocalDocumentStoreImpl(private val baseDir: File) {
     }
 
     fun updateUploadStatus(documentId: String, status: String, message: String? = null) {
+        updateUploadDiagnostics(documentId, status, message, null)
+    }
+
+    fun updateUploadDiagnostics(
+        documentId: String,
+        status: String,
+        message: String? = null,
+        diagnosticsJson: String? = null,
+    ) {
         val current = readRecord(documentId) ?: return
         writeRecord(
             current.copy(
                 uploadStatus = status,
                 updatedAt = System.currentTimeMillis(),
                 lastSyncMessage = message,
+                lastSyncDetailsJson = diagnosticsJson,
             )
         )
     }

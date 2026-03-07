@@ -35,11 +35,12 @@ open class GarlandUploadExecutor(
         val response = gson.fromJson(raw, WritePlanEnvelope::class.java)
         if (!response.ok || response.plan == null) {
             val message = response.error ?: "Invalid upload plan"
-            store.updateUploadStatus(documentId, "upload-plan-failed", message)
+            store.updateUploadDiagnostics(documentId, "upload-plan-failed", message)
             return UploadExecutionResult(false, 0, 0, false, message)
         }
 
         val uploads = response.plan.uploads
+        val uploadDiagnostics = mutableListOf<DocumentEndpointDiagnostic>()
         var uploadedShares = 0
         uploads.forEach { upload ->
             val body = Base64.getDecoder().decode(upload.bodyBase64)
@@ -54,7 +55,13 @@ open class GarlandUploadExecutor(
             client.newCall(request).execute().use { responseBody ->
                 if (!responseBody.isSuccessful) {
                     val message = "Upload failed on ${upload.serverUrl} with HTTP ${responseBody.code}"
-                    store.updateUploadStatus(documentId, "upload-http-${responseBody.code}", message)
+                    uploadDiagnostics += DocumentEndpointDiagnostic(upload.serverUrl, "http-${responseBody.code}", message)
+                    store.updateUploadDiagnostics(
+                        documentId,
+                        "upload-http-${responseBody.code}",
+                        message,
+                        DocumentSyncDiagnosticsCodec.encode(DocumentSyncDiagnostics(uploads = uploadDiagnostics)),
+                    )
                     return UploadExecutionResult(
                         success = false,
                         attemptedShares = uploads.size,
@@ -64,6 +71,7 @@ open class GarlandUploadExecutor(
                     )
                 }
             }
+            uploadDiagnostics += DocumentEndpointDiagnostic(upload.serverUrl, "ok", "Uploaded share ${upload.shareIdHex}")
             uploadedShares += 1
         }
 
@@ -75,12 +83,30 @@ open class GarlandUploadExecutor(
                 relayPublished = false,
                 message = "Upload plan is missing commit event",
             ).also {
-                store.updateUploadStatus(documentId, "relay-publish-failed", "Upload plan is missing commit event")
+                store.updateUploadDiagnostics(
+                    documentId,
+                    "relay-publish-failed",
+                    "Upload plan is missing commit event",
+                    DocumentSyncDiagnosticsCodec.encode(DocumentSyncDiagnostics(uploads = uploadDiagnostics)),
+                )
             }
 
         val relayResult = relayPublisher.publish(relayUrls, commitEvent)
+        val relayDiagnostics = relayResult.relayOutcomes.map { outcome ->
+            DocumentEndpointDiagnostic(
+                target = outcome.relayUrl,
+                status = if (outcome.accepted) "ok" else "failed",
+                detail = outcome.reason ?: if (outcome.accepted) "Relay accepted commit event" else "Relay rejected commit event",
+            )
+        }
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = uploadDiagnostics,
+                relays = relayDiagnostics,
+            )
+        )
         if (relayResult.successfulRelays == 0) {
-            store.updateUploadStatus(documentId, "relay-publish-failed", relayResult.message)
+            store.updateUploadDiagnostics(documentId, "relay-publish-failed", relayResult.message, diagnosticsJson)
             return UploadExecutionResult(
                 success = false,
                 attemptedShares = uploads.size,
@@ -95,7 +121,7 @@ open class GarlandUploadExecutor(
         } else {
             "relay-published-partial"
         }
-        store.updateUploadStatus(documentId, relayStatus, relayResult.message)
+        store.updateUploadDiagnostics(documentId, relayStatus, relayResult.message, diagnosticsJson)
         return UploadExecutionResult(
             success = true,
             attemptedShares = uploads.size,

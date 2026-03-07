@@ -61,6 +61,61 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/active_document_diagnostics_label"
+        android:textColor="@color/garland_ink"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/activeDocumentDiagnosticsText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/active_document_diagnostics_none"
+        android:textColor="@color/garland_muted"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/activeDocumentUploadsLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/active_document_uploads_label"
+        android:textColor="@color/garland_ink"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/activeDocumentUploadsText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="@color/garland_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/activeDocumentRelaysLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/active_document_relays_label"
+        android:textColor="@color/garland_ink"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/activeDocumentRelaysText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="@color/garland_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:text="@string/local_documents_label"
         android:textColor="@color/garland_ink"

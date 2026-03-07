@@ -1,6 +1,7 @@
 package com.andotherstuff.garland
 
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -8,15 +9,11 @@ import androidx.appcompat.app.AppCompatActivity
 import com.andotherstuff.garland.databinding.ActivityMainBinding
 import com.google.android.material.button.MaterialButton
 import org.json.JSONObject
-import kotlin.concurrent.thread
-
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var session: GarlandSessionStore
     private lateinit var store: LocalDocumentStore
-    private lateinit var uploadExecutor: GarlandUploadExecutor
-    private lateinit var downloadExecutor: GarlandDownloadExecutor
-    private lateinit var syncExecutor: GarlandSyncExecutor
+    private lateinit var workScheduler: GarlandWorkScheduler
     private var privateKeyHex: String? = null
     private var preparedDocumentId: String? = null
 
@@ -26,9 +23,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         session = GarlandSessionStore(applicationContext)
         store = LocalDocumentStore(applicationContext)
-        uploadExecutor = GarlandUploadExecutor(applicationContext)
-        downloadExecutor = GarlandDownloadExecutor(applicationContext)
-        syncExecutor = GarlandSyncExecutor(applicationContext)
+        workScheduler = GarlandWorkScheduler(applicationContext)
 
         bindDefaults()
         binding.statusText.text = getString(R.string.app_boot_status)
@@ -109,29 +104,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.syncDocumentsButton.setOnClickListener {
-            binding.statusText.text = getString(R.string.sync_documents_running)
             val relays = currentRelays()
             session.saveRelays(relays)
-            thread {
-                val result = runCatching { syncExecutor.syncPendingDocuments(relays) }
-                runOnUiThread {
-                    binding.statusText.text = result.fold(
-                        onSuccess = {
-                            selectDocument(store.readRecord(preparedDocumentId.orEmpty()) ?: store.latestDocument(), false)
-                            getString(
-                                R.string.sync_documents_result,
-                                it.successfulDocuments,
-                                it.attemptedDocuments,
-                                it.message,
-                            )
-                        },
-                        onFailure = {
-                            refreshDocumentList(preparedDocumentId)
-                            getString(R.string.sync_documents_error, it.message ?: "unknown error")
-                        }
-                    )
-                }
-            }
+            workScheduler.enqueuePendingSync(relays)
+            refreshDocumentList(preparedDocumentId)
+            binding.statusText.text = getString(R.string.sync_documents_queued)
         }
 
         binding.retryUploadButton.setOnClickListener {
@@ -169,49 +146,24 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            binding.statusText.text = getString(R.string.restore_running, documentId)
-            thread {
-                val result = runCatching { downloadExecutor.restoreDocument(documentId, privateKey) }
-                runOnUiThread {
-                    binding.statusText.text = result.fold(
-                        onSuccess = {
-                            selectDocument(store.readRecord(documentId), false)
-                            getString(R.string.restore_result, it.restoredBytes, it.message)
-                        },
-                        onFailure = {
-                            selectDocument(store.readRecord(documentId), false)
-                            getString(R.string.restore_error, it.message ?: "unknown error")
-                        }
-                    )
-                }
-            }
+            workScheduler.enqueueRestore(documentId)
+            selectDocument(store.readRecord(documentId), false)
+            binding.statusText.text = getString(R.string.restore_queued, documentId)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        selectDocument(preparedDocumentId?.let { store.readRecord(it) } ?: store.latestDocument(), false)
     }
 
     private fun executeUpload(documentId: String, runningText: String) {
         binding.statusText.text = runningText
         val relays = currentRelays()
         session.saveRelays(relays)
-        thread {
-            val result = runCatching { uploadExecutor.executeDocumentUpload(documentId, relays) }
-            runOnUiThread {
-                binding.statusText.text = result.fold(
-                    onSuccess = {
-                        selectDocument(store.readRecord(documentId), false)
-                        getString(
-                            R.string.upload_result,
-                            it.uploadedShares,
-                            it.attemptedShares,
-                            it.message
-                        )
-                    },
-                    onFailure = {
-                        selectDocument(store.readRecord(documentId), false)
-                        getString(R.string.upload_execution_error, it.message ?: "unknown error")
-                    }
-                )
-            }
-        }
+        workScheduler.enqueuePendingSync(relays, documentId)
+        selectDocument(store.readRecord(documentId), false)
+        binding.statusText.text = getString(R.string.upload_queued, documentId)
     }
 
     private fun currentBlossomServers(): List<String> {
@@ -246,15 +198,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActiveDocument(record: LocalDocumentRecord?) {
+        val summary = record?.let { GarlandPlanInspector.summarize(store.readUploadPlan(it.documentId)) }
+        val diagnostics = DocumentDiagnosticsFormatter.detailSections(record, summary)
         binding.activeDocumentText.text = if (record == null) {
             getString(R.string.active_document_none)
         } else {
             getString(R.string.active_document_loaded, record.displayName, record.uploadStatus)
         }
+        binding.activeDocumentDiagnosticsText.text = diagnostics.overview
+        bindDiagnosticSection(binding.activeDocumentUploadsLabel, binding.activeDocumentUploadsText, diagnostics.uploadsLabel, diagnostics.uploads)
+        bindDiagnosticSection(binding.activeDocumentRelaysLabel, binding.activeDocumentRelaysText, diagnostics.relaysLabel, diagnostics.relays)
         binding.activeDocumentDetailText.text = if (record == null) {
             getString(R.string.active_document_details_none)
         } else {
-            val summary = GarlandPlanInspector.summarize(store.readUploadPlan(record.documentId))
             val localBytes = runCatching { store.contentFile(record.documentId).takeIf { it.exists() }?.length() ?: 0L }
                 .getOrDefault(0L)
             val detailText = if (summary == null) {
@@ -318,6 +274,16 @@ class MainActivity : AppCompatActivity() {
         binding.contentInput.setText("")
     }
 
+    private fun bindDiagnosticSection(labelView: TextView, textView: TextView, label: String?, content: String?) {
+        val visible = !content.isNullOrBlank()
+        labelView.visibility = if (visible) View.VISIBLE else View.GONE
+        textView.visibility = if (visible) View.VISIBLE else View.GONE
+        if (visible) {
+            labelView.text = label
+            textView.text = content
+        }
+    }
+
     private fun refreshDocumentList(selectedDocumentId: String?) {
         val records = store.listDocuments().sortedByDescending { it.updatedAt }
         binding.documentListContainer.removeAllViews()
@@ -338,15 +304,12 @@ class MainActivity : AppCompatActivity() {
                     params.bottomMargin = (8 * resources.displayMetrics.density).toInt()
                 }
                 isAllCaps = false
-                text = buildString {
-                    if (record.documentId == selectedDocumentId) {
-                        append("* ")
-                    }
-                    append(record.displayName)
-                    append(" [")
-                    append(record.uploadStatus)
-                    append("]")
-                }
+                textAlignment = android.view.View.TEXT_ALIGNMENT_VIEW_START
+                text = DocumentDiagnosticsFormatter.listLabel(
+                    record = record,
+                    summary = GarlandPlanInspector.summarize(store.readUploadPlan(record.documentId)),
+                    isSelected = record.documentId == selectedDocumentId,
+                )
                 setOnClickListener { selectDocument(record, true) }
             }
             binding.documentListContainer.addView(button)

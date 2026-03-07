@@ -12,8 +12,8 @@ import android.provider.DocumentsProvider
 class GarlandDocumentsProvider : DocumentsProvider() {
     private val store by lazy { LocalDocumentStore(context!!.applicationContext) }
     private val session by lazy { GarlandSessionStore(context!!.applicationContext) }
-    private val uploadExecutor by lazy { GarlandUploadExecutor(context!!.applicationContext) }
     private val downloadExecutor by lazy { GarlandDownloadExecutor(context!!.applicationContext) }
+    private val workScheduler by lazy { GarlandWorkScheduler(context!!.applicationContext) }
 
     override fun onCreate(): Boolean = true
 
@@ -187,7 +187,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         store.updateUploadStatus(documentId, status, message)
         if (status != "upload-plan-ready") return
 
-        uploadExecutor.executeDocumentUpload(documentId, session.loadRelays())
+        workScheduler.enqueuePendingSync(session.loadRelays(), documentId)
     }
 
     private fun restoreDocumentIfNeeded(documentId: String) {

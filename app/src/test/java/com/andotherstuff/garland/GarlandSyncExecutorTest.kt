@@ -37,6 +37,27 @@ class GarlandSyncExecutorTest {
         assertEquals(0, result.attemptedDocuments)
         assertTrue(result.message.contains("No pending"))
     }
+
+    @Test
+    fun syncsQueuedDocumentWhenTargeted() {
+        val tempDir = Files.createTempDirectory("garland-sync-targeted-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val queued = store.createDocument("queued.txt", "text/plain")
+        store.updateUploadStatus(queued.documentId, "sync-queued")
+        val other = store.createDocument("other.txt", "text/plain")
+        store.updateUploadStatus(other.documentId, "upload-plan-ready")
+
+        val uploadExecutor = RecordingUploadExecutor(store)
+        val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
+
+        val result = syncExecutor.syncPendingDocuments(
+            relayUrls = listOf("wss://relay.example"),
+            documentIds = setOf(queued.documentId),
+        )
+
+        assertEquals(1, result.attemptedDocuments)
+        assertEquals(listOf(queued.documentId), uploadExecutor.uploadedIds)
+    }
 }
 
 private class RecordingUploadExecutor(store: LocalDocumentStoreImpl) : GarlandUploadExecutor(store) {

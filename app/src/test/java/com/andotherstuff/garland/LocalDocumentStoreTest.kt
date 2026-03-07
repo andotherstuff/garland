@@ -50,4 +50,20 @@ class LocalDocumentStoreTest {
         assertEquals("relay-publish-failed", store.readRecord(document.documentId)?.uploadStatus)
         assertEquals("relay timeout", store.readRecord(document.documentId)?.lastSyncMessage)
     }
+
+    @Test
+    fun persistsStructuredDiagnosticsWithStatusUpdates() {
+        val tempDir = Files.createTempDirectory("garland-store-diagnostics-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(DocumentEndpointDiagnostic("https://blossom.one", "ok", "Uploaded share a1")),
+            )
+        )
+
+        store.updateUploadDiagnostics(document.documentId, "relay-published", "Published to 1/1 relays", diagnosticsJson)
+
+        assertEquals(diagnosticsJson, store.readRecord(document.documentId)?.lastSyncDetailsJson)
+    }
 }
