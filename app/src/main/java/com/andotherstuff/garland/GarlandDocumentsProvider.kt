@@ -8,6 +8,7 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
+import android.net.Uri
 
 class GarlandDocumentsProvider : DocumentsProvider() {
     private val store by lazy { LocalDocumentStore(context!!.applicationContext) }
@@ -69,6 +70,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             ) {
                 store.updateFromContent(documentId)
                 buildUploadPlanAndUpload(documentId)
+                notifyDocumentChanged(documentId)
             }
         }
 
@@ -82,11 +84,13 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             displayName = displayName ?: "Untitled",
             mimeType = mimeType ?: "application/octet-stream"
         )
+        notifyDocumentChanged(record.documentId)
         return record.documentId
     }
 
     override fun deleteDocument(documentId: String) {
         store.deleteDocument(documentId)
+        notifyDocumentChanged(documentId)
     }
 
     override fun queryRecentDocuments(rootId: String?, projection: Array<out String>?): Cursor {
@@ -111,7 +115,8 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             .filter {
                 it.displayName.lowercase().contains(needle) ||
                     it.uploadStatus.lowercase().contains(needle) ||
-                    it.mimeType.lowercase().contains(needle)
+                    it.mimeType.lowercase().contains(needle) ||
+                    it.lastSyncMessage.orEmpty().lowercase().contains(needle)
             }
             .forEach { includeRecord(result, it) }
         return result
@@ -154,6 +159,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             .add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, record.documentId)
             .add(DocumentsContract.Document.COLUMN_MIME_TYPE, record.mimeType)
             .add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, "${record.displayName} [${record.uploadStatus}]")
+            .add(DocumentsContract.Document.COLUMN_SUMMARY, buildSummary(record))
             .add(
                 DocumentsContract.Document.COLUMN_FLAGS,
                 DocumentsContract.Document.FLAG_SUPPORTS_DELETE or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
@@ -199,6 +205,22 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         runCatching { downloadExecutor.restoreDocument(documentId, privateKeyHex) }
     }
 
+    private fun buildSummary(record: LocalDocumentRecord): String {
+        val status = record.lastSyncMessage?.takeIf { it.isNotBlank() } ?: record.uploadStatus
+        return "${record.mimeType} - $status"
+    }
+
+    private fun notifyDocumentChanged(documentId: String) {
+        val resolver = context?.contentResolver ?: return
+        val documentUri = DocumentsContract.buildDocumentUri(AUTHORITY, documentId)
+        val childrenUri = DocumentsContract.buildChildDocumentsUri(AUTHORITY, ROOT_DOCUMENT_ID)
+        val recentUri = DocumentsContract.buildRecentDocumentsUri(AUTHORITY, ROOT_ID)
+        val rootsUri = DocumentsContract.buildRootsUri(AUTHORITY)
+        listOf(documentUri, childrenUri, recentUri, rootsUri).forEach { uri ->
+            resolver.notifyChange(uri, null)
+        }
+    }
+
     private fun resolveRootProjection(projection: Array<out String>?): Array<String> {
         return projection?.map { it.toString() }?.toTypedArray()
             ?: arrayOf(
@@ -216,6 +238,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                 DocumentsContract.Document.COLUMN_MIME_TYPE,
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_SUMMARY,
                 DocumentsContract.Document.COLUMN_LAST_MODIFIED,
                 DocumentsContract.Document.COLUMN_FLAGS,
                 DocumentsContract.Document.COLUMN_SIZE,
@@ -224,6 +247,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
     }
 
     companion object {
+        private const val AUTHORITY = "com.andotherstuff.garland.documents"
         private const val ROOT_ID = "garland-root"
         private const val ROOT_DOCUMENT_ID = "root"
     }

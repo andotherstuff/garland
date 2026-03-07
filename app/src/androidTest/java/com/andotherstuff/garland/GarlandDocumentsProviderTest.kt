@@ -1,7 +1,10 @@
 package com.andotherstuff.garland
 
 import android.net.Uri
+import android.database.ContentObserver
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import android.provider.DocumentsContract
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -17,6 +20,8 @@ import java.io.Closeable
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.Base64
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 @RunWith(AndroidJUnit4::class)
@@ -248,6 +253,13 @@ class GarlandDocumentsProviderTest {
         val rootDocumentId = queryRootDocumentId()
         val alphaUri = createAndWriteDocument(rootDocumentId, "alpha-note.txt", "alpha body")
         createAndWriteDocument(rootDocumentId, "beta.txt", "beta body")
+        val alphaDocumentId = DocumentsContract.getDocumentId(alphaUri)
+
+        store.updateUploadDiagnostics(
+            documentId = alphaDocumentId,
+            status = "relay-published-partial",
+            message = "Relay timeout on wss://relay.alpha",
+        )
 
         val childNamesBeforeDelete = queryChildDisplayNames(rootDocumentId)
         assertTrue(childNamesBeforeDelete.any { it.startsWith("alpha-note.txt") })
@@ -258,13 +270,15 @@ class GarlandDocumentsProviderTest {
             assertTrue(cursor.count >= 2)
         }
 
-        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "alpha")
+        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "timeout")
         resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
             assertTrue(cursor.moveToFirst())
             val displayName = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
             val documentId = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID))
+            val summary = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SUMMARY))
             assertTrue(displayName.startsWith("alpha-note.txt"))
             assertEquals(1, cursor.count)
+            assertEquals("text/plain - Relay timeout on wss://relay.alpha", summary)
             val foundUri = documentUri(documentId)
             resolver.openInputStream(foundUri)!!.use { stream ->
                 assertEquals("alpha body", stream.readBytes().toString(Charsets.UTF_8))
@@ -272,20 +286,64 @@ class GarlandDocumentsProviderTest {
             resolver.query(foundUri, null, null, null, null)!!.use { documentCursor ->
                 assertTrue(documentCursor.moveToFirst())
                 assertEquals(
-                    "alpha-note.txt [waiting-for-identity]",
+                    "alpha-note.txt [relay-published-partial]",
                     documentCursor.getString(documentCursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+                )
+                assertEquals(
+                    "text/plain - Relay timeout on wss://relay.alpha",
+                    documentCursor.getString(documentCursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SUMMARY))
                 )
             }
         }
 
         DocumentsContract.deleteDocument(resolver, alphaUri)
-        val deletedId = DocumentsContract.getDocumentId(alphaUri)
-        assertEquals(null, store.readRecord(deletedId))
-        assertTrue(!store.contentFile(deletedId).exists())
+        assertEquals(null, store.readRecord(alphaDocumentId))
+        assertTrue(!store.contentFile(alphaDocumentId).exists())
 
         val childNamesAfterDelete = queryChildDisplayNames(rootDocumentId)
         assertTrue(childNamesAfterDelete.none { it.startsWith("alpha-note.txt") })
         assertTrue(childNamesAfterDelete.any { it.startsWith("beta.txt") })
+    }
+
+    @Test
+    fun createWriteAndDeleteNotifyProviderObservers() {
+        val rootDocumentId = queryRootDocumentId()
+        val childUri = DocumentsContract.buildChildDocumentsUri(AUTHORITY, rootDocumentId)
+        val recentUri = DocumentsContract.buildRecentDocumentsUri(AUTHORITY, ROOT_ID)
+        val childObserver = RecordingObserver()
+        val recentObserver = RecordingObserver()
+        resolver.registerContentObserver(childUri, false, childObserver)
+        resolver.registerContentObserver(recentUri, false, recentObserver)
+        try {
+            val documentUri = DocumentsContract.createDocument(
+                resolver,
+                documentUri(rootDocumentId),
+                "text/plain",
+                "observer-note.txt"
+            )!!
+            childObserver.awaitChange("child create")
+            recentObserver.awaitChange("recent create")
+
+            val documentObserver = RecordingObserver()
+            resolver.registerContentObserver(documentUri, false, documentObserver)
+            try {
+                resolver.openOutputStream(documentUri, "w")!!.use { stream ->
+                    stream.write("observer body".toByteArray())
+                }
+                documentObserver.awaitChange("document write")
+
+                childObserver.reset()
+                recentObserver.reset()
+                DocumentsContract.deleteDocument(resolver, documentUri)
+                childObserver.awaitChange("child delete")
+                recentObserver.awaitChange("recent delete")
+            } finally {
+                resolver.unregisterContentObserver(documentObserver)
+            }
+        } finally {
+            resolver.unregisterContentObserver(childObserver)
+            resolver.unregisterContentObserver(recentObserver)
+        }
     }
 
     private fun createAndWriteDocument(rootDocumentId: String, displayName: String, content: String): Uri {
@@ -344,6 +402,23 @@ class GarlandDocumentsProviderTest {
     companion object {
         private const val AUTHORITY = "com.andotherstuff.garland.documents"
         private const val ROOT_ID = "garland-root"
+    }
+}
+
+private class RecordingObserver : ContentObserver(Handler(Looper.getMainLooper())) {
+    @Volatile
+    private var latch = CountDownLatch(1)
+
+    override fun onChange(selfChange: Boolean) {
+        latch.countDown()
+    }
+
+    fun reset() {
+        latch = CountDownLatch(1)
+    }
+
+    fun awaitChange(label: String) {
+        assertTrue("Timed out waiting for $label notification", latch.await(2, TimeUnit.SECONDS))
     }
 }
 

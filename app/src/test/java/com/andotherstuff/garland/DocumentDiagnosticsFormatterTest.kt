@@ -229,6 +229,51 @@ class DocumentDiagnosticsFormatterTest {
     }
 
     @Test
+    fun buildsRelayFailureSectionFromLegacyResultMessage() {
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "relay-published-partial",
+            lastSyncMessage = "Published to 1/2 relays; failed: wss://relay.two (timeout)",
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+
+        assertEquals("Relays (1 failed)", sections.relaysLabel)
+        assertEquals("- relay.two (timeout)", sections.relays)
+    }
+
+    @Test
+    fun buildsUploadFailureSectionFromLegacyResultMessage() {
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "upload-http-500",
+            lastSyncMessage = "Upload failed on https://blossom.two with HTTP 500",
+        )
+        val summary = GarlandPlanSummary(
+            documentId = "doc123",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            blockCount = 1,
+            serverCount = 2,
+            sha256Hex = "abc123",
+            servers = listOf("https://blossom.one", "https://blossom.two"),
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary)
+
+        assertEquals("Uploads (1 failed)", sections.uploadsLabel)
+        assertEquals("- blossom.two with HTTP 500", sections.uploads)
+    }
+
+    @Test
     fun labelsFallbackUploadSectionAsPlannedServers() {
         val record = LocalDocumentRecord(
             documentId = "doc123",

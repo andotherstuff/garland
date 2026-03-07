@@ -74,16 +74,31 @@ object DocumentDiagnosticsFormatter {
             lines += endpointSummaryLine("Relays", it)
         }
         val uploadDiagnostics = diagnostics?.uploads?.takeIf { it.isNotEmpty() }
-        val uploads = uploadDiagnostics?.joinToString("\n", transform = ::formatEndpointDiagnostic)
-            ?: summary?.servers?.takeIf { it.isNotEmpty() }?.joinToString("\n", transform = ::normalizeServer)
+        val legacyUploadFailure = extractLegacyUploadFailure(record.lastSyncMessage)
+        val uploads = when {
+            !uploadDiagnostics.isNullOrEmpty() -> uploadDiagnostics.joinToString("\n", transform = ::formatEndpointDiagnostic)
+            legacyUploadFailure != null -> "- ${normalizeFailureEntry(legacyUploadFailure)}"
+            !summary?.servers.isNullOrEmpty() -> summary.servers.joinToString("\n", transform = ::normalizeServer)
+            else -> null
+        }
         val uploadsLabel = when {
             !uploadDiagnostics.isNullOrEmpty() -> endpointSectionLabel("Uploads", uploadDiagnostics)
+            legacyUploadFailure != null -> "Uploads (1 failed)"
             !summary?.servers.isNullOrEmpty() -> "Planned servers"
             else -> null
         }
         val relayDiagnostics = diagnostics?.relays?.takeIf { it.isNotEmpty() }
-        val relays = relayDiagnostics?.joinToString("\n", transform = ::formatEndpointDiagnostic)
-        val relaysLabel = if (relayDiagnostics.isNullOrEmpty()) null else endpointSectionLabel("Relays", relayDiagnostics)
+        val legacyRelayFailures = extractFailureEntries(record.lastSyncMessage)
+        val relays = when {
+            !relayDiagnostics.isNullOrEmpty() -> relayDiagnostics.joinToString("\n", transform = ::formatEndpointDiagnostic)
+            legacyRelayFailures.isNotEmpty() -> legacyRelayFailures.joinToString("\n") { "- ${normalizeFailureEntry(it)}" }
+            else -> null
+        }
+        val relaysLabel = when {
+            !relayDiagnostics.isNullOrEmpty() -> endpointSectionLabel("Relays", relayDiagnostics)
+            legacyRelayFailures.isNotEmpty() -> "Relays (${legacyRelayFailures.size} failed)"
+            else -> null
+        }
         return DetailSections(
             overview = lines.joinToString("\n"),
             uploadsLabel = uploadsLabel,
@@ -146,16 +161,36 @@ object DocumentDiagnosticsFormatter {
         val trimmed = message?.trim().orEmpty()
         if (trimmed.isEmpty()) return listOf("Last result: No sync result yet")
 
-        val parts = trimmed.split("; failed:", limit = 2)
+        val parts = splitFailureMessage(trimmed)
         val lines = mutableListOf("Last result: ${parts[0].trim()}")
         if (parts.size == 2) {
             lines += "Failures:"
-            lines += parts[1]
-                .split(',')
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .map { "- $it" }
+            lines += extractFailureEntries(trimmed).map { "- $it" }
         }
         return lines
+    }
+
+    private fun extractFailureEntries(message: String?): List<String> {
+        val trimmed = message?.trim().orEmpty()
+        val parts = splitFailureMessage(trimmed)
+        if (parts.size != 2) return emptyList()
+        return parts[1]
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    private fun splitFailureMessage(message: String): List<String> {
+        return message.split("; failed:", limit = 2)
+    }
+
+    private fun extractLegacyUploadFailure(message: String?): String? {
+        val trimmed = message?.trim().orEmpty()
+        if (!trimmed.startsWith("Upload failed on ")) return null
+        return trimmed.removePrefix("Upload failed on ")
+    }
+
+    private fun normalizeFailureEntry(entry: String): String {
+        return entry.removePrefix("https://").removePrefix("wss://")
     }
 }

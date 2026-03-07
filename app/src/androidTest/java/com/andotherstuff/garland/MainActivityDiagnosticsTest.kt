@@ -93,6 +93,50 @@ class MainActivityDiagnosticsTest {
     }
 
     @Test
+    fun showsLegacyRelayFailuresWhenStructuredDiagnosticsAreMissing() {
+        val document = store.upsertPreparedDocument(
+            documentId = "doc-legacy-failure",
+            displayName = "legacy-note.txt",
+            mimeType = "text/plain",
+            content = "hello world".toByteArray(),
+            uploadPlanJson = sampleUploadPlanJson(documentId = "doc-legacy-failure"),
+        )
+        store.updateUploadStatus(
+            document.documentId,
+            "relay-published-partial",
+            "Published to 1/2 relays; failed: wss://relay.two (timeout)",
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withId(R.id.activeDocumentText)).check(matches(withText(containsString("legacy-note.txt"))))
+            onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (1 failed)")))
+            onView(withId(R.id.activeDocumentRelaysText)).check(matches(withText(containsString("relay.two (timeout)"))))
+        }
+    }
+
+    @Test
+    fun showsLegacyUploadFailuresWhenStructuredDiagnosticsAreMissing() {
+        val document = store.upsertPreparedDocument(
+            documentId = "doc-legacy-upload-failure",
+            displayName = "legacy-upload-note.txt",
+            mimeType = "text/plain",
+            content = "hello world".toByteArray(),
+            uploadPlanJson = sampleUploadPlanJson(documentId = "doc-legacy-upload-failure"),
+        )
+        store.updateUploadStatus(
+            document.documentId,
+            "upload-http-500",
+            "Upload failed on https://blossom.two with HTTP 500",
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withId(R.id.activeDocumentText)).check(matches(withText(containsString("legacy-upload-note.txt"))))
+            onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Uploads (1 failed)")))
+            onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("blossom.two with HTTP 500"))))
+        }
+    }
+
+    @Test
     fun showsPlannedServersLabelBeforeUploadDiagnosticsExist() {
         store.upsertPreparedDocument(
             documentId = "doc-planned",
