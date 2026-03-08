@@ -72,14 +72,14 @@ If the branch or path already exists, pick a new unique `<agent-name>` instead o
 
 ## Workstreams
 
-### 1. Release captain
+### 1. Release captain (`release-captain-prep-20260308`)
 
 Goal: own the final release path and keep the checklist honest.
 
-- [-] Create a fresh worktree from `origin/main`.
-- [-] Confirm `git -C "$WORKTREE" rev-parse HEAD` matches `git -C "$WORKTREE" rev-parse origin/main` before final release.
-- [ ] Confirm `docs/ALPHA_RELEASE_CHECKLIST.md`, `docs/CURRENT_STATUS.md`, `README.md`, `NEXT_WAVE.md`, and `docs/RELEASE_NOTES_v0.0.2-alpha.md` still match the actual release state.
-- [ ] Confirm the deferred device-validation risk is documented before publishing.
+- [x] Create a fresh worktree from `origin/main`.
+- [x] Confirm `git -C "$WORKTREE" rev-parse HEAD` matches `git -C "$WORKTREE" rev-parse origin/main` before final release.
+- [x] Confirm `docs/ALPHA_RELEASE_CHECKLIST.md`, `docs/CURRENT_STATUS.md`, `README.md`, `NEXT_WAVE.md`, and `docs/RELEASE_NOTES_v0.0.2-alpha.md` still match the actual release state.
+- [x] Confirm the deferred device-validation risk is documented before publishing.
 - [ ] Run `automation/release_alpha.sh v0.0.2-alpha` from the clean release worktree once the no-device release gates are closed.
 - [ ] Capture the final APK path, SHA-256 file path, and GitHub prerelease URL.
 
