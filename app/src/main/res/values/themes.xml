@@ -1,9 +1,17 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.Garland" parent="Theme.Material3.Light.NoActionBar">
-        <item name="android:statusBarColor">@android:color/white</item>
-        <item name="colorPrimary">@color/garland_leaf</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="android:navigationBarColor">@android:color/white</item>
+    <style name="Theme.Garland" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:statusBarColor">@color/garland_bg</item>
+        <item name="android:navigationBarColor">@color/garland_bg</item>
         <item name="android:windowBackground">@color/garland_bg</item>
+        <item name="colorPrimary">@color/garland_leaf</item>
+        <item name="colorOnPrimary">@color/garland_bg</item>
+        <item name="colorSecondary">@color/garland_gold</item>
+        <item name="colorOnSecondary">@color/garland_bg</item>
+        <item name="colorSurface">@color/garland_surface</item>
+        <item name="colorOnSurface">@color/garland_ink</item>
+        <item name="colorSurfaceVariant">@color/garland_surface_alt</item>
+        <item name="colorOnSurfaceVariant">@color/garland_muted</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
 </resources>

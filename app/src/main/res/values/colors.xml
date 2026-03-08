@@ -1,6 +1,12 @@
 <resources>
-    <color name="garland_bg">#F7F4EE</color>
-    <color name="garland_ink">#122620</color>
-    <color name="garland_leaf">#2E6B4B</color>
-    <color name="garland_muted">#5D6B66</color>
+    <color name="garland_bg">#09110F</color>
+    <color name="garland_surface">#101B18</color>
+    <color name="garland_surface_alt">#162522</color>
+    <color name="garland_ink">#E6F2ED</color>
+    <color name="garland_muted">#A1B8AF</color>
+    <color name="garland_leaf">#62C08B</color>
+    <color name="garland_gold">#D6B36D</color>
+    <color name="garland_outline">#28433D</color>
+    <color name="garland_warning">#FFB86B</color>
+    <color name="garland_error">#FF8A80</color>
 </resources>
