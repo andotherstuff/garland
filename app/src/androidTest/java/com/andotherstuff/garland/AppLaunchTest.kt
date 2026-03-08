@@ -16,7 +16,7 @@ class AppLaunchTest {
     val activityRule = ActivityScenarioRule(MainActivity::class.java)
 
     @Test
-    fun showsStatusText() {
-        onView(withId(R.id.statusText)).check(matches(isDisplayed()))
+    fun showsDocumentList() {
+        onView(withId(R.id.documentListContainer)).check(matches(isDisplayed()))
     }
 }
