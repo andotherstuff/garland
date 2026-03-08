@@ -12,8 +12,6 @@ use crate::packaging::CONTENT_CAPACITY;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrepareWriteRequest {
     pub private_key_hex: String,
-    pub display_name: String,
-    pub mime_type: String,
     pub created_at: u64,
     pub content_b64: String,
     pub servers: Vec<String>,
@@ -39,8 +37,6 @@ pub struct ManifestBlock {
 pub struct WriteManifest {
     pub version: u32,
     pub document_id: String,
-    pub display_name: String,
-    pub mime_type: String,
     pub size_bytes: usize,
     pub sha256_hex: String,
     pub created_at: u64,
@@ -94,15 +90,7 @@ pub fn prepare_single_block_write(
         .map_err(|_| WritePlanError::InvalidContentBase64)?;
 
     let private_key_bytes = decode_private_key(&request.private_key_hex)?;
-    let document_id = hex::encode(Sha256::digest(
-        format!(
-            "{}\n{}\n{}",
-            request.display_name,
-            request.created_at,
-            hex::encode(Sha256::digest(&content))
-        )
-        .as_bytes(),
-    ));
+    let document_id = random_document_id_hex();
     let file_key = derive_file_key(&private_key_bytes, &document_id)?;
     let nonce = random_nonce();
     let servers: Vec<BlossomServer> = request
@@ -151,8 +139,6 @@ pub fn prepare_single_block_write(
     let manifest = WriteManifest {
         version: 1,
         document_id: document_id.clone(),
-        display_name: request.display_name.clone(),
-        mime_type: request.mime_type.clone(),
         size_bytes: content.len(),
         sha256_hex: hex::encode(Sha256::digest(&content)),
         created_at: request.created_at,
@@ -176,6 +162,12 @@ pub fn prepare_single_block_write(
         uploads,
         commit_event,
     })
+}
+
+fn random_document_id_hex() -> String {
+    let mut document_id = [0_u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut document_id);
+    hex::encode(document_id)
 }
 
 fn split_into_blocks(content: &[u8]) -> Vec<&[u8]> {

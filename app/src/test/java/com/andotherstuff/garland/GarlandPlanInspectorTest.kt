@@ -92,6 +92,30 @@ class GarlandPlanInspectorTest {
     }
 
     @Test
+    fun toleratesMissingMimeTypeInManifest() {
+        val summary = GarlandPlanInspector.summarize(
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123",
+                  "size_bytes": 5,
+                  "sha256_hex": "abc123",
+                  "blocks": [
+                    {"servers": ["https://one"]}
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        requireNotNull(summary)
+        assertNull(summary.mimeType)
+        assertEquals(1, summary.serverCount)
+    }
+
+    @Test
     fun countsDistinctServersAcrossAllBlocks() {
         val summary = GarlandPlanInspector.summarize(
             """

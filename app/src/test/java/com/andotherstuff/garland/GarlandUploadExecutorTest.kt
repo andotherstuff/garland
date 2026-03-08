@@ -579,6 +579,84 @@ class GarlandUploadExecutorTest {
     }
 
     @Test
+    fun publishesCommitWhenAtLeastOneReplicaUploadSucceeds() {
+        val tempDir = Files.createTempDirectory("garland-upload-partial-replica-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val firstServer = MockWebServer()
+        val secondServer = MockWebServer()
+        val relayServer = MockWebServer()
+        firstServer.enqueue(
+            MockResponse()
+                .setResponseCode(400)
+                .setHeader("X-Reason", "Filetype not allowed")
+                .setBody("{\"error\":\"file type not detected or not allowed\"}")
+        )
+        secondServer.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        relayServer.enqueue(
+            MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                    webSocket.close(1000, null)
+                }
+            })
+        )
+        firstServer.start()
+        secondServer.start()
+        relayServer.start()
+
+        try {
+            val document = store.createDocument("note.txt", "text/plain")
+            val firstUploadUrl = firstServer.url("").toString().removeSuffix("/")
+            val secondUploadUrl = secondServer.url("").toString().removeSuffix("/")
+            val relayUrl = relayServer.url("/").toString().replaceFirst("http", "ws")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$firstUploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="},
+                      {"server_url":"$secondUploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(store, client)
+            val result = executor.executeDocumentUpload(document.documentId, listOf(relayUrl))
+
+            assertTrue(result.success)
+            assertEquals(1, result.uploadedShares)
+            assertTrue(result.message.contains("uploaded 1/2 shares"))
+            assertEquals("relay-published", store.readRecord(document.documentId)?.uploadStatus)
+            val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+            assertEquals(2, diagnostics?.uploads?.size)
+            assertTrue(diagnostics?.uploads?.first()?.detail?.contains("Filetype not allowed") == true)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            firstServer.shutdown()
+            secondServer.shutdown()
+            relayServer.shutdown()
+        }
+    }
+
+    @Test
     fun storesNetworkFailureStatusAfterUploadRetriesAreExhausted() {
         val tempDir = Files.createTempDirectory("garland-upload-network-failure-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)

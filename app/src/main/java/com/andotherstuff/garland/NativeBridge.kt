@@ -9,4 +9,5 @@ object NativeBridge {
     external fun prepareSingleBlockWrite(requestJson: String): String
     external fun recoverSingleBlockRead(requestJson: String): String
     external fun signCustomEvent(requestJson: String): String
+    external fun signBlossomUploadAuth(requestJson: String): String
 }

@@ -18,7 +18,7 @@ mod tests {
         prepare_single_block_write, recover_single_block_read, PrepareWriteRequest,
         RecoverReadRequest,
     };
-    use crate::nostr_event::{sign_custom_event, UnsignedEvent};
+    use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, UnsignedEvent};
     use crate::packaging::{
         frame_content, unframe_content, BLOCK_SIZE, CONTENT_CAPACITY, FRAME_SIZE,
     };
@@ -153,6 +153,29 @@ mod tests {
     }
 
     #[test]
+    fn derives_distinct_blob_auth_keys_per_share() {
+        let first = sign_blossom_upload_auth_event(
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
+            &"11".repeat(32),
+            1_701_907_200,
+            1_701_907_500,
+        )
+        .expect("first auth event should sign");
+        let second = sign_blossom_upload_auth_event(
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
+            &"22".repeat(32),
+            1_701_907_200,
+            1_701_907_500,
+        )
+        .expect("second auth event should sign");
+
+        assert_ne!(first.pubkey_hex, second.pubkey_hex);
+        assert_eq!(first.tags[0], vec!["t".to_string(), "upload".to_string()]);
+        assert_eq!(first.tags[1][0], "x");
+        assert_eq!(first.tags[1][1], "11".repeat(32));
+    }
+
+    #[test]
     fn rejects_custom_event_kind_outside_u16_range() {
         let event = UnsignedEvent {
             created_at: 1_701_907_200,
@@ -193,8 +216,6 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
-            display_name: "note.txt".into(),
-            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "bXZwIGZpbGU=".into(),
             servers: vec![
@@ -215,6 +236,30 @@ mod tests {
         assert_eq!(plan.commit_event.id_hex.len(), 64);
         assert_eq!(plan.commit_event.sig_hex.len(), 128);
         assert_eq!(plan.manifest.document_id.len(), 64);
+        let manifest_json =
+            serde_json::to_string(&plan.manifest).expect("manifest should serialize");
+        assert!(!manifest_json.contains("display_name"));
+        assert!(!manifest_json.contains("mime_type"));
+    }
+
+    #[test]
+    fn write_plan_document_ids_are_randomized() {
+        let request = PrepareWriteRequest {
+            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
+                .into(),
+            created_at: 1_701_907_200,
+            content_b64: "bXZwIGZpbGU=".into(),
+            servers: vec![
+                "https://cdn.nostrcheck.me".into(),
+                "https://blossom.nostr.build".into(),
+                "https://blossom.yakihonne.com".into(),
+            ],
+        };
+
+        let first = prepare_single_block_write(&request).expect("first write plan should build");
+        let second = prepare_single_block_write(&request).expect("second write plan should build");
+
+        assert_ne!(first.document_id, second.document_id);
     }
 
     #[test]
@@ -222,8 +267,6 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
-            display_name: "note.txt".into(),
-            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "aGVsbG8=".into(),
             servers: vec![
@@ -251,8 +294,6 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
-            display_name: "big.txt".into(),
-            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: base64::engine::general_purpose::STANDARD.encode(payload),
             servers: vec![
@@ -277,8 +318,6 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
-            display_name: "big.txt".into(),
-            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: base64::engine::general_purpose::STANDARD.encode(&payload),
             servers: vec![

@@ -129,15 +129,35 @@ open class GarlandUploadExecutor(
         val uploadDiagnostics = mutableListOf<DocumentEndpointDiagnostic>()
         val resolvedUploadTargets = mutableListOf<ResolvedUploadTarget>()
         var uploadedShares = 0
-        preparedUploads.forEach { preparedUpload ->
-            val upload = preparedUpload.upload
-            val attemptResult = executeUploadWithRetry(preparedUpload, attemptedAuth = privateKeyHex != null)
-            if (attemptResult.failureMessage != null) {
-                uploadDiagnostics += attemptResult.failureDiagnostic!!
+        preparedUploads.groupBy { it.upload.shareIdHex }.values.forEach { shareUploads ->
+            var shareUploaded = false
+            var shareFailure: UploadAttemptResult? = null
+            shareUploads.forEach { preparedUpload ->
+                val attemptResult = executeUploadWithRetry(preparedUpload, attemptedAuth = privateKeyHex != null)
+                if (attemptResult.failureMessage != null) {
+                    uploadDiagnostics += attemptResult.failureDiagnostic!!
+                    shareFailure = attemptResult
+                } else {
+                    shareUploaded = true
+                    attemptResult.successDiagnostic?.let(uploadDiagnostics::add)
+                    attemptResult.resolvedTarget?.let { resolvedUploadTargets += it }
+                    uploadedShares += 1
+                }
+            }
+            if (!shareUploaded) {
+                val failure = shareFailure ?: UploadAttemptResult(
+                    failureStatus = "upload-network-failed",
+                    failureDiagnostic = DocumentEndpointDiagnostic(
+                        shareUploads.first().upload.serverUrl,
+                        "network-error",
+                        "Upload failed for share ${shareUploads.first().upload.shareIdHex}",
+                    ),
+                    failureMessage = "Upload failed for share ${shareUploads.first().upload.shareIdHex}",
+                )
                 store.updateUploadDiagnostics(
                     documentId,
-                    attemptResult.failureStatus!!,
-                    attemptResult.failureMessage,
+                    failure.failureStatus!!,
+                    failure.failureMessage,
                     DocumentSyncDiagnosticsCodec.encode(DocumentSyncDiagnostics(uploads = uploadDiagnostics)),
                 )
                 return UploadExecutionResult(
@@ -145,13 +165,9 @@ open class GarlandUploadExecutor(
                     attemptedShares = uploads.size,
                     uploadedShares = uploadedShares,
                     relayPublished = false,
-                    message = attemptResult.failureMessage,
+                    message = failure.failureMessage!!,
                 )
             }
-
-            attemptResult.successDiagnostic?.let(uploadDiagnostics::add)
-            attemptResult.resolvedTarget?.let { resolvedUploadTargets += it }
-            uploadedShares += 1
         }
         persistResolvedUploadTargets(documentId, raw, resolvedUploadTargets)
 
@@ -201,13 +217,18 @@ open class GarlandUploadExecutor(
         } else {
             "relay-published-partial"
         }
-        store.updateUploadDiagnostics(documentId, relayStatus, relayResult.message, diagnosticsJson)
+        val finalMessage = if (uploadedShares == uploads.size) {
+            relayResult.message
+        } else {
+            "${relayResult.message}; uploaded $uploadedShares/${uploads.size} shares"
+        }
+        store.updateUploadDiagnostics(documentId, relayStatus, finalMessage, diagnosticsJson)
         return UploadExecutionResult(
             success = true,
             attemptedShares = uploads.size,
             uploadedShares = uploadedShares,
             relayPublished = true,
-            message = relayResult.message,
+            message = finalMessage,
         )
     }
 
@@ -282,7 +303,13 @@ open class GarlandUploadExecutor(
             try {
                 client.newCall(request).execute().use { responseBody ->
                     if (!responseBody.isSuccessful) {
-                        val baseMessage = uploadFailureMessage(upload.serverUrl, responseBody.code, attemptedAuth)
+                        val baseMessage = uploadFailureMessage(
+                            serverUrl = upload.serverUrl,
+                            statusCode = responseBody.code,
+                            attemptedAuth = attemptedAuth,
+                            rejectionReason = responseBody.header("X-Reason"),
+                            responseBodyText = responseBody.body?.string(),
+                        )
                         if (shouldRetryUploadResponse(responseBody.code) && attempt < MAX_UPLOAD_ATTEMPTS) {
                             return@use
                         }
@@ -351,7 +378,7 @@ open class GarlandUploadExecutor(
             throw IllegalStateException("Failed to sign Blossom auth for upload plan entry $index: ${error.message ?: "unknown error"}")
         }
         val authJson = gson.toJson(signedEvent.toRelayEventPayload())
-        return "Nostr ${Base64.getEncoder().encodeToString(authJson.toByteArray(Charsets.UTF_8))}"
+        return "Nostr ${Base64.getUrlEncoder().withoutPadding().encodeToString(authJson.toByteArray(Charsets.UTF_8))}"
     }
 
     private fun parseUploadResponse(upload: UploadBody, responseBodyText: String): ResolvedUploadTarget? {
@@ -400,8 +427,14 @@ open class GarlandUploadExecutor(
         }
     }
 
-    private fun uploadFailureMessage(serverUrl: String, statusCode: Int, attemptedAuth: Boolean): String {
-        return when (statusCode) {
+    private fun uploadFailureMessage(
+        serverUrl: String,
+        statusCode: Int,
+        attemptedAuth: Boolean,
+        rejectionReason: String?,
+        responseBodyText: String?,
+    ): String {
+        val baseMessage = when (statusCode) {
             401 -> if (attemptedAuth) {
                 "Upload failed on $serverUrl with HTTP 401 (server rejected Blossom auth)"
             } else {
@@ -414,6 +447,14 @@ open class GarlandUploadExecutor(
             }
             else -> "Upload failed on $serverUrl with HTTP $statusCode"
         }
+        val detail = rejectionReason
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: responseBodyText
+                ?.trim()
+                ?.replace("\n", " ")
+                ?.takeIf { it.isNotEmpty() }
+        return if (detail == null) baseMessage else "$baseMessage ($detail)"
     }
 
     private fun uploadNetworkFailureMessage(serverUrl: String, error: IOException): String {

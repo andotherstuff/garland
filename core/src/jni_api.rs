@@ -8,7 +8,7 @@ use crate::identity::derive_nostr_identity;
 use crate::mvp_write::{
     prepare_single_block_write, recover_single_block_read, PrepareWriteRequest, RecoverReadRequest,
 };
-use crate::nostr_event::{sign_custom_event, UnsignedEvent};
+use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, UnsignedEvent};
 
 #[derive(Serialize)]
 struct IdentityResponse {
@@ -42,8 +42,6 @@ struct SignEventResponse {
 #[derive(Deserialize)]
 struct PrepareWriteJson {
     private_key_hex: String,
-    display_name: String,
-    mime_type: String,
     created_at: u64,
     content_b64: String,
     servers: Vec<String>,
@@ -64,6 +62,14 @@ struct SignEventJson {
     kind: u64,
     tags: Vec<Vec<String>>,
     content: String,
+}
+
+#[derive(Deserialize)]
+struct BlossomUploadAuthJson {
+    private_key_hex: String,
+    share_id_hex: String,
+    created_at: u64,
+    expiration: u64,
 }
 
 #[unsafe(no_mangle)]
@@ -124,8 +130,6 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_prepareSingle
         Ok(request) => {
             let request = PrepareWriteRequest {
                 private_key_hex: request.private_key_hex,
-                display_name: request.display_name,
-                mime_type: request.mime_type,
                 created_at: request.created_at,
                 content_b64: request.content_b64,
                 servers: request.servers,
@@ -241,6 +245,50 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_signCustomEve
                 },
             }
         }
+        Err(error) => SignEventResponse {
+            ok: false,
+            event: None,
+            error: Some(format!("invalid request json: {}", error)),
+        },
+    };
+
+    let payload = serde_json::to_string(&response)
+        .unwrap_or_else(|err| format!("{{\"ok\":false,\"event\":null,\"error\":\"{}\"}}", err));
+
+    env.new_string(payload)
+        .expect("JNI should allocate response string")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_signBlossomUploadAuth(
+    mut env: JNIEnv,
+    _class: JClass,
+    request_json: JString,
+) -> jstring {
+    let request_json: String = env
+        .get_string(&request_json)
+        .map(|value| value.into())
+        .unwrap_or_default();
+
+    let response = match serde_json::from_str::<BlossomUploadAuthJson>(&request_json) {
+        Ok(request) => match sign_blossom_upload_auth_event(
+            &request.private_key_hex,
+            &request.share_id_hex,
+            request.created_at,
+            request.expiration,
+        ) {
+            Ok(signed_event) => SignEventResponse {
+                ok: true,
+                event: serde_json::to_value(signed_event).ok(),
+                error: None,
+            },
+            Err(error) => SignEventResponse {
+                ok: false,
+                event: None,
+                error: Some(error.to_string()),
+            },
+        },
         Err(error) => SignEventResponse {
             ok: false,
             event: None,

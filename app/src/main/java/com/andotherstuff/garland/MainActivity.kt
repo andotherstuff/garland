@@ -70,8 +70,6 @@ class MainActivity : AppCompatActivity() {
 
             val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
                 privateKeyHex = privateKey,
-                displayName = binding.fileNameInput.text?.toString().orEmpty().ifBlank { "note.txt" },
-                mimeType = binding.mimeTypeInput.text?.toString().orEmpty().ifBlank { "text/plain" },
                 content = binding.contentInput.text?.toString().orEmpty().toByteArray(),
                 blossomServers = currentBlossomServers(),
                 createdAt = System.currentTimeMillis() / 1000,
@@ -265,7 +263,7 @@ class MainActivity : AppCompatActivity() {
                 getString(
                     R.string.active_document_details,
                     summary.documentId.take(12),
-                    summary.mimeType,
+                    summary.mimeType ?: record.mimeType,
                     summary.sizeBytes,
                     summary.blockCount,
                     summary.serverCount,

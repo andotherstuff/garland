@@ -19,8 +19,6 @@ class GarlandConfigTest {
     fun buildsPrepareWriteJson() {
         val json = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = "deadbeef",
-            displayName = "note.txt",
-            mimeType = "text/plain",
             content = "hello".toByteArray(),
             blossomServers = GarlandConfig.defaults.blossomServers,
             createdAt = 123L,
@@ -28,17 +26,16 @@ class GarlandConfigTest {
 
         val payload = JsonParser.parseString(json).asJsonObject
         assertEquals("deadbeef", payload.get("private_key_hex").asString)
-        assertEquals("note.txt", payload.get("display_name").asString)
         assertEquals("aGVsbG8=", payload.get("content_b64").asString)
         assertEquals(3, payload.getAsJsonArray("servers").size())
+        assertFalse(payload.has("display_name"))
+        assertFalse(payload.has("mime_type"))
     }
 
     @Test
     fun prepareWriteJsonSanitizesConfiguredBlossomServers() {
         val json = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = "deadbeef",
-            displayName = "note.txt",
-            mimeType = "text/plain",
             content = "hello".toByteArray(),
             blossomServers = listOf(" https://one.example ", "", "https://one.example", "https://two.example "),
             createdAt = 123L,
@@ -60,18 +57,17 @@ class GarlandConfigTest {
     }
 
     @Test
-    fun prepareWriteJsonEscapesControlCharactersByProducingValidJson() {
+    fun prepareWriteJsonRemainsValidWithoutPlaintextMetadataFields() {
         val json = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = "deadbeef",
-            displayName = "line\nbreak \"quote\"",
-            mimeType = "text/plain",
             content = "hello".toByteArray(),
             blossomServers = GarlandConfig.defaults.blossomServers,
             createdAt = 123L,
         )
 
         val payload = JsonParser.parseString(json).asJsonObject
-        assertEquals("line\nbreak \"quote\"", payload.get("display_name").asString)
+        assertFalse(payload.has("display_name"))
+        assertFalse(payload.has("mime_type"))
     }
 
     @Test

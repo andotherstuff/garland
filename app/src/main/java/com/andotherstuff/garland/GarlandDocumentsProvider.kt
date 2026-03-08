@@ -245,8 +245,6 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         val content = store.contentFile(documentId).readBytes()
         val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = privateKeyHex,
-            displayName = record.displayName,
-            mimeType = record.mimeType,
             content = content,
             blossomServers = session.resolvedBlossomServers(),
             createdAt = System.currentTimeMillis() / 1000,

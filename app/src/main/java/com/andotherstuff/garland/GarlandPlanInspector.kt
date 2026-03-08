@@ -6,7 +6,7 @@ import com.google.gson.JsonParser
 
 data class GarlandPlanSummary(
     val documentId: String,
-    val mimeType: String,
+    val mimeType: String?,
     val sizeBytes: Long,
     val blockCount: Int,
     val serverCount: Int,
@@ -52,7 +52,7 @@ object GarlandPlanInspector {
     private fun decodeSummary(plan: JsonObject, manifest: JsonObject): GarlandPlanSummary? {
         val uploads = plan.optionalArray("uploads")?.size()
         val documentId = manifest.requiredString("document_id")?.takeIf { it.isNotBlank() } ?: return null
-        val mimeType = manifest.requiredString("mime_type")?.takeIf { it.isNotBlank() } ?: return null
+        val mimeType = manifest.optionalString("mime_type")?.takeIf { it.isNotBlank() }
         val sizeBytes = manifest.requiredLong("size_bytes")?.takeIf { it >= 0L } ?: return null
         val sha256Hex = manifest.requiredString("sha256_hex")?.takeIf { it.isNotBlank() } ?: return null
         val blocks = manifest.requiredArray("blocks") ?: return null
@@ -112,6 +112,12 @@ object GarlandPlanInspector {
     }
 
     private fun JsonObject.requiredString(fieldName: String): String? {
+        val value = get(fieldName) ?: return null
+        return value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
+    }
+
+    private fun JsonObject.optionalString(fieldName: String): String? {
+        if (!has(fieldName)) return null
         val value = get(fieldName) ?: return null
         return value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
     }

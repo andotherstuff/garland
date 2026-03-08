@@ -282,8 +282,6 @@ class GarlandDocumentsProviderTest {
         TestHttpFileServer(restoredText.toByteArray()).use { server ->
             val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
                 privateKeyHex = privateKeyHex,
-                displayName = "append-restore-note.txt",
-                mimeType = "text/plain",
                 content = restoredText.toByteArray(),
                 blossomServers = listOf(server.baseUrl),
                 createdAt = System.currentTimeMillis() / 1000,
@@ -336,8 +334,6 @@ class GarlandDocumentsProviderTest {
         TestHttpFileServer(restoredText.toByteArray()).use { server ->
             val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
                 privateKeyHex = privateKeyHex,
-                displayName = "rw-restore-note.txt",
-                mimeType = "text/plain",
                 content = restoredText.toByteArray(),
                 blossomServers = listOf(server.baseUrl),
                 createdAt = System.currentTimeMillis() / 1000,
@@ -846,8 +842,6 @@ class GarlandDocumentsProviderTest {
         TestHttpFileServer(restoredText.toByteArray()).use { server ->
             val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
                 privateKeyHex = privateKeyHex,
-                displayName = "restore-note.txt",
-                mimeType = "text/plain",
                 content = restoredText.toByteArray(),
                 blossomServers = listOf(server.baseUrl),
                 createdAt = System.currentTimeMillis() / 1000,

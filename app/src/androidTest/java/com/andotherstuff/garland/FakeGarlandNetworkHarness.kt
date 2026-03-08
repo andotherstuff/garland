@@ -165,8 +165,13 @@ class FakeGarlandNetworkHarness : AutoCloseable {
         if (header.isNullOrBlank() || !header.startsWith("Nostr ")) return null
         return runCatching {
             val encoded = header.removePrefix("Nostr ").trim()
-            Base64.getDecoder().decode(encoded).toString(Charsets.UTF_8)
+            decodeAuthorizationPayload(encoded).toString(Charsets.UTF_8)
         }.getOrNull()
+    }
+
+    private fun decodeAuthorizationPayload(encoded: String): ByteArray {
+        return runCatching { Base64.getUrlDecoder().decode(encoded) }
+            .getOrElse { Base64.getDecoder().decode(encoded) }
     }
 
     private sealed interface RelayMode {
