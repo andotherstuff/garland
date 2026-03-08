@@ -41,13 +41,25 @@
         <item name="android:textStyle">bold</item>
     </style>
 
+    <style name="TextAppearance.Garland.DisplayTitle" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+
     <style name="TextAppearance.Garland.HeroTitle" parent="TextAppearance.Material3.HeadlineSmall">
         <item name="android:textColor">@color/garland_ink</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:lineSpacingExtra">2dp</item>
     </style>
 
     <style name="TextAppearance.Garland.BodyMuted" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/garland_muted</item>
+    </style>
+
+    <style name="TextAppearance.Garland.BodySupport" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">@color/garland_muted</item>
+        <item name="android:lineSpacingExtra">3dp</item>
     </style>
 
     <style name="TextAppearance.Garland.BodyStrong" parent="TextAppearance.Material3.BodyMedium">

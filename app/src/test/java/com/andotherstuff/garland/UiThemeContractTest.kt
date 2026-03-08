@@ -73,6 +73,25 @@ class UiThemeContractTest {
     }
 
     @Test
+    fun layoutsUseSharedSpacingTokensAndRefinedTypographyStyles() {
+        val dimensXml = projectFile("app", "src", "main", "res", "values", "dimens.xml")
+        val stylesXml = projectFile("app", "src", "main", "res", "values", "styles.xml")
+        val mainLayout = projectFile("app", "src", "main", "res", "layout", "activity_main.xml")
+        val diagnosticsLayout = projectFile("app", "src", "main", "res", "layout", "activity_diagnostics.xml")
+
+        assertTrue(dimensXml.contains("garland_screen_padding"))
+        assertTrue(dimensXml.contains("garland_card_spacing"))
+        assertTrue(stylesXml.contains("TextAppearance.Garland.DisplayTitle"))
+        assertTrue(stylesXml.contains("TextAppearance.Garland.BodySupport"))
+        assertTrue(mainLayout.contains("@dimen/garland_screen_padding"))
+        assertTrue(mainLayout.contains("@style/TextAppearance.Garland.DisplayTitle"))
+        assertTrue(mainLayout.contains("@style/TextAppearance.Garland.BodySupport"))
+        assertTrue(diagnosticsLayout.contains("@dimen/garland_screen_padding"))
+        assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.DisplayTitle"))
+        assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.BodySupport"))
+    }
+
+    @Test
     fun styleAndColorTokensExposeSemanticDiagnosticStates() {
         val stylesXml = projectFile("app", "src", "main", "res", "values", "styles.xml")
         val colorsXml = projectFile("app", "src", "main", "res", "values", "colors.xml")

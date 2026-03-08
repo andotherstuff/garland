@@ -1,0 +1,10 @@
+<resources>
+    <dimen name="garland_screen_padding">24dp</dimen>
+    <dimen name="garland_card_spacing">18dp</dimen>
+    <dimen name="garland_card_padding">24dp</dimen>
+    <dimen name="garland_hero_card_padding">28dp</dimen>
+    <dimen name="garland_section_gap">20dp</dimen>
+    <dimen name="garland_content_gap">12dp</dimen>
+    <dimen name="garland_tight_gap">6dp</dimen>
+    <dimen name="garland_button_gap">10dp</dimen>
+</resources>
