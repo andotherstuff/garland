@@ -28,6 +28,7 @@ This repo intentionally targets the smallest Android MVP that can:
 ## Verified Status
 
 - `./gradlew test` passes for the Android unit-test suite
+- `automation/verify_alpha_no_device.sh` now runs the repeatable no-device alpha verification path
 - `./gradlew assembleDebug` builds the debug APK successfully
 - `cargo test` passes for the Rust core
 - connected Android instrumentation is still not verified in-repo and remains an alpha-release gate
@@ -35,8 +36,8 @@ This repo intentionally targets the smallest Android MVP that can:
 ## Alpha Release Gaps
 
 - run the Android instrumentation suite on a connected emulator or device as part of release verification
-- add a local fake Blossom and relay harness for end-to-end upload, sync, restore, and retry coverage
 - expand diagnostics beyond the current latest-result view if alpha testing needs longer per-document history
+- finish the connected-device and manual sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`
 
 ## License
 
