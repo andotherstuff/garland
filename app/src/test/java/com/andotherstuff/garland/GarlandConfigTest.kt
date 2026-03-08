@@ -1,6 +1,8 @@
 package com.andotherstuff.garland
 
+import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,10 +26,26 @@ class GarlandConfigTest {
             createdAt = 123L,
         )
 
-        assertTrue(json.contains("\"private_key_hex\":\"deadbeef\""))
-        assertTrue(json.contains("\"display_name\":\"note.txt\""))
-        assertTrue(json.contains("\"content_b64\":\"aGVsbG8=\""))
-        assertEquals(3, "https://".toRegex().findAll(json).count())
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("deadbeef", payload.get("private_key_hex").asString)
+        assertEquals("note.txt", payload.get("display_name").asString)
+        assertEquals("aGVsbG8=", payload.get("content_b64").asString)
+        assertEquals(3, payload.getAsJsonArray("servers").size())
+    }
+
+    @Test
+    fun prepareWriteJsonEscapesControlCharactersByProducingValidJson() {
+        val json = GarlandConfig.buildPrepareWriteRequestJson(
+            privateKeyHex = "deadbeef",
+            displayName = "line\nbreak \"quote\"",
+            mimeType = "text/plain",
+            content = "hello".toByteArray(),
+            blossomServers = GarlandConfig.defaults.blossomServers,
+            createdAt = 123L,
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("line\nbreak \"quote\"", payload.get("display_name").asString)
     }
 
     @Test
@@ -39,8 +57,17 @@ class GarlandConfigTest {
             encryptedBlock = "hello".toByteArray(),
         )
 
-        assertTrue(json.contains("\"private_key_hex\":\"deadbeef\""))
-        assertTrue(json.contains("\"document_id\":\"doc123\""))
-        assertTrue(json.contains("\"encrypted_block_b64\":\"aGVsbG8=\""))
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("deadbeef", payload.get("private_key_hex").asString)
+        assertEquals("doc123", payload.get("document_id").asString)
+        assertEquals("aGVsbG8=", payload.get("encrypted_block_b64").asString)
+    }
+
+    @Test
+    fun responseOkOnlyAcceptsRealBooleanOkFields() {
+        assertTrue(GarlandConfig.responseOk("{\"ok\":true}"))
+        assertFalse(GarlandConfig.responseOk("{\"message\":\"contains \\\"ok\\\":true\"}"))
+        assertFalse(GarlandConfig.responseOk("{\"ok\":\"true\"}"))
+        assertFalse(GarlandConfig.responseOk("not json"))
     }
 }

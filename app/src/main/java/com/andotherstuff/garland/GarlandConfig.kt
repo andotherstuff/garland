@@ -1,5 +1,9 @@
 package com.andotherstuff.garland
 
+import com.google.gson.Gson
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import java.util.Base64
 
 data class GarlandDefaults(
@@ -8,6 +12,8 @@ data class GarlandDefaults(
 )
 
 object GarlandConfig {
+    private val gson = Gson()
+
     val defaults = GarlandDefaults(
         relays = listOf(
             "wss://relay.damus.io",
@@ -29,19 +35,17 @@ object GarlandConfig {
         blossomServers: List<String>,
         createdAt: Long,
     ): String {
-        val serversJson = blossomServers.joinToString(prefix = "[", postfix = "]", separator = ",") {
-            "\"${escapeJson(it)}\""
+        val payload = JsonObject().apply {
+            addProperty("private_key_hex", privateKeyHex)
+            addProperty("display_name", displayName)
+            addProperty("mime_type", mimeType)
+            addProperty("created_at", createdAt)
+            addProperty("content_b64", Base64.getEncoder().encodeToString(content))
+            add("servers", JsonArray().apply {
+                blossomServers.forEach(::add)
+            })
         }
-        return """
-            {
-              "private_key_hex":"${escapeJson(privateKeyHex)}",
-              "display_name":"${escapeJson(displayName)}",
-              "mime_type":"${escapeJson(mimeType)}",
-              "created_at":$createdAt,
-              "content_b64":"${Base64.getEncoder().encodeToString(content)}",
-              "servers":$serversJson
-            }
-        """.trimIndent().replace("\n", "")
+        return gson.toJson(payload)
     }
 
     fun buildRecoverReadRequestJson(
@@ -50,19 +54,21 @@ object GarlandConfig {
         blockIndex: Int,
         encryptedBlock: ByteArray,
     ): String {
-        return """
-            {
-              "private_key_hex":"${escapeJson(privateKeyHex)}",
-              "document_id":"${escapeJson(documentId)}",
-              "block_index":$blockIndex,
-              "encrypted_block_b64":"${Base64.getEncoder().encodeToString(encryptedBlock)}"
-            }
-        """.trimIndent().replace("\n", "")
+        val payload = JsonObject().apply {
+            addProperty("private_key_hex", privateKeyHex)
+            addProperty("document_id", documentId)
+            addProperty("block_index", blockIndex)
+            addProperty("encrypted_block_b64", Base64.getEncoder().encodeToString(encryptedBlock))
+        }
+        return gson.toJson(payload)
     }
 
-    private fun escapeJson(value: String): String {
-        return value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
+    fun responseOk(responseJson: String): Boolean {
+        val payload = runCatching { JsonParser.parseString(responseJson) }.getOrNull()
+            ?.takeIf { it.isJsonObject }
+            ?.asJsonObject
+            ?: return false
+        val okField = payload.get("ok") ?: return false
+        return okField.isJsonPrimitive && okField.asJsonPrimitive.isBoolean && okField.asBoolean
     }
 }

@@ -252,7 +252,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         )
         val responseJson = NativeBridge.prepareSingleBlockWrite(requestJson)
         store.saveUploadPlan(documentId, responseJson)
-        val status = if (responseJson.contains("\"ok\":true")) "upload-plan-ready" else "upload-plan-failed"
+        val status = if (GarlandConfig.responseOk(responseJson)) "upload-plan-ready" else "upload-plan-failed"
         val message = if (status == "upload-plan-ready") "Upload plan prepared from provider write" else "Upload plan preparation failed"
         store.updateUploadStatus(documentId, status, message)
         if (status != "upload-plan-ready") return

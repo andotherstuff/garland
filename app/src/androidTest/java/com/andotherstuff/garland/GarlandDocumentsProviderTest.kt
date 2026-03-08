@@ -375,8 +375,9 @@ class GarlandDocumentsProviderTest {
         assertEquals("Upload plan prepared from provider write", record?.lastSyncMessage)
         val uploadPlan = store.readUploadPlan(documentId)
         assertNotNull(uploadPlan)
-        assertTrue(uploadPlan!!.contains("\"ok\":true"))
-        assertTrue(uploadPlan.contains("\"document_id\":\"$documentId\""))
+        val uploadPlanJson = JSONObject(uploadPlan!!)
+        assertTrue(uploadPlanJson.getBoolean("ok"))
+        assertEquals(documentId, uploadPlanJson.getJSONObject("plan").getString("document_id"))
     }
 
     @Test
