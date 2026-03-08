@@ -47,6 +47,21 @@ mod tests {
     }
 
     #[test]
+    fn derives_identity_with_passphrase() {
+        let mnemonic =
+            "leader monkey parrot ring guide accident before fence cannon height naive bean";
+        let identity = derive_nostr_identity(mnemonic, "garland-passphrase")
+            .expect("identity should derive with passphrase");
+
+        assert_eq!(identity.private_key_hex.len(), 64);
+        assert!(identity.nsec.starts_with("nsec1"));
+        assert_ne!(
+            identity.private_key_hex,
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
+        );
+    }
+
+    #[test]
     fn frames_and_unframes_short_content() {
         let content = b"garland";
         let frame = frame_content(content).expect("frame should build");
@@ -135,6 +150,42 @@ mod tests {
         assert_eq!(signed.id_hex.len(), 64);
         assert_eq!(signed.pubkey_hex.len(), 64);
         assert_eq!(signed.sig_hex.len(), 128);
+    }
+
+    #[test]
+    fn rejects_custom_event_kind_outside_u16_range() {
+        let event = UnsignedEvent {
+            created_at: 1_701_907_200,
+            kind: u16::MAX as u64 + 1,
+            tags: vec![vec!["t".into(), "upload".into()]],
+            content: "garland upload authorization".into(),
+        };
+
+        let error = sign_custom_event(
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
+            &event,
+        )
+        .expect_err("event kind outside u16 range should fail");
+
+        assert_eq!(error.to_string(), "event kind is invalid");
+    }
+
+    #[test]
+    fn rejects_custom_event_with_empty_tag() {
+        let event = UnsignedEvent {
+            created_at: 1_701_907_200,
+            kind: 24_242,
+            tags: vec![Vec::new()],
+            content: "garland upload authorization".into(),
+        };
+
+        let error = sign_custom_event(
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
+            &event,
+        )
+        .expect_err("empty tag should fail");
+
+        assert_eq!(error.to_string(), "event tags are invalid");
     }
 
     #[test]
