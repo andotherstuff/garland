@@ -100,7 +100,7 @@ class GarlandWorkSchedulerTest {
 
         assertEquals("garland-restore:doc-restore", backend.restoreName)
         assertEquals("doc-restore", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_DOCUMENT_ID))
-        assertEquals("deadbeef", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX))
+        assertNull(backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX))
         assertEquals(
             listOf(StatusUpdate("doc-restore", "restore-queued", "Queued Garland restore in background")),
             statusStore.updates,
@@ -117,7 +117,7 @@ class GarlandWorkSchedulerTest {
 
         assertEquals("garland-restore:doc-restore", backend.restoreName)
         assertEquals("doc-restore", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_DOCUMENT_ID))
-        assertEquals("deadbeef", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX))
+        assertNull(backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX))
         assertEquals(
             listOf(StatusUpdate("doc-restore", "restore-queued", "Queued Garland restore in background")),
             statusStore.updates,

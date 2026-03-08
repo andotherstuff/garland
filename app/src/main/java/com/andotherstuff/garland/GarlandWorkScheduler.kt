@@ -53,13 +53,12 @@ class GarlandWorkScheduler internal constructor(
     fun enqueueRestore(documentId: String, privateKeyHex: String? = null): UUID {
         val normalizedDocumentId = RestoreDocumentWorker.normalizeDocumentId(documentId)
             ?: throw IllegalArgumentException("Document id is required for background restore")
+        RestoreDocumentWorker.normalizePrivateKeyHex(privateKeyHex)
         if (!statusStore.hasActiveBackgroundRestore(normalizedDocumentId)) {
             statusStore.updateUploadStatus(normalizedDocumentId, "restore-queued", "Queued Garland restore in background")
         }
         val requestData = Data.Builder()
             .putString(RestoreDocumentWorker.KEY_DOCUMENT_ID, normalizedDocumentId)
-        RestoreDocumentWorker.normalizePrivateKeyHex(privateKeyHex)
-            ?.let { requestData.putString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX, it) }
         val request = OneTimeWorkRequestBuilder<RestoreDocumentWorker>()
             .setConstraints(networkConstraints())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)

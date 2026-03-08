@@ -41,11 +41,19 @@ class MainActivity : AppCompatActivity() {
             )
 
             binding.statusText.text = if (response.optBoolean("ok")) {
-                privateKeyHex = response.optString("private_key_hex")
-                session.savePrivateKeyHex(privateKeyHex.orEmpty())
-                getString(R.string.identity_loaded, response.optString("nsec"))
+                val derivedPrivateKey = GarlandSessionStore.normalizePrivateKeyHex(response.optString("private_key_hex"))
+                if (derivedPrivateKey == null) {
+                    privateKeyHex = null
+                    session.clearPrivateKeyHex()
+                    getString(R.string.identity_error, "missing private key")
+                } else {
+                    privateKeyHex = derivedPrivateKey
+                    session.savePrivateKeyHex(derivedPrivateKey)
+                    getString(R.string.identity_loaded, response.optString("nsec"))
+                }
             } else {
                 privateKeyHex = null
+                session.clearPrivateKeyHex()
                 getString(R.string.identity_error, response.optString("error"))
             }
         }

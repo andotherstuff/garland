@@ -6,10 +6,18 @@ class GarlandSessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("garland-session", Context.MODE_PRIVATE)
 
     fun savePrivateKeyHex(privateKeyHex: String) {
-        prefs.edit().putString(KEY_PRIVATE_KEY_HEX, privateKeyHex).apply()
+        val editor = prefs.edit()
+        normalizePrivateKeyHex(privateKeyHex)
+            ?.let { editor.putString(KEY_PRIVATE_KEY_HEX, it) }
+            ?: editor.remove(KEY_PRIVATE_KEY_HEX)
+        editor.apply()
     }
 
-    fun loadPrivateKeyHex(): String? = prefs.getString(KEY_PRIVATE_KEY_HEX, null)
+    fun loadPrivateKeyHex(): String? = normalizePrivateKeyHex(prefs.getString(KEY_PRIVATE_KEY_HEX, null))
+
+    fun clearPrivateKeyHex() {
+        prefs.edit().remove(KEY_PRIVATE_KEY_HEX).apply()
+    }
 
     fun saveBlossomServers(servers: List<String>) {
         prefs.edit()
@@ -54,6 +62,10 @@ class GarlandSessionStore(context: Context) {
     }
 
     companion object {
+        internal fun normalizePrivateKeyHex(privateKeyHex: String?): String? {
+            return privateKeyHex?.trim()?.takeIf { it.isNotEmpty() }
+        }
+
         private const val KEY_PRIVATE_KEY_HEX = "private_key_hex"
         private const val KEY_SERVER_ONE = "server_one"
         private const val KEY_SERVER_TWO = "server_two"

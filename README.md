@@ -22,6 +22,7 @@ This repo intentionally targets the smallest Android MVP that can:
 - local Garland document store with upload status tracking
 - `DocumentsProvider` integration with recent document, search, path lookup, write, delete, restore-on-read, and image thumbnail support
 - WorkManager-backed background sync and restore with duplicate-job protection and retry classification for permanent vs transient failures
+- restore jobs read the loaded identity from session state instead of persisting the private key in WorkManager input
 - per-document upload and relay diagnostics preserved across queued and running status transitions
 - dedicated diagnostics reports now include recent per-document history and a copyable tester report
 - manifest validation now rejects duplicate or invalid server entries across upload and restore paths

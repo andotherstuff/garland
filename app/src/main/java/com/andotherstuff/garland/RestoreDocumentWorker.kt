@@ -39,7 +39,7 @@ class RestoreDocumentWorker(
         }
 
         internal fun normalizePrivateKeyHex(privateKeyHex: String?): String? {
-            return privateKeyHex?.trim()?.takeIf { it.isNotEmpty() }
+            return GarlandSessionStore.normalizePrivateKeyHex(privateKeyHex)
         }
     }
 
