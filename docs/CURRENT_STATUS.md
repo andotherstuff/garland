@@ -19,7 +19,9 @@
 - Background sync and restore run through WorkManager with duplicate-job protection and retry classification
 - Restore jobs resolve identity from session state instead of storing the private key in WorkManager payloads
 - Diagnostics are preserved in `MainActivity` summaries and a dedicated diagnostics screen with recent history and copyable reports
+- Blossom uploads now sign user-key kind `24242` auth events when a server requires upload authorization
 - Manifest validation now rejects duplicate or invalid server entries, and restore-side plan failures now store structured diagnostics
+- Restore prefers server-returned retrieval URLs and now explains fetched-share mismatches before entering crypto recovery
 
 ## Open release gates
 

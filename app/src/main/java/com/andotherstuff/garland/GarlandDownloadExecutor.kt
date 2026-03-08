@@ -8,6 +8,7 @@ import com.google.gson.JsonSyntaxException
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.security.MessageDigest
 import java.util.Base64
 
 data class DownloadExecutionResult(
@@ -23,6 +24,10 @@ class GarlandDownloadExecutor(
     private val gson: Gson = Gson(),
     private val recoverBlock: (String) -> String = NativeBridge::recoverSingleBlockRead,
 ) {
+    private companion object {
+        const val ENCRYPTED_BLOCK_SIZE = 262_144
+    }
+
     constructor(
         context: Context,
         client: OkHttpClient = OkHttpClient(),
@@ -59,7 +64,7 @@ class GarlandDownloadExecutor(
         blocks.forEach { block ->
             val blockServers = block.servers.orEmpty()
             val blockIndex = block.index ?: 0
-            val fetchResult = fetchEncryptedBody(block)
+            val fetchResult = fetchEncryptedBody(block, response.plan.uploads.orEmpty())
             val encryptedBody = fetchResult.body
                 ?: return DownloadExecutionResult(
                     false,
@@ -69,6 +74,18 @@ class GarlandDownloadExecutor(
                 ).also {
                     store.updateUploadStatus(documentId, "download-failed", it.message)
                 }
+            val shareIdHex = block.shareIdHex.orEmpty()
+            val fetchedShareId = sha256Hex(encryptedBody)
+            if (!fetchedShareId.equals(shareIdHex, ignoreCase = true)) {
+                val message = "Downloaded share from ${fetchResult.sourceUrl ?: "configured server"} did not match expected share ID $shareIdHex"
+                store.updateUploadStatus(documentId, "download-failed", message)
+                return DownloadExecutionResult(false, blockServers.size, restoredContent.size, message)
+            }
+            if (encryptedBody.size != ENCRYPTED_BLOCK_SIZE) {
+                val message = "Downloaded share from ${fetchResult.sourceUrl ?: "configured server"} had invalid encrypted block length ${encryptedBody.size}"
+                store.updateUploadStatus(documentId, "download-failed", message)
+                return DownloadExecutionResult(false, blockServers.size, restoredContent.size, message)
+            }
 
             val requestJson = GarlandConfig.buildRecoverReadRequestJson(
                 privateKeyHex = privateKeyHex,
@@ -133,27 +150,21 @@ class GarlandDownloadExecutor(
         return ParsedOptionalString(isValid = true, value = field.asString)
     }
 
-    private fun fetchEncryptedBody(block: ManifestBlockEnvelope): FetchEncryptedBodyResult {
+    private fun fetchEncryptedBody(block: ManifestBlockEnvelope, uploads: List<StoredUploadBodyEnvelope>): FetchEncryptedBodyResult {
         var invalidUrlMessage: String? = null
         var attemptedValidRequest = false
-        val shareIdHex = block.shareIdHex.orEmpty()
-        block.servers.orEmpty().forEach { serverUrl ->
-            listOf(
-                serverUrl.trimEnd('/') + "/" + shareIdHex,
-                serverUrl.trimEnd('/') + "/upload/" + shareIdHex,
-            ).forEach { url ->
-                runCatching {
-                    val request = Request.Builder().url(url).get().build()
-                    attemptedValidRequest = true
-                    client.newCall(request).execute().use { response ->
-                        if (response.isSuccessful) {
-                            return FetchEncryptedBodyResult(body = response.body?.bytes())
-                        }
+        for (url in block.candidateDownloadUrls(uploads)) {
+            runCatching {
+                val request = Request.Builder().url(url).get().build()
+                attemptedValidRequest = true
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        return FetchEncryptedBodyResult(body = response.body?.bytes(), sourceUrl = url)
                     }
-                }.onFailure { error ->
-                    if (error is IllegalArgumentException && !attemptedValidRequest) {
-                        invalidUrlMessage = invalidBlossomServerUrlMessage(error)
-                    }
+                }
+            }.onFailure { error ->
+                if (error is IllegalArgumentException && !attemptedValidRequest) {
+                    invalidUrlMessage = invalidBlossomServerUrlMessage(error)
                 }
             }
         }
@@ -189,11 +200,16 @@ class GarlandDownloadExecutor(
             ),
         )
     }
+
+    private fun sha256Hex(body: ByteArray): String {
+        return MessageDigest.getInstance("SHA-256").digest(body).joinToString("") { "%02x".format(it) }
+    }
 }
 
 private data class FetchEncryptedBodyResult(
     val body: ByteArray?,
     val error: String? = null,
+    val sourceUrl: String? = null,
 )
 
 private data class ParsedOptionalString(
@@ -213,6 +229,7 @@ private data class DownloadRecoveryEnvelope(
 
 private data class DownloadPreparedPlan(
     val manifest: DownloadManifestEnvelope?,
+    val uploads: List<StoredUploadBodyEnvelope>?,
 )
 
 private data class DownloadManifestEnvelope(
@@ -226,6 +243,12 @@ private data class ManifestBlockEnvelope(
     val servers: List<String>?,
 )
 
+private data class StoredUploadBodyEnvelope(
+    @SerializedName("server_url") val serverUrl: String?,
+    @SerializedName("share_id_hex") val shareIdHex: String?,
+    @SerializedName("retrieval_url") val retrievalUrl: String?,
+)
+
 private fun DownloadManifestEnvelope.toValidationInfo(): GarlandManifestInfo {
     return GarlandManifestInfo(
         documentId = documentId,
@@ -237,4 +260,19 @@ private fun DownloadManifestEnvelope.toValidationInfo(): GarlandManifestInfo {
             )
         },
     )
+}
+
+private fun ManifestBlockEnvelope.candidateDownloadUrls(uploads: List<StoredUploadBodyEnvelope>): List<String> {
+    val shareIdHex = shareIdHex.orEmpty()
+    return buildList {
+        uploads
+            .filter { it.shareIdHex.equals(shareIdHex, ignoreCase = true) }
+            .mapNotNull { it.retrievalUrl?.trim()?.takeIf(String::isNotEmpty) }
+            .forEach(::add)
+        servers.orEmpty().forEach { serverUrl ->
+            val normalizedServer = serverUrl.trimEnd('/')
+            add("$normalizedServer/$shareIdHex")
+            add("$normalizedServer/upload/$shareIdHex")
+        }
+    }.distinct()
 }

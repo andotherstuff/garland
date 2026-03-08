@@ -8,7 +8,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
+import java.security.MessageDigest
 import java.util.Base64
+import okio.Buffer
 
 class GarlandDownloadExecutorTest {
     @Test
@@ -80,7 +82,9 @@ class GarlandDownloadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-download-invalid-recovery-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("encrypted-share"))
+        val encryptedShare = encryptedShare(fillByte = 4)
+        val shareIdHex = sha256Hex(encryptedShare)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(encryptedShare)))
         server.start()
 
         try {
@@ -96,8 +100,8 @@ class GarlandDownloadExecutorTest {
                       "blocks": [
                         {
                           "index": 0,
-                          "share_id_hex": "a1b2c3",
-                          "servers": ["$serverUrl"]
+                           "share_id_hex": "$shareIdHex",
+                           "servers": ["$serverUrl"]
                         }
                       ]
                     }
@@ -292,7 +296,9 @@ class GarlandDownloadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-download-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("encrypted-share"))
+        val encryptedShare = encryptedShare(fillByte = 7)
+        val shareIdHex = sha256Hex(encryptedShare)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(encryptedShare)))
         server.start()
 
         val document = store.createDocument("note.txt", "text/plain")
@@ -307,8 +313,8 @@ class GarlandDownloadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "a1b2c3",
-                      "servers": ["$serverUrl"]
+                       "share_id_hex": "$shareIdHex",
+                       "servers": ["$serverUrl"]
                     }
                   ]
                 }
@@ -344,8 +350,10 @@ class GarlandDownloadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-download-fallback-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
+        val encryptedShare = encryptedShare(fillByte = 8)
+        val shareIdHex = sha256Hex(encryptedShare)
         server.enqueue(MockResponse().setResponseCode(404))
-        server.enqueue(MockResponse().setResponseCode(200).setBody("encrypted-share"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(encryptedShare)))
         server.start()
 
         val document = store.createDocument("note.txt", "text/plain")
@@ -360,8 +368,8 @@ class GarlandDownloadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "a1b2c3",
-                      "servers": ["$serverUrl"]
+                       "share_id_hex": "$shareIdHex",
+                       "servers": ["$serverUrl"]
                     }
                   ]
                 }
@@ -394,8 +402,12 @@ class GarlandDownloadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-download-multi-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("encrypted-share-one"))
-        server.enqueue(MockResponse().setResponseCode(200).setBody("encrypted-share-two"))
+        val encryptedShareOne = encryptedShare(fillByte = 9)
+        val encryptedShareTwo = encryptedShare(fillByte = 10)
+        val shareIdOne = sha256Hex(encryptedShareOne)
+        val shareIdTwo = sha256Hex(encryptedShareTwo)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(encryptedShareOne)))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(encryptedShareTwo)))
         server.start()
 
         val document = store.createDocument("note.txt", "text/plain")
@@ -410,13 +422,13 @@ class GarlandDownloadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "a1b2c3",
-                      "servers": ["$serverUrl"]
+                       "share_id_hex": "$shareIdOne",
+                       "servers": ["$serverUrl"]
                     },
                     {
                       "index": 1,
-                      "share_id_hex": "d4e5f6",
-                      "servers": ["$serverUrl"]
+                       "share_id_hex": "$shareIdTwo",
+                       "servers": ["$serverUrl"]
                     }
                   ]
                 }
@@ -444,5 +456,68 @@ class GarlandDownloadExecutorTest {
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
         server.shutdown()
+    }
+
+    @Test
+    fun usesStoredRetrievalUrlAndExplainsDownloadedShareMismatch() {
+        val tempDir = Files.createTempDirectory("garland-download-retrieval-url-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val harness = FakeGarlandNetworkHarness()
+
+        try {
+            val document = store.createDocument("note.txt", "text/plain")
+            val expectedShareId = sha256Hex(encryptedShare(fillByte = 11))
+            harness.enqueueDownloadPath("/blob/$expectedShareId", "not-a-garland-share".toByteArray())
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "plan": {
+                    "manifest": {
+                      "document_id": "${document.documentId}",
+                      "blocks": [
+                        {
+                          "index": 0,
+                          "share_id_hex": "$expectedShareId",
+                          "servers": ["${harness.blossomBaseUrl()}"]
+                        }
+                      ]
+                    },
+                    "uploads": [
+                      {
+                        "server_url": "${harness.blossomBaseUrl()}",
+                        "share_id_hex": "$expectedShareId",
+                        "retrieval_url": "${harness.blossomBaseUrl()}/blob/$expectedShareId"
+                      }
+                    ]
+                  }
+                }
+                """.trimIndent(),
+            )
+            val client = OkHttpClient()
+            val executor = GarlandDownloadExecutor(
+                store = store,
+                client = client,
+                recoverBlock = { error("should not reach native recovery") },
+            )
+
+            val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+            assertFalse(result.success)
+            assertTrue(result.message.contains("did not match expected share ID"))
+            assertEquals(listOf("/blob/$expectedShareId"), harness.downloadRequestPaths())
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            harness.close()
+        }
+    }
+
+    private fun encryptedShare(fillByte: Int): ByteArray = ByteArray(262_144) { fillByte.toByte() }
+
+    private fun sha256Hex(body: ByteArray): String {
+        return MessageDigest.getInstance("SHA-256").digest(body).joinToString("") { "%02x".format(it) }
     }
 }

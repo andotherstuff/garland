@@ -7,16 +7,20 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import java.util.Base64
+import okio.Buffer
 
 class FakeGarlandNetworkHarness : AutoCloseable {
     private val server = MockWebServer()
     private val uploadStatusCodes = ArrayDeque<Int>()
-    private val directDownloads = mutableMapOf<String, String>()
-    private val uploadPathDownloads = mutableMapOf<String, String>()
+    private val downloadBodies = mutableMapOf<String, ByteArray>()
+    private val uploadResponseBodies = mutableMapOf<String, String>()
     private val uploadedShareIds = mutableListOf<String>()
+    private val uploadAuthorizationJsons = mutableListOf<String>()
     private val relayEventIds = mutableListOf<String>()
     private val requestedDownloadPaths = mutableListOf<String>()
     private var relayMode: RelayMode = RelayMode.Accept("")
+    private var requireUploadAuthorization = false
 
     init {
         server.dispatcher = object : Dispatcher() {
@@ -48,11 +52,30 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     }
 
     fun enqueueDirectDownload(shareIdHex: String, body: String) {
-        directDownloads[shareIdHex] = body
+        downloadBodies["/$shareIdHex"] = body.toByteArray()
     }
 
     fun enqueueUploadPathDownload(shareIdHex: String, body: String) {
-        uploadPathDownloads[shareIdHex] = body
+        downloadBodies["/upload/$shareIdHex"] = body.toByteArray()
+    }
+
+    fun enqueueDownloadPath(path: String, body: ByteArray) {
+        val normalizedPath = if (path.startsWith('/')) path else "/$path"
+        downloadBodies[normalizedPath] = body
+    }
+
+    fun enqueueUploadDescriptor(shareIdHex: String, downloadPath: String = "/$shareIdHex") {
+        val normalizedPath = if (downloadPath.startsWith('/')) downloadPath else "/$downloadPath"
+        uploadResponseBodies[shareIdHex] = """
+            {
+              "url": "${server.url(normalizedPath)}",
+              "sha256": "$shareIdHex"
+            }
+        """.trimIndent()
+    }
+
+    fun requireUploadAuthorization() {
+        requireUploadAuthorization = true
     }
 
     fun acceptRelayEvents(reason: String = "") {
@@ -73,6 +96,8 @@ class FakeGarlandNetworkHarness : AutoCloseable {
 
     fun uploadedShareIds(): List<String> = uploadedShareIds.toList()
 
+    fun uploadAuthorizationJsons(): List<String> = uploadAuthorizationJsons.toList()
+
     fun receivedRelayEventIds(): List<String> = relayEventIds.toList()
 
     fun downloadRequestPaths(): List<String> = requestedDownloadPaths.toList()
@@ -82,21 +107,22 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     }
 
     private fun handleUpload(request: RecordedRequest): MockResponse {
-        request.getHeader("X-SHA-256")?.let(uploadedShareIds::add)
+        val shareId = request.getHeader("X-SHA-256")
+        shareId?.let(uploadedShareIds::add)
+        val authPayload = parseAuthorizationJson(request.getHeader("Authorization"))
+        authPayload?.let(uploadAuthorizationJsons::add)
+        if (requireUploadAuthorization && authPayload == null) {
+            return MockResponse().setResponseCode(401).setBody("{\"error\":\"missing blossom auth\"}")
+        }
         val statusCode = uploadStatusCodes.removeFirstOrNull() ?: 200
-        return MockResponse().setResponseCode(statusCode).setBody("{}")
+        val responseBody = shareId?.let(uploadResponseBodies::get) ?: "{}"
+        return MockResponse().setResponseCode(statusCode).setBody(responseBody)
     }
 
     private fun handleDownload(path: String): MockResponse {
         requestedDownloadPaths += path
-        if (path.startsWith("/upload/")) {
-            val shareId = path.removePrefix("/upload/")
-            val body = uploadPathDownloads[shareId] ?: return MockResponse().setResponseCode(404)
-            return MockResponse().setResponseCode(200).setBody(body)
-        }
-        val shareId = path.removePrefix("/")
-        val body = directDownloads[shareId] ?: return MockResponse().setResponseCode(404)
-        return MockResponse().setResponseCode(200).setBody(body)
+        val body = downloadBodies[path] ?: return MockResponse().setResponseCode(404)
+        return MockResponse().setResponseCode(200).setBody(Buffer().write(body))
     }
 
     private fun relayResponse(): MockResponse {
@@ -132,6 +158,14 @@ class FakeGarlandNetworkHarness : AutoCloseable {
                 .asJsonObject
                 .get("id")
                 .asString
+        }.getOrNull()
+    }
+
+    private fun parseAuthorizationJson(header: String?): String? {
+        if (header.isNullOrBlank() || !header.startsWith("Nostr ")) return null
+        return runCatching {
+            val encoded = header.removePrefix("Nostr ").trim()
+            Base64.getDecoder().decode(encoded).toString(Charsets.UTF_8)
         }.getOrNull()
     }
 

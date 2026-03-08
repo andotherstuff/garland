@@ -62,10 +62,6 @@ class GarlandSessionStore(context: Context) {
     }
 
     companion object {
-        internal fun normalizePrivateKeyHex(privateKeyHex: String?): String? {
-            return privateKeyHex?.trim()?.takeIf { it.isNotEmpty() }
-        }
-
         private const val KEY_PRIVATE_KEY_HEX = "private_key_hex"
         private const val KEY_SERVER_ONE = "server_one"
         private const val KEY_SERVER_TWO = "server_two"
@@ -73,5 +69,9 @@ class GarlandSessionStore(context: Context) {
         private const val KEY_RELAY_ONE = "relay_one"
         private const val KEY_RELAY_TWO = "relay_two"
         private const val KEY_RELAY_THREE = "relay_three"
+
+        internal fun normalizePrivateKeyHex(privateKeyHex: String?): String? {
+            return privateKeyHex?.trim()?.takeIf { it.isNotEmpty() }
+        }
     }
 }

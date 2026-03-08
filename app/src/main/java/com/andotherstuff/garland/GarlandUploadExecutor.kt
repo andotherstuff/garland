@@ -2,6 +2,8 @@ package com.andotherstuff.garland
 
 import android.content.Context
 import com.google.gson.Gson
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -22,6 +24,9 @@ open class GarlandUploadExecutor(
     private val client: OkHttpClient = OkHttpClient(),
     private val gson: Gson = Gson(),
     private val relayPublisher: NostrRelayPublisher = NostrRelayPublisher(client, gson),
+    private val privateKeyProvider: (() -> String?)? = null,
+    private val authEventSigner: BlossomAuthEventSigner = NativeBridgeBlossomAuthEventSigner(gson),
+    private val clock: () -> Long = { System.currentTimeMillis() / 1000 },
 ) {
     private companion object {
         const val UNREADABLE_UPLOAD_PLAN_MESSAGE = "Unreadable upload plan metadata"
@@ -32,6 +37,7 @@ open class GarlandUploadExecutor(
         val upload: UploadBody,
         val requestUrl: String,
         val body: ByteArray,
+        val authorizationHeader: String?,
     )
 
     private data class PreparedUploadResult(
@@ -44,7 +50,14 @@ open class GarlandUploadExecutor(
         context: Context,
         client: OkHttpClient = OkHttpClient(),
         gson: Gson = Gson(),
-    ) : this(LocalDocumentStoreImpl(context.applicationContext.filesDir.resolve("garland-documents")), client, gson)
+    ) : this(
+        store = LocalDocumentStoreImpl(context.applicationContext.filesDir.resolve("garland-documents")),
+        client = client,
+        gson = gson,
+        relayPublisher = NostrRelayPublisher(client, gson),
+        privateKeyProvider = GarlandSessionStore(context.applicationContext)::loadPrivateKeyHex,
+        authEventSigner = NativeBridgeBlossomAuthEventSigner(gson),
+    )
 
     open fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
         val raw = store.readUploadPlan(documentId)
@@ -79,8 +92,19 @@ open class GarlandUploadExecutor(
                 storeUploadPlanFailure(documentId, planDiagnostic(manifestFailure.field, manifestFailure.status, manifestFailure.message), manifestFailure.message)
             }
         }
+        val privateKeyHex = privateKeyProvider?.invoke()?.trim()?.takeIf { it.isNotEmpty() }
         val preparedUploads = uploads.mapIndexed { index, upload ->
-            val prepared = prepareUploadRequest(upload, index + 1)
+            val prepared = runCatching { prepareUploadRequest(upload, index + 1, privateKeyHex) }
+                .getOrElse { error ->
+                    val message = error.message ?: "Failed to prepare upload request"
+                    return UploadExecutionResult(false, 0, 0, false, message).also {
+                        storeUploadPlanFailure(
+                            documentId,
+                            planDiagnostic("plan.uploads[${index + 1}].auth", "invalid", message),
+                            message,
+                        )
+                    }
+                }
             if (prepared.errorMessage != null) {
                 return UploadExecutionResult(false, 0, 0, false, prepared.errorMessage).also {
                     storeUploadPlanFailure(
@@ -93,20 +117,24 @@ open class GarlandUploadExecutor(
             prepared.request!!
         }
         val uploadDiagnostics = mutableListOf<DocumentEndpointDiagnostic>()
+        val resolvedUploadTargets = mutableListOf<ResolvedUploadTarget>()
         var uploadedShares = 0
         preparedUploads.forEach { preparedUpload ->
             val upload = preparedUpload.upload
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(preparedUpload.requestUrl)
                 .header("X-SHA-256", upload.shareIdHex)
                 .header("X-Content-Length", preparedUpload.body.size.toString())
                 .header("X-Content-Type", "application/octet-stream")
                 .put(preparedUpload.body.toRequestBody("application/octet-stream".toMediaType()))
-                .build()
+            preparedUpload.authorizationHeader?.let {
+                requestBuilder.header("Authorization", it)
+            }
+            val request = requestBuilder.build()
 
             client.newCall(request).execute().use { responseBody ->
                 if (!responseBody.isSuccessful) {
-                    val message = "Upload failed on ${upload.serverUrl} with HTTP ${responseBody.code}"
+                    val message = uploadFailureMessage(upload.serverUrl, responseBody.code, privateKeyHex != null)
                     uploadDiagnostics += DocumentEndpointDiagnostic(upload.serverUrl, "http-${responseBody.code}", message)
                     store.updateUploadDiagnostics(
                         documentId,
@@ -122,10 +150,35 @@ open class GarlandUploadExecutor(
                         message = message,
                     )
                 }
+
+                val resolvedTarget = runCatching {
+                    parseUploadResponse(
+                        upload = upload,
+                        responseBodyText = responseBody.body?.string().orEmpty(),
+                    )
+                }.getOrElse { error ->
+                    val message = error.message ?: "Upload response validation failed"
+                    uploadDiagnostics += DocumentEndpointDiagnostic(upload.serverUrl, "response-invalid", message)
+                    store.updateUploadDiagnostics(
+                        documentId,
+                        "upload-response-invalid",
+                        message,
+                        DocumentSyncDiagnosticsCodec.encode(DocumentSyncDiagnostics(uploads = uploadDiagnostics)),
+                    )
+                    return UploadExecutionResult(
+                        success = false,
+                        attemptedShares = uploads.size,
+                        uploadedShares = uploadedShares,
+                        relayPublished = false,
+                        message = message,
+                    )
+                }
+                resolvedTarget?.let { resolvedUploadTargets += it }
             }
             uploadDiagnostics += DocumentEndpointDiagnostic(upload.serverUrl, "ok", "Uploaded share ${upload.shareIdHex}")
             uploadedShares += 1
         }
+        persistResolvedUploadTargets(documentId, raw, resolvedUploadTargets)
 
         val commitEvent = response.plan.commitEvent
             ?: return UploadExecutionResult(
@@ -183,7 +236,7 @@ open class GarlandUploadExecutor(
         )
     }
 
-    private fun prepareUploadRequest(upload: UploadBody, index: Int): PreparedUploadResult {
+    private fun prepareUploadRequest(upload: UploadBody, index: Int, privateKeyHex: String?): PreparedUploadResult {
         if (upload.serverUrl.isBlank()) {
             return PreparedUploadResult(
                 diagnostic = planDiagnostic("plan.uploads[$index].server_url", "missing", "Upload plan entry $index is missing Blossom server URL"),
@@ -230,8 +283,90 @@ open class GarlandUploadExecutor(
         }
 
         return PreparedUploadResult(
-            request = PreparedUploadRequest(upload = upload, requestUrl = requestUrl, body = body)
+            request = PreparedUploadRequest(
+                upload = upload,
+                requestUrl = requestUrl,
+                body = body,
+                authorizationHeader = buildAuthorizationHeader(privateKeyHex, upload.shareIdHex, index),
+            )
         )
+    }
+
+    private fun buildAuthorizationHeader(privateKeyHex: String?, shareIdHex: String, index: Int): String? {
+        if (privateKeyHex.isNullOrBlank()) return null
+        val createdAt = clock()
+        val expiration = createdAt + 300
+        val signedEvent = try {
+            authEventSigner.signUpload(privateKeyHex, shareIdHex, createdAt, expiration)
+        } catch (error: IllegalStateException) {
+            throw error
+        } catch (error: Exception) {
+            throw IllegalStateException("Failed to sign Blossom auth for upload plan entry $index: ${error.message ?: "unknown error"}")
+        }
+        val authJson = gson.toJson(signedEvent.toRelayEventPayload())
+        return "Nostr ${Base64.getEncoder().encodeToString(authJson.toByteArray(Charsets.UTF_8))}"
+    }
+
+    private fun parseUploadResponse(upload: UploadBody, responseBodyText: String): ResolvedUploadTarget? {
+        if (responseBodyText.isBlank()) return null
+        val payload = runCatching { JsonParser.parseString(responseBodyText) }.getOrNull()
+            ?.takeIf { it.isJsonObject }
+            ?.asJsonObject
+            ?: return null
+        val sha256 = payload.optionalString("sha256")
+        if (!sha256.isNullOrBlank() && !sha256.equals(upload.shareIdHex, ignoreCase = true)) {
+            throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} returned sha256 $sha256 for share ${upload.shareIdHex}"
+            )
+        }
+        val retrievalUrl = payload.optionalString("url")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        runCatching { Request.Builder().url(retrievalUrl).build() }
+            .getOrElse {
+                throw IllegalStateException(
+                    "Upload response from ${upload.serverUrl} returned invalid retrieval URL: ${it.message ?: retrievalUrl}"
+                )
+            }
+        return ResolvedUploadTarget(upload.serverUrl, upload.shareIdHex, retrievalUrl)
+    }
+
+    private fun persistResolvedUploadTargets(documentId: String, rawPlanJson: String, resolvedTargets: List<ResolvedUploadTarget>) {
+        if (resolvedTargets.isEmpty()) return
+        val targetMap = resolvedTargets.associateBy { it.serverUrl to it.shareIdHex }
+        val root = runCatching { JsonParser.parseString(rawPlanJson) }.getOrNull()
+            ?.takeIf { it.isJsonObject }
+            ?.asJsonObject
+            ?: return
+        val uploads = root.getAsJsonObject("plan")?.getAsJsonArray("uploads") ?: return
+        var mutated = false
+        uploads.forEach { element ->
+            val uploadObject = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+            val serverUrl = uploadObject.optionalString("server_url") ?: return@forEach
+            val shareIdHex = uploadObject.optionalString("share_id_hex") ?: return@forEach
+            val resolved = targetMap[serverUrl to shareIdHex] ?: return@forEach
+            if (uploadObject.optionalString("retrieval_url") != resolved.retrievalUrl) {
+                uploadObject.addProperty("retrieval_url", resolved.retrievalUrl)
+                mutated = true
+            }
+        }
+        if (mutated) {
+            store.saveUploadPlan(documentId, gson.toJson(root))
+        }
+    }
+
+    private fun uploadFailureMessage(serverUrl: String, statusCode: Int, attemptedAuth: Boolean): String {
+        return when (statusCode) {
+            401 -> if (attemptedAuth) {
+                "Upload failed on $serverUrl with HTTP 401 (server rejected Blossom auth)"
+            } else {
+                "Upload failed on $serverUrl with HTTP 401 (server likely requires Blossom auth)"
+            }
+            403 -> if (attemptedAuth) {
+                "Upload failed on $serverUrl with HTTP 403 (server denied Blossom auth)"
+            } else {
+                "Upload failed on $serverUrl with HTTP 403"
+            }
+            else -> "Upload failed on $serverUrl with HTTP $statusCode"
+        }
     }
 
     private fun invalidBlossomServerUrlMessage(index: Int, error: IllegalArgumentException): String {
@@ -254,6 +389,12 @@ open class GarlandUploadExecutor(
 
     private fun planDiagnostic(field: String, status: String, detail: String): DocumentPlanDiagnostic {
         return DocumentPlanDiagnostic(field = field, status = status, detail = detail)
+    }
+
+    private fun JsonObject.optionalString(fieldName: String): String? {
+        val field = get(fieldName) ?: return null
+        if (!field.isJsonPrimitive || !field.asJsonPrimitive.isString) return null
+        return field.asString
     }
 }
 
@@ -303,4 +444,11 @@ private data class UploadBody(
     @SerializedName("server_url") val serverUrl: String,
     @SerializedName("share_id_hex") val shareIdHex: String,
     @SerializedName("body_b64") val bodyBase64: String,
+    @SerializedName("retrieval_url") val retrievalUrl: String? = null,
+)
+
+private data class ResolvedUploadTarget(
+    val serverUrl: String,
+    val shareIdHex: String,
+    val retrievalUrl: String,
 )

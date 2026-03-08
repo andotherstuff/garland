@@ -8,6 +8,7 @@ use crate::identity::derive_nostr_identity;
 use crate::mvp_write::{
     prepare_single_block_write, recover_single_block_read, PrepareWriteRequest, RecoverReadRequest,
 };
+use crate::nostr_event::{sign_custom_event, UnsignedEvent};
 
 #[derive(Serialize)]
 struct IdentityResponse {
@@ -31,6 +32,13 @@ struct ReadRecoveryResponse {
     error: Option<String>,
 }
 
+#[derive(Serialize)]
+struct SignEventResponse {
+    ok: bool,
+    event: Option<serde_json::Value>,
+    error: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct PrepareWriteJson {
     private_key_hex: String,
@@ -47,6 +55,15 @@ struct RecoverReadJson {
     document_id: String,
     block_index: u32,
     encrypted_block_b64: String,
+}
+
+#[derive(Deserialize)]
+struct SignEventJson {
+    private_key_hex: String,
+    created_at: u64,
+    kind: u64,
+    tags: Vec<Vec<String>>,
+    content: String,
 }
 
 #[unsafe(no_mangle)]
@@ -186,6 +203,53 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_recoverSingle
             err
         )
     });
+
+    env.new_string(payload)
+        .expect("JNI should allocate response string")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_signCustomEvent(
+    mut env: JNIEnv,
+    _class: JClass,
+    request_json: JString,
+) -> jstring {
+    let request_json: String = env
+        .get_string(&request_json)
+        .map(|value| value.into())
+        .unwrap_or_default();
+
+    let response = match serde_json::from_str::<SignEventJson>(&request_json) {
+        Ok(request) => {
+            let event = UnsignedEvent {
+                created_at: request.created_at,
+                kind: request.kind,
+                tags: request.tags,
+                content: request.content,
+            };
+            match sign_custom_event(&request.private_key_hex, &event) {
+                Ok(signed_event) => SignEventResponse {
+                    ok: true,
+                    event: serde_json::to_value(signed_event).ok(),
+                    error: None,
+                },
+                Err(error) => SignEventResponse {
+                    ok: false,
+                    event: None,
+                    error: Some(error.to_string()),
+                },
+            }
+        }
+        Err(error) => SignEventResponse {
+            ok: false,
+            event: None,
+            error: Some(format!("invalid request json: {}", error)),
+        },
+    };
+
+    let payload = serde_json::to_string(&response)
+        .unwrap_or_else(|err| format!("{{\"ok\":false,\"event\":null,\"error\":\"{}\"}}", err));
 
     env.new_string(payload)
         .expect("JNI should allocate response string")

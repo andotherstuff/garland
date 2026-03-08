@@ -21,11 +21,13 @@ This repo intentionally targets the smallest Android MVP that can:
 - multi-block upload planning and multi-block restore support
 - local Garland document store with upload status tracking
 - `DocumentsProvider` integration with recent document, search, path lookup, write, delete, restore-on-read, and image thumbnail support
+- Blossom uploads now sign kind `24242` authorization events with the loaded identity when a server requires auth
 - WorkManager-backed background sync and restore with duplicate-job protection and retry classification for permanent vs transient failures
 - restore jobs read the loaded identity from session state instead of persisting the private key in WorkManager input
 - per-document upload and relay diagnostics preserved across queued and running status transitions
 - dedicated diagnostics reports now include recent per-document history and a copyable tester report
 - manifest validation now rejects duplicate or invalid server entries across upload and restore paths
+- restore now prefers server-returned retrieval URLs and explains downloaded-share mismatches before crypto recovery
 - provider MIME fallback naming now covers wildcard non-image creates such as `text/*` and `application/*`
 - Rust core for identity derivation, multi-block write planning, and block recovery
 

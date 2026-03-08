@@ -10,6 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
+import com.google.gson.JsonParser
 
 class GarlandUploadExecutorTest {
     @Test
@@ -692,5 +693,133 @@ class GarlandUploadExecutorTest {
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
         server.shutdown()
+    }
+
+    @Test
+    fun signsBlossomUploadAuthAndPersistsReturnedRetrievalUrl() {
+        val tempDir = Files.createTempDirectory("garland-upload-auth-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val harness = FakeGarlandNetworkHarness()
+
+        try {
+            harness.requireUploadAuthorization()
+            harness.enqueueUploadSuccess()
+            harness.enqueueUploadDescriptor("a1", "/blob/a1")
+            harness.acceptRelayEvents()
+            val document = store.createDocument("note.txt", "text/plain")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"${harness.blossomBaseUrl()}","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"${"b".repeat(64)}",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"${"c".repeat(128)}"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(
+                store = store,
+                client = client,
+                relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+                privateKeyProvider = { "deadbeef".repeat(8) },
+                authEventSigner = BlossomAuthEventSigner { _, shareIdHex, createdAt, expiration ->
+                    SignedRelayEvent(
+                        id = "a".repeat(64),
+                        pubkey = "b".repeat(64),
+                        createdAt = createdAt,
+                        kind = 24242,
+                        tags = listOf(
+                            listOf("t", "upload"),
+                            listOf("x", shareIdHex),
+                            listOf("expiration", expiration.toString()),
+                        ),
+                        content = "garland upload authorization",
+                        sig = "c".repeat(128),
+                    )
+                },
+            )
+
+            val result = executor.executeDocumentUpload(document.documentId, listOf(harness.relayWebSocketUrl()))
+
+            assertTrue(result.success)
+            val authJson = JsonParser.parseString(harness.uploadAuthorizationJsons().single()).asJsonObject
+            assertEquals(24242, authJson.get("kind").asInt)
+            assertEquals("upload", authJson.getAsJsonArray("tags")[0].asJsonArray[1].asString)
+            assertEquals("a1", authJson.getAsJsonArray("tags")[1].asJsonArray[1].asString)
+            assertTrue(store.readUploadPlan(document.documentId)?.contains("\"retrieval_url\":\"${harness.blossomBaseUrl()}/blob/a1\"") == true)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            harness.close()
+        }
+    }
+
+    @Test
+    fun explainsUnauthorizedUploadWhenServerRequiresBlossomAuth() {
+        val tempDir = Files.createTempDirectory("garland-upload-unauthorized-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val harness = FakeGarlandNetworkHarness()
+
+        try {
+            harness.requireUploadAuthorization()
+            val document = store.createDocument("note.txt", "text/plain")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"${harness.blossomBaseUrl()}","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"${"b".repeat(64)}",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"${"c".repeat(128)}"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(
+                store = store,
+                client = client,
+                relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+            )
+
+            val result = executor.executeDocumentUpload(document.documentId, listOf(harness.relayWebSocketUrl()))
+
+            assertFalse(result.success)
+            assertTrue(result.message.contains("requires Blossom auth"))
+            assertTrue(store.readRecord(document.documentId)?.lastSyncMessage?.contains("requires Blossom auth") == true)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            harness.close()
+        }
     }
 }
