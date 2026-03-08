@@ -193,6 +193,68 @@ class GarlandDownloadExecutorTest {
     }
 
     @Test
+    fun marksRestoreAsFailedWhenManifestBlocksAreMissingAndStoresPlanDiagnostic() {
+        val tempDir = Files.createTempDirectory("garland-download-missing-blocks-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123"
+                }
+              }
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandDownloadExecutor(store = store, recoverBlock = { error("should not recover") })
+
+        val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+        assertFalse(result.success)
+        assertEquals("Manifest has no blocks", result.message)
+        assertEquals("download-failed", store.readRecord(document.documentId)?.uploadStatus)
+        val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+        assertEquals("plan.manifest.blocks", diagnostics?.plan?.first()?.field)
+        assertEquals("missing", diagnostics?.plan?.first()?.status)
+    }
+
+    @Test
+    fun marksRestoreAsFailedWhenManifestBlockHasDuplicateServers() {
+        val tempDir = Files.createTempDirectory("garland-download-duplicate-servers-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123",
+                  "blocks": [
+                    {
+                      "index": 0,
+                      "share_id_hex": "aa",
+                      "servers": ["https://blossom.one", "https://blossom.one"]
+                    }
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandDownloadExecutor(store = store, recoverBlock = { error("should not recover") })
+
+        val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+        assertFalse(result.success)
+        assertEquals("Manifest block 0 has duplicate server URLs", result.message)
+        assertEquals("download-failed", store.readRecord(document.documentId)?.uploadStatus)
+    }
+
+    @Test
     fun marksRestoreAsFailedWhenManifestShareIdHexIsInvalid() {
         val tempDir = Files.createTempDirectory("garland-download-invalid-share-id-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)

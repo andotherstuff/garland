@@ -1,5 +1,7 @@
 package com.andotherstuff.garland
 
+import okhttp3.Request
+
 internal data class GarlandManifestValidationFailure(
     val field: String,
     val status: String,
@@ -138,8 +140,28 @@ internal object GarlandManifestValidator {
                     message = "Manifest block $expectedIndex has blank server URL",
                 )
             }
+            if (block.servers.distinct().size != block.servers.size) {
+                return GarlandManifestValidationFailure(
+                    field = "plan.manifest.blocks[$expectedIndex].servers",
+                    status = "invalid",
+                    message = "Manifest block $expectedIndex has duplicate server URLs",
+                )
+            }
+            if (block.servers.any { !isValidServerUrl(it) }) {
+                return GarlandManifestValidationFailure(
+                    field = "plan.manifest.blocks[$expectedIndex].servers",
+                    status = "invalid",
+                    message = "Invalid Blossom server URL in manifest block $expectedIndex",
+                )
+            }
         }
 
         return null
+    }
+
+    private fun isValidServerUrl(serverUrl: String): Boolean {
+        return runCatching {
+            Request.Builder().url(serverUrl.trimEnd('/') + "/health").build()
+        }.isSuccess
     }
 }

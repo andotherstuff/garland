@@ -14,6 +14,7 @@ data class LocalDocumentRecord(
     val uploadStatus: String,
     val lastSyncMessage: String? = null,
     val lastSyncDetailsJson: String? = null,
+    val syncHistoryJson: String? = null,
 )
 
 class LocalDocumentStore(private val context: Context) {
@@ -64,6 +65,10 @@ class LocalDocumentStoreImpl(
     private val baseDir: File,
     private val onDocumentChanged: ((String) -> Unit)? = null,
 ) {
+    private companion object {
+        const val MAX_SYNC_HISTORY_ENTRIES = 8
+    }
+
     private val blobDir = File(baseDir, "blobs")
     private val metaDir = File(baseDir, "meta")
     private val gson = Gson()
@@ -177,16 +182,24 @@ class LocalDocumentStoreImpl(
         clearDiagnostics: Boolean = false,
     ) {
         val current = readRecord(documentId) ?: return
+        val resolvedMessage = message ?: current.lastSyncMessage
+        val resolvedDiagnostics = when {
+            diagnosticsJson != null -> diagnosticsJson
+            clearDiagnostics -> null
+            else -> current.lastSyncDetailsJson
+        }
         writeRecord(
             current.copy(
                 uploadStatus = status,
                 updatedAt = System.currentTimeMillis(),
-                lastSyncMessage = message ?: current.lastSyncMessage,
-                lastSyncDetailsJson = when {
-                    diagnosticsJson != null -> diagnosticsJson
-                    clearDiagnostics -> null
-                    else -> current.lastSyncDetailsJson
-                },
+                lastSyncMessage = resolvedMessage,
+                lastSyncDetailsJson = resolvedDiagnostics,
+                syncHistoryJson = appendSyncHistory(
+                    existing = current.syncHistoryJson,
+                    status = status,
+                    message = resolvedMessage,
+                    diagnosticsJson = resolvedDiagnostics,
+                ),
             )
         )
         onDocumentChanged?.invoke(documentId)
@@ -201,6 +214,25 @@ class LocalDocumentStoreImpl(
 
     private fun writeRecord(record: LocalDocumentRecord) {
         metadataFile(record.documentId).writeText(gson.toJson(record))
+    }
+
+    private fun appendSyncHistory(
+        existing: String?,
+        status: String,
+        message: String?,
+        diagnosticsJson: String?,
+    ): String? {
+        val history = DocumentSyncHistoryCodec.decode(existing).orEmpty().toMutableList()
+        history.add(
+            0,
+            DocumentSyncHistoryEntry(
+                recordedAt = System.currentTimeMillis(),
+                status = status,
+                message = message,
+                diagnosticsJson = diagnosticsJson,
+            )
+        )
+        return DocumentSyncHistoryCodec.encode(history.take(MAX_SYNC_HISTORY_ENTRIES))
     }
 
     private fun isRecordMetadataFile(file: File): Boolean {

@@ -36,6 +36,12 @@ class DocumentDiagnosticsScreenPresenterTest {
             uploadStatus = "relay-published-partial",
             lastSyncMessage = "Published to 0/1 relays; failed: wss://relay.one (timeout)",
             lastSyncDetailsJson = diagnosticsJson,
+            syncHistoryJson = DocumentSyncHistoryCodec.encode(
+                listOf(
+                    DocumentSyncHistoryEntry(2_000L, "relay-published-partial", "Published to 0/1 relays; failed: wss://relay.one (timeout)", diagnosticsJson),
+                    DocumentSyncHistoryEntry(1_000L, "sync-running", "Queued Garland sync in background", null),
+                )
+            ),
         )
         val other = record(documentId = "doc-other", displayName = "other.txt", updatedAt = 10)
 
@@ -52,6 +58,9 @@ class DocumentDiagnosticsScreenPresenterTest {
         assertTrue(state.uploads?.contains("blossom.one [OK] Uploaded share a1") == true)
         assertEquals("Relays (1/1 failed)", state.relaysLabel)
         assertTrue(state.relays?.contains("relay.one [Failed] timeout") == true)
+        assertEquals("Recent history (2 entries)", state.historyLabel)
+        assertTrue(state.history?.contains("Relay published partial") == true)
+        assertTrue(state.exportText.contains("Diagnostics report for selected.txt"))
         assertEquals(listOf("selected.txt", "other.txt"), state.documentOptions.map { it.label })
     }
 
@@ -67,6 +76,8 @@ class DocumentDiagnosticsScreenPresenterTest {
         assertEquals("Diagnostics", state.title)
         assertEquals("No local Garland documents yet.", state.selectedLabel)
         assertEquals("Select a document to inspect diagnostics.", state.overview)
+        assertEquals(null, state.historyLabel)
+        assertEquals("No local Garland documents yet.", state.exportText)
         assertTrue(state.documentOptions.isEmpty())
     }
 
@@ -77,6 +88,7 @@ class DocumentDiagnosticsScreenPresenterTest {
         uploadStatus: String = "pending-local-write",
         lastSyncMessage: String? = null,
         lastSyncDetailsJson: String? = null,
+        syncHistoryJson: String? = null,
     ): LocalDocumentRecord {
         return LocalDocumentRecord(
             documentId = documentId,
@@ -87,6 +99,7 @@ class DocumentDiagnosticsScreenPresenterTest {
             uploadStatus = uploadStatus,
             lastSyncMessage = lastSyncMessage,
             lastSyncDetailsJson = lastSyncDetailsJson,
+            syncHistoryJson = syncHistoryJson,
         )
     }
 

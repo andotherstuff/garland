@@ -15,6 +15,8 @@ object DocumentDiagnosticsFormatter {
         val uploads: String?,
         val relaysLabel: String?,
         val relays: String?,
+        val historyLabel: String?,
+        val history: String?,
     )
 
     fun listLabel(record: LocalDocumentRecord, summary: GarlandPlanSummary?, isSelected: Boolean, planMalformed: Boolean = false): String {
@@ -83,6 +85,8 @@ object DocumentDiagnosticsFormatter {
                 uploads = null,
                 relaysLabel = null,
                 relays = null,
+                historyLabel = null,
+                history = null,
             )
         }
         val lines = mutableListOf<String>()
@@ -133,6 +137,9 @@ object DocumentDiagnosticsFormatter {
         val relayDiagnostics = diagnostics?.relays
             ?.takeIf { it.isNotEmpty() }
             ?.let(::prioritizeFailingEndpoints)
+        val historyEntries = record.syncHistoryJson
+            ?.let(DocumentSyncHistoryCodec::decode)
+            .orEmpty()
         val legacyRelayFailures = extractFailureEntries(record.lastSyncMessage)
         val relays = when {
             !relayDiagnostics.isNullOrEmpty() -> relayDiagnostics.joinToString("\n", transform = ::formatEndpointDiagnostic)
@@ -144,6 +151,12 @@ object DocumentDiagnosticsFormatter {
             legacyRelayFailures.isNotEmpty() -> "Relays (${legacyRelayFailures.size} failed)"
             else -> null
         }
+        val history = historyEntries
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString("\n", transform = ::formatHistoryEntry)
+        val historyLabel = historyEntries
+            .takeIf { it.isNotEmpty() }
+            ?.let { "Recent history (${it.size} entries)" }
         if (shouldShowPreservedDiagnosticsHint(record.uploadStatus, uploads, relays)) {
             lines += PRESERVED_DIAGNOSTICS_LABEL
         }
@@ -153,6 +166,8 @@ object DocumentDiagnosticsFormatter {
             uploads = uploads,
             relaysLabel = relaysLabel,
             relays = relays,
+            historyLabel = historyLabel,
+            history = history,
         )
     }
 
@@ -162,7 +177,21 @@ object DocumentDiagnosticsFormatter {
             sections.overview,
             sections.uploads?.let { "${sections.uploadsLabel}:\n$it" },
             sections.relays?.let { "${sections.relaysLabel}:\n$it" },
+            sections.history?.let { "${sections.historyLabel}:\n$it" },
         ).filterNotNull().joinToString("\n")
+    }
+
+    fun exportText(record: LocalDocumentRecord?, summary: GarlandPlanSummary?, planMalformed: Boolean = false): String {
+        if (record == null) return "No local Garland documents yet."
+        val sections = detailSections(record, summary, planMalformed)
+        return listOf(
+            "Diagnostics report for ${record.displayName}",
+            "Document ID: ${record.documentId}",
+            sections.overview,
+            sections.uploads?.let { "${sections.uploadsLabel}:\n$it" },
+            sections.relays?.let { "${sections.relaysLabel}:\n$it" },
+            sections.history?.let { "${sections.historyLabel}:\n$it" },
+        ).filterNotNull().joinToString("\n\n")
     }
 
     fun hasUploadDiagnostics(record: LocalDocumentRecord?, summary: GarlandPlanSummary?, planMalformed: Boolean = false): Boolean {
@@ -200,6 +229,14 @@ object DocumentDiagnosticsFormatter {
 
     private fun formatPlanDiagnostic(diagnostic: DocumentPlanDiagnostic): String {
         return "- ${normalizePlanField(diagnostic.field)} [${formatPlanStatus(diagnostic.status)}] ${diagnostic.detail}"
+    }
+
+    private fun formatHistoryEntry(entry: DocumentSyncHistoryEntry): String {
+        val summary = listOf(
+            formatStatus(entry.status),
+            entry.message?.trim()?.takeIf { it.isNotEmpty() },
+        ).joinToString(" - ")
+        return "- $summary"
     }
 
     private fun prioritizeFailingPlanDiagnostics(diagnostics: List<DocumentPlanDiagnostic>): List<DocumentPlanDiagnostic> {

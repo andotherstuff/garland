@@ -118,4 +118,47 @@ class LocalDocumentStoreTest {
         assertEquals("sync-running", store.readRecord(document.documentId)?.uploadStatus)
         assertEquals("relay timeout", store.readRecord(document.documentId)?.lastSyncMessage)
     }
+
+    @Test
+    fun appendsRecentSyncHistoryEntriesForDiagnostics() {
+        val tempDir = Files.createTempDirectory("garland-store-history-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        val firstDiagnostics = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(DocumentEndpointDiagnostic("https://blossom.one", "failed", "timeout")),
+            )
+        )
+        val secondDiagnostics = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                relays = listOf(DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event")),
+            )
+        )
+
+        store.updateUploadDiagnostics(document.documentId, "upload-http-500", "Upload failed on blossom.one with HTTP 500", firstDiagnostics)
+        store.updateUploadDiagnostics(document.documentId, "relay-published", "Published to 1/1 relays", secondDiagnostics)
+
+        val history = DocumentSyncHistoryCodec.decode(store.readRecord(document.documentId)?.syncHistoryJson)
+
+        assertEquals(2, history?.size)
+        assertEquals("relay-published", history?.first()?.status)
+        assertEquals("upload-http-500", history?.get(1)?.status)
+    }
+
+    @Test
+    fun capsRecentSyncHistoryAtEightEntries() {
+        val tempDir = Files.createTempDirectory("garland-store-history-cap-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+
+        repeat(10) { index ->
+            store.updateUploadStatus(document.documentId, "status-$index", "message-$index")
+        }
+
+        val history = DocumentSyncHistoryCodec.decode(store.readRecord(document.documentId)?.syncHistoryJson)
+
+        assertEquals(8, history?.size)
+        assertEquals("status-9", history?.first()?.status)
+        assertEquals("status-2", history?.last()?.status)
+    }
 }

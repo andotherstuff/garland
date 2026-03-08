@@ -15,6 +15,9 @@ data class DocumentDiagnosticsScreenState(
     val uploads: String?,
     val relaysLabel: String?,
     val relays: String?,
+    val historyLabel: String?,
+    val history: String?,
+    val exportText: String,
     val documentOptions: List<DocumentDiagnosticsOption>,
 )
 
@@ -38,6 +41,9 @@ object DocumentDiagnosticsScreenPresenter {
             uploads = sections.uploads,
             relaysLabel = sections.relaysLabel,
             relays = sections.relays,
+            historyLabel = sections.historyLabel,
+            history = sections.history,
+            exportText = DocumentDiagnosticsFormatter.exportText(selectedRecord, summary),
             documentOptions = sortedRecords.map { record ->
                 DocumentDiagnosticsOption(
                     documentId = record.documentId,

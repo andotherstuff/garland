@@ -1,5 +1,7 @@
 package com.andotherstuff.garland
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -24,6 +26,7 @@ class DiagnosticsActivity : AppCompatActivity() {
         selectedDocumentId = intent.getStringExtra(EXTRA_DOCUMENT_ID)
 
         binding.refreshDiagnosticsButton.setOnClickListener { render() }
+        binding.copyDiagnosticsButton.setOnClickListener { copyDiagnosticsReport() }
         render()
     }
 
@@ -44,7 +47,16 @@ class DiagnosticsActivity : AppCompatActivity() {
         binding.diagnosticsOverviewText.text = state.overview
         bindDiagnosticSection(binding.diagnosticsUploadsLabel, binding.diagnosticsUploadsText, state.uploadsLabel, state.uploads)
         bindDiagnosticSection(binding.diagnosticsRelaysLabel, binding.diagnosticsRelaysText, state.relaysLabel, state.relays)
+        bindDiagnosticSection(binding.diagnosticsHistoryLabel, binding.diagnosticsHistoryText, state.historyLabel, state.history)
         renderDocumentOptions(state.documentOptions)
+        binding.copyDiagnosticsButton.isEnabled = state.selectedDocumentId != null
+        binding.copyDiagnosticsButton.tag = state.exportText
+    }
+
+    private fun copyDiagnosticsReport() {
+        val report = binding.copyDiagnosticsButton.tag as? String ?: return
+        val clipboard = getSystemService(ClipboardManager::class.java) ?: return
+        clipboard.setPrimaryClip(ClipData.newPlainText("Garland diagnostics", report))
     }
 
     private fun renderDocumentOptions(options: List<DocumentDiagnosticsOption>) {

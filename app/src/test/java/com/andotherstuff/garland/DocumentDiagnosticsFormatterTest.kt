@@ -654,4 +654,39 @@ class DocumentDiagnosticsFormatterTest {
         assertTrue(details.contains("Planned servers:"))
         assertTrue(details.contains("- blossom.one"))
     }
+
+    @Test
+    fun buildsHistorySectionAndExportTextForDiagnostics() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(DocumentEndpointDiagnostic("https://blossom.one", "failed", "HTTP 500")),
+                relays = listOf(DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event")),
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "relay-published",
+            lastSyncMessage = "Published to 1/1 relays",
+            lastSyncDetailsJson = diagnosticsJson,
+            syncHistoryJson = DocumentSyncHistoryCodec.encode(
+                listOf(
+                    DocumentSyncHistoryEntry(2_000L, "relay-published", "Published to 1/1 relays", diagnosticsJson),
+                    DocumentSyncHistoryEntry(1_000L, "upload-http-500", "Upload failed on blossom.one with HTTP 500", diagnosticsJson),
+                )
+            ),
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+        val exportText = DocumentDiagnosticsFormatter.exportText(record, summary = null)
+
+        assertEquals("Recent history (2 entries)", sections.historyLabel)
+        assertTrue(sections.history?.contains("Relay published") == true)
+        assertTrue(sections.history?.contains("Upload HTTP 500") == true)
+        assertTrue(exportText.contains("Diagnostics report for note.txt"))
+        assertTrue(exportText.contains("Recent history (2 entries):"))
+    }
 }
