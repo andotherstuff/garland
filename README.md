@@ -46,6 +46,12 @@ This repo intentionally targets the smallest Android MVP that can:
 - `cargo test` passes for the Rust core
 - connected Android instrumentation and manual device checks remain the only open alpha-release gates
 
+## Resource-safe Gradle usage
+
+- Use `./automation/gradle_capped.sh <tasks...>` for Garland Gradle work when possible.
+- The wrapper forces low-priority single-worker Gradle runs with `nice`, `ionice`, `--no-daemon`, and `ActiveProcessorCount=1` so builds are less likely to stall the machine.
+- Repo automation already uses the capped wrapper for no-device verification and agent loops.
+
 ## Alpha Release Gaps
 
 - run `./gradlew connectedDebugAndroidTest` on a connected emulator or device
