@@ -65,7 +65,12 @@ This file tracks the next integration wave after the current Garland MVP.
     - keep the dedicated diagnostics view aligned with tester feedback
     - validate whether the new recent-history and copy-report path is enough for alpha sign-off
 
-4. Provider polish
+4. Transfer resilience follow-through
+    - validate authenticated Blossom uploads against real servers that require `kind 24242` auth
+    - verify persisted retrieval URLs on real servers and confirm no fallback mismatch cases remain
+    - surface clearer distinctions between unauthorized, missing-share, malformed-response, and corrupted-share failures
+
+5. Provider polish
     - confirm wildcard and non-image MIME handling on a real device
     - verify tree/document contract edges on real devices
 
@@ -104,11 +109,16 @@ This file tracks the next integration wave after the current Garland MVP.
     - keep the current summary in `MainActivity`
     - collect on-device feedback on the new dedicated history and copy-report flow
 
-3. Harden provider and manifest edges
+3. Validate live transport interop
+    - test authenticated Blossom upload against at least one auth-required server
+    - confirm server-returned retrieval URLs restore correctly end-to-end
+    - capture any server-specific auth or retrieval quirks for operator docs
+
+4. Harden provider and manifest edges
     - verify wildcard MIME handling beyond image thumbnails on-device
     - verify malformed or incomplete multi-block manifests fail cleanly on-device
 
-4. Work the alpha release checklist
+5. Work the alpha release checklist
     - run `automation/verify_alpha_no_device.sh`
     - capture `./gradlew jacocoDebugUnitTestReport`
     - capture `python3 automation/report_android_unit_coverage.py`

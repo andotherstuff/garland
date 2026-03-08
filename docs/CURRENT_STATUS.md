@@ -43,7 +43,7 @@
 - `automation/verify_alpha_no_device.sh` -> pass
 - `./gradlew testDebugUnitTest` -> pass
 - `./gradlew jacocoDebugUnitTestReport` -> pass
-- `python3 automation/report_android_unit_coverage.py` -> 59% instruction, 50% branch, 56.6% line coverage
+- `python3 automation/report_android_unit_coverage.py` -> 59% instruction, 50% branch, 57.2% line coverage
 - `./gradlew compileDebugAndroidTestKotlin` -> pass
 - `./gradlew assembleDebug` -> pass
 - `./gradlew lintDebug` -> pass
