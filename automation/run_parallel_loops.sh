@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT="/home/vibe/garland"
-PARENT="/home/vibe/garland-worktrees"
+RUN_ID="${RUN_ID:-loop-$(date +%Y%m%d-%H%M%S)}"
+PARENT="/home/vibe/garland-worktrees/$RUN_ID"
 ROUNDS="${1:-4}"
 LOOPS="${2:-3}"
 
@@ -18,6 +19,7 @@ WORKLOADS=(
 )
 
 mkdir -p "$PARENT"
+mkdir -p "$ROOT/.autoloop-logs"
 
 PIDS=()
 WORKTREE_PATHS=()
@@ -25,15 +27,11 @@ WORKTREE_PATHS=()
 for entry in "${WORKLOADS[@]:0:$LOOPS}"; do
   name="${entry%%:*}"
   workload_rel="${entry#*:}"
-  branch="loop/$name"
+  branch="loop/$RUN_ID/$name"
   worktree="$PARENT/$name"
-  log_file="$ROOT/.autoloop-logs/${name}-runner.log"
+  log_file="$ROOT/.autoloop-logs/${name}-${RUN_ID}.log"
 
-  rm -rf "$worktree"
   git -C "$ROOT" worktree add -b "$branch" "$worktree" HEAD
-  rm -rf "$worktree/automation"
-  cp -R "$ROOT/automation" "$worktree/automation"
-  chmod +x "$worktree/automation/opencode_scoped_loop.sh"
   (
     cd "$worktree"
     ./automation/opencode_scoped_loop.sh "$worktree" "$workload_rel" "$ROUNDS" "$name"
@@ -54,6 +52,7 @@ printf 'Worktrees:\n'
 for path in "${WORKTREE_PATHS[@]}"; do
   printf -- '- %s\n' "$path"
 done
+printf 'Run ID: %s\n' "$RUN_ID"
 
 if [ "$failed" -ne 0 ]; then
   echo "One or more loops failed. Check .autoloop-logs/*-runner.log"

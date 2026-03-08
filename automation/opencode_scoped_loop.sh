@@ -16,6 +16,7 @@ STATE_FILE="$ROOT/.autoloop-state-$LOOP_NAME.md"
 ANDROID_HOME_DEFAULT="/home/vibe/Android"
 export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_HOME_DEFAULT}"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 
 mkdir -p "$LOG_DIR"
 
@@ -73,11 +74,17 @@ Anti-drift rules:
 - Do not touch release metadata or GitHub state.
 - Update NEXT_WAVE.md only if a todo item is actually complete and the evidence exists.
 - When Gradle needs the Android SDK, use the existing environment variables ANDROID_HOME and ANDROID_SDK_ROOT already set in the shell.
+- The worktree already contains the repo automation files. Do not copy or duplicate the automation directory.
+- Prefer repo-local commands that work without extra shell setup.
+- If Android commands need adb or emulator, they should work from PATH in this shell.
 
 Verification rules:
 - Run the smallest correct verification commands for the files you changed.
 - If tests fail, fix them before ending the round.
 - Prefer empirical verification over code inspection.
+- If a Gradle daemon disappears, retry the same verification with `./gradlew --no-daemon ...` before declaring failure.
+- Before running `connectedDebugAndroidTest`, check whether a device is available with `adb devices`.
+- If no device is connected, do not fail the round for that alone; run compile-time Android test verification instead and record the device block clearly.
 
 Output format at the end:
 ROUND_STATUS: <done or blocked>
