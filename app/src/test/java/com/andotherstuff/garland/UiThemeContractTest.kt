@@ -108,6 +108,25 @@ class UiThemeContractTest {
     }
 
     @Test
+    fun diagnosticsViewsUseReadableDetailTypography() {
+        val stylesXml = projectFile("app", "src", "main", "res", "values", "styles.xml")
+        val mainLayout = projectFile("app", "src", "main", "res", "layout", "activity_main.xml")
+        val diagnosticsLayout = projectFile("app", "src", "main", "res", "layout", "activity_diagnostics.xml")
+
+        assertTrue(stylesXml.contains("TextAppearance.Garland.DiagnosticsBody"))
+        assertTrue(mainLayout.contains("@style/TextAppearance.Garland.DiagnosticsBody"))
+        assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.DiagnosticsBody"))
+        assertTrue(mainLayout.contains("@+id/activeDocumentDiagnosticsText"))
+        assertTrue(mainLayout.contains("@+id/activeDocumentUploadsText"))
+        assertTrue(mainLayout.contains("@+id/activeDocumentRelaysText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsOverviewText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsUploadsText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsRelaysText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsHistoryText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsTroubleshootingText"))
+    }
+
+    @Test
     fun styleAndColorTokensExposeSemanticDiagnosticStates() {
         val stylesXml = projectFile("app", "src", "main", "res", "values", "styles.xml")
         val colorsXml = projectFile("app", "src", "main", "res", "values", "colors.xml")

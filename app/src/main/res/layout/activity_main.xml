@@ -136,7 +136,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_content_gap"
                     android:text="@string/active_document_diagnostics_none"
-                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+                    android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody" />
 
                 <TextView
                     android:id="@+id/activeDocumentUploadsLabel"
@@ -152,8 +152,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:textColor="@color/garland_muted"
-                    android:textSize="13sp"
+                    android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
                     android:visibility="gone" />
 
                 <TextView
@@ -170,8 +169,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:textColor="@color/garland_muted"
-                    android:textSize="13sp"
+                    android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
                     android:visibility="gone" />
 
                 <com.google.android.material.button.MaterialButton

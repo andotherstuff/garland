@@ -85,6 +85,12 @@
         <item name="android:lineSpacingExtra">3dp</item>
     </style>
 
+    <style name="TextAppearance.Garland.DiagnosticsBody" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/garland_muted</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:lineSpacingExtra">4dp</item>
+    </style>
+
     <style name="TextAppearance.Garland.BodyStrong" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/garland_ink</item>
     </style>
