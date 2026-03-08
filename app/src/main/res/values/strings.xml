@@ -19,6 +19,9 @@ sha256 %6$s</string>
     <string name="active_document_diagnostic">Last result: %s</string>
     <string name="active_document_storage">Local bytes: %1$d • plan: %2$s</string>
     <string name="active_document_servers">Servers: %s</string>
+    <string name="open_diagnostics_button">Open full diagnostics</string>
+    <string name="diagnostics_refresh_button">Refresh diagnostics</string>
+    <string name="diagnostics_documents_label">Document diagnostics</string>
     <string name="local_documents_label">Local Garland documents</string>
     <string name="refresh_documents_button">Refresh</string>
     <string name="sync_documents_button">Sync pending</string>

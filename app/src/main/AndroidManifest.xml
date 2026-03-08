@@ -12,6 +12,10 @@
         android:theme="@style/Theme.Garland">
 
         <activity
+            android:name=".DiagnosticsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

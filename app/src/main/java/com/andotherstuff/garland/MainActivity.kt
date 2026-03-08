@@ -103,6 +103,10 @@ class MainActivity : AppCompatActivity() {
             refreshDocumentList(preparedDocumentId)
         }
 
+        binding.openDiagnosticsButton.setOnClickListener {
+            startActivity(DiagnosticsActivity.createIntent(this, preparedDocumentId))
+        }
+
         binding.syncDocumentsButton.setOnClickListener {
             val relays = currentRelays()
             session.saveRelays(relays)

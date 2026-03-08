@@ -17,6 +17,7 @@ This repo intentionally targets the smallest Android MVP that can:
 ## Current MVP
 
 - native Android screen for identity, upload prep, upload retry, remote restore, and local document selection
+- dedicated diagnostics screen for tester-facing per-document upload and relay triage
 - multi-block upload planning and multi-block restore support
 - local Garland document store with upload status tracking
 - `DocumentsProvider` integration with recent document, search, path lookup, write, delete, restore-on-read, and image thumbnail support
@@ -24,11 +25,18 @@ This repo intentionally targets the smallest Android MVP that can:
 - per-document upload and relay diagnostics preserved across queued and running status transitions
 - Rust core for identity derivation, multi-block write planning, and block recovery
 
+## Verified Status
+
+- `./gradlew test` passes for the Android unit-test suite
+- `./gradlew assembleDebug` builds the debug APK successfully
+- `cargo test` passes for the Rust core
+- connected Android instrumentation is still not verified in-repo and remains an alpha-release gate
+
 ## Alpha Release Gaps
 
 - run the Android instrumentation suite on a connected emulator or device as part of release verification
 - add a local fake Blossom and relay harness for end-to-end upload, sync, restore, and retry coverage
-- move the inline diagnostics details into a dedicated diagnostics screen or flow for tester-facing triage
+- expand diagnostics beyond the current latest-result view if alpha testing needs longer per-document history
 
 ## License
 

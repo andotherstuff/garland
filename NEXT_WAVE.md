@@ -14,15 +14,23 @@ This file tracks the next integration wave after the current Garland MVP.
 - WorkManager-backed sync and restore with unique work lanes and permanent-vs-transient retry rules
 - preserved upload/relay diagnostics across queued, running, restore, and retry status changes
 
+## Current Status
+
+- Android unit tests pass with `./gradlew test`
+- Rust core tests pass with `cargo test`
+- debug build passes with `./gradlew assembleDebug`
+- connected instrumentation is still pending because it has not been run on an emulator or device
+- `MainActivity` keeps a compact diagnostics summary and now opens a dedicated diagnostics screen for fuller per-document triage
+
 ## Alpha Blockers
 
 1. End-to-end Android verification
-   - run connected instrumentation for provider flow and diagnostics flow on an emulator or device
+   - run connected instrumentation for provider flow, worker flow, and diagnostics flow on an emulator or device
    - add a repeatable local fake Blossom/relay harness for upload, sync, restore, and retry coverage
 
 2. Diagnostics UX
-   - move inline document diagnostics into a dedicated diagnostics view or screen
    - make per-server and per-relay failures easier for testers to scan and export
+   - extend the dedicated diagnostics screen if alpha testing needs longer per-document history
 
 3. Provider and file handling polish
    - exercise thumbnail behavior and provider contracts on-device
@@ -39,11 +47,15 @@ This file tracks the next integration wave after the current Garland MVP.
    - fake relay acceptance, rejection, timeout, and malformed endpoint cases
    - wire the harness into Android instrumentation
 
-2. Diagnostics screen
-   - promote the current inline diagnostics into a full tester-facing inspection flow
-   - include per-document history for upload, relay publish, sync, and restore
+2. Connected-device verification pass
+   - bring up an emulator or device path that can run `connectedDebugAndroidTest`
+   - execute provider, worker, and diagnostics instrumentation against the current MVP before more UI churn
 
-3. Provider polish
+3. Diagnostics screen follow-through
+   - keep the new dedicated diagnostics view aligned with tester feedback
+   - add longer per-document history if the current latest-result view is not enough
+
+4. Provider polish
    - broaden MIME-aware behavior beyond images
    - verify tree/document contract edges on real devices
 
@@ -67,4 +79,28 @@ This file tracks the next integration wave after the current Garland MVP.
 - [x] Prevent duplicate sync/restore jobs and classify permanent worker failures
 - [ ] Run connected Android instrumentation on an emulator or device
 - [ ] Add a local fake Blossom/relay harness for end-to-end verification
-- [ ] Add a dedicated diagnostics screen for alpha testers
+- [x] Add a dedicated diagnostics screen for alpha testers
+
+## Clean Next Steps
+
+1. Get a repeatable Android test target running
+   - install or connect an emulator/device path that exposes `adb`
+   - run `./gradlew connectedDebugAndroidTest`
+   - capture failures as either harness gaps or product bugs
+
+2. Build the fake network harness
+   - cover Blossom upload/download success and failure cases
+   - cover relay accept, reject, timeout, and malformed-response cases
+   - route instrumentation tests through the harness instead of public endpoints
+
+3. Extend diagnostics follow-through
+   - keep the current summary in `MainActivity`
+   - add longer per-document history if alpha testing shows the dedicated screen needs it
+
+4. Harden provider and manifest edges
+   - add MIME-aware handling beyond image thumbnails
+   - verify malformed or incomplete multi-block manifests fail cleanly
+
+5. Write an alpha release checklist
+   - include build, unit tests, connected instrumentation, and manual provider checks
+   - freeze the exact commands and evidence needed for sign-off

@@ -113,6 +113,14 @@
         android:textSize="13sp"
         android:visibility="gone" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/openDiagnosticsButton"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/open_diagnostics_button" />
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
