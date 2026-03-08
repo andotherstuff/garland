@@ -419,6 +419,13 @@ open class GarlandUploadExecutor(
         return recordType ?: "application/octet-stream"
     }
 
+    private fun resolveUploadContentType(documentId: String, manifestMimeType: String?): String {
+        val manifestType = manifestMimeType?.trim()?.takeIf { it.isNotEmpty() }
+        if (manifestType != null) return manifestType
+        val recordType = store.readRecord(documentId)?.mimeType?.trim()?.takeIf { it.isNotEmpty() }
+        return recordType ?: "application/octet-stream"
+    }
+
     private fun parseUploadResponse(upload: UploadBody, responseBodyText: String): ResolvedUploadTarget? {
         if (responseBodyText.isBlank()) return null
         val payload = runCatching { JsonParser.parseString(responseBodyText) }.getOrNull()
@@ -561,6 +568,7 @@ open class GarlandUploadExecutor(
             server.host == retrieval.host &&
             server.port == retrieval.port
     }
+
     private fun JsonObject.optionalString(fieldName: String): String? {
         val field = get(fieldName) ?: return null
         if (!field.isJsonPrimitive || !field.asJsonPrimitive.isString) return null

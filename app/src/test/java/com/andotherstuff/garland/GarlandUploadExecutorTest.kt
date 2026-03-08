@@ -680,7 +680,7 @@ class GarlandUploadExecutorTest {
             )
 
             val client = OkHttpClient()
-            val executor = GarlandUploadExecutor(store, client)
+            val executor = GarlandUploadExecutor(store, client, retrySleep = {})
             val result = executor.executeDocumentUpload(document.documentId, listOf(relayUrl))
 
             assertTrue(result.success)
@@ -991,6 +991,7 @@ class GarlandUploadExecutorTest {
             assertEquals(1, harness.uploadAuthorizationHeaders().size)
             assertFalse(harness.uploadAuthorizationHeaders().single().contains('='))
             assertTrue(store.readUploadPlan(document.documentId)?.contains("\"retrieval_url\":\"${harness.blossomBaseUrl()}/blob/$HELLO_SHARE_ID\"") == true)
+            assertEquals(listOf("text/plain"), harness.uploadContentTypes())
 
             client.dispatcher.cancelAll()
             client.dispatcher.executorService.shutdown()
