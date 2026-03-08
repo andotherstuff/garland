@@ -45,6 +45,10 @@ struct PrepareWriteJson {
     created_at: u64,
     content_b64: String,
     servers: Vec<String>,
+    #[serde(default)]
+    document_id: Option<String>,
+    #[serde(default)]
+    previous_event_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -133,6 +137,8 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_prepareSingle
                 created_at: request.created_at,
                 content_b64: request.content_b64,
                 servers: request.servers,
+                document_id: request.document_id,
+                previous_event_id: request.previous_event_id,
             };
             match prepare_single_block_write(&request) {
                 Ok(plan) => WritePlanResponse {

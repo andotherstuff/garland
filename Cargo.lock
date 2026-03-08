@@ -244,6 +244,7 @@ dependencies = [
  "hmac",
  "jni",
  "nostr",
+ "pbkdf2",
  "pretty_assertions",
  "rand",
  "serde",

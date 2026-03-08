@@ -25,8 +25,9 @@ Rules:
 - If you touch Rust core code, rebuild JNI libs with:
   ANDROID_NDK_HOME="/home/vibe/Android/ndk/27.2.12479018" cargo ndk -t arm64-v8a -t x86_64 -o app/src/main/jniLibs build --release
 - Verify every round with the smallest correct set of commands:
-  - run ./gradlew test for Kotlin/Android code changes
-  - run ./gradlew assembleDebug when Android app code, manifest, resources, or Gradle config changed
+  - run focused Gradle tests for Kotlin/Android code changes; prefer `./gradlew --max-workers=2 :app:testDebugUnitTest` or narrower test targets over full app builds
+  - run `./gradlew --max-workers=2 compileDebugAndroidTestKotlin` when Android test-source compile coverage is enough
+  - run `./gradlew --max-workers=2 assembleDebug` only for release prep, packaging/build-system changes, manifest/resource changes that need APK validation, JNI integration changes, or suspected build-only bugs
   - run cargo test when Rust code changed
 - Fix any failures before ending the round.
 

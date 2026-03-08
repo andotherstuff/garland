@@ -248,6 +248,8 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             content = content,
             blossomServers = session.resolvedBlossomServers(),
             createdAt = System.currentTimeMillis() / 1000,
+            documentId = record.documentId,
+            previousEventId = record.lastCommitEventId,
         )
         val responseJson = NativeBridge.prepareSingleBlockWrite(requestJson)
         store.saveUploadPlan(documentId, responseJson)

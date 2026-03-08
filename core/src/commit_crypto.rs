@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use thiserror::Error;
 
+use crate::key_hierarchy::{derive_commit_key, derive_master_key};
+
 type HmacSha256 = Hmac<Sha256>;
 type ChaCha20Cipher = chacha20::ChaCha20;
 
@@ -116,10 +118,10 @@ fn decode_private_key(private_key_hex: &str) -> Result<[u8; 32], CommitCryptoErr
 }
 
 fn derive_commit_keys(private_key: &[u8; 32]) -> Result<([u8; 32], [u8; 32]), CommitCryptoError> {
-    let hk = Hkdf::<Sha256>::new(None, private_key);
-    let mut commit_key = [0_u8; 32];
-    hk.expand(b"garland-v1:commit", &mut commit_key)
-        .map_err(|_| CommitCryptoError::HkdfExpansionFailed)?;
+    let master_key =
+        derive_master_key(private_key).map_err(|_| CommitCryptoError::HkdfExpansionFailed)?;
+    let commit_key =
+        derive_commit_key(&master_key).map_err(|_| CommitCryptoError::HkdfExpansionFailed)?;
 
     let commit_hk = Hkdf::<Sha256>::new(None, &commit_key);
     let mut enc_key = [0_u8; 32];

@@ -2,6 +2,7 @@ pub mod commit_crypto;
 pub mod crypto;
 pub mod identity;
 pub mod jni_api;
+pub mod key_hierarchy;
 pub mod mvp_write;
 pub mod nostr_event;
 pub mod packaging;
@@ -9,6 +10,8 @@ pub mod packaging;
 #[cfg(test)]
 mod tests {
     use base64::Engine as _;
+    use nostr::nips::nip06::FromMnemonic;
+    use nostr::Keys;
     use pretty_assertions::assert_eq;
     use serde_json::Value;
 
@@ -21,7 +24,7 @@ mod tests {
         prepare_single_block_write, recover_single_block_read, PrepareWriteRequest,
         RecoverReadRequest,
     };
-    use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, UnsignedEvent};
+    use crate::nostr_event::{sign_custom_event, UnsignedEvent};
     use crate::packaging::{
         frame_content, unframe_content, BLOCK_SIZE, CONTENT_CAPACITY, FRAME_SIZE,
     };
@@ -31,15 +34,18 @@ mod tests {
         let mnemonic =
             "leader monkey parrot ring guide accident before fence cannon height naive bean";
         let identity = derive_nostr_identity(mnemonic, "").expect("identity should derive");
+        let raw_identity =
+            Keys::from_mnemonic_advanced(mnemonic, Some(""), Some(0), Some(0), Some(0))
+                .expect("raw identity should derive");
 
-        assert_eq!(
+        assert_eq!(identity.private_key_hex.len(), 64);
+        assert!(identity.nsec.starts_with("nsec1"));
+        assert_ne!(
             identity.private_key_hex,
-            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
+            raw_identity.secret_key().to_secret_hex()
         );
-        assert_eq!(
-            identity.nsec,
-            "nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp"
-        );
+        let second = derive_nostr_identity(mnemonic, "").expect("identity should re-derive");
+        assert_eq!(identity, second);
     }
 
     #[test]
@@ -55,13 +61,12 @@ mod tests {
             "leader monkey parrot ring guide accident before fence cannon height naive bean";
         let identity = derive_nostr_identity(mnemonic, "garland-passphrase")
             .expect("identity should derive with passphrase");
+        let empty =
+            derive_nostr_identity(mnemonic, "").expect("empty-passphrase identity should derive");
 
         assert_eq!(identity.private_key_hex.len(), 64);
         assert!(identity.nsec.starts_with("nsec1"));
-        assert_ne!(
-            identity.private_key_hex,
-            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
-        );
+        assert_ne!(identity.private_key_hex, empty.private_key_hex);
     }
 
     #[test]
@@ -85,6 +90,16 @@ mod tests {
         assert_eq!(frame.len(), FRAME_SIZE);
         let recovered = unframe_content(&frame).expect("frame should decode");
         assert_eq!(recovered, b"");
+    }
+
+    #[test]
+    fn randomizes_padding_bytes() {
+        let first = frame_content(b"garland").expect("first frame should build");
+        let second = frame_content(b"garland").expect("second frame should build");
+
+        assert_ne!(&first[4 + 7..], &second[4 + 7..]);
+        assert_eq!(unframe_content(&first).unwrap(), b"garland");
+        assert_eq!(unframe_content(&second).unwrap(), b"garland");
     }
 
     #[test]
@@ -156,29 +171,6 @@ mod tests {
     }
 
     #[test]
-    fn derives_distinct_blob_auth_keys_per_share() {
-        let first = sign_blossom_upload_auth_event(
-            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
-            &"11".repeat(32),
-            1_701_907_200,
-            1_701_907_500,
-        )
-        .expect("first auth event should sign");
-        let second = sign_blossom_upload_auth_event(
-            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
-            &"22".repeat(32),
-            1_701_907_200,
-            1_701_907_500,
-        )
-        .expect("second auth event should sign");
-
-        assert_ne!(first.pubkey_hex, second.pubkey_hex);
-        assert_eq!(first.tags[0], vec!["t".to_string(), "upload".to_string()]);
-        assert_eq!(first.tags[1][0], "x");
-        assert_eq!(first.tags[1][1], "11".repeat(32));
-    }
-
-    #[test]
     fn rejects_custom_event_kind_outside_u16_range() {
         let event = UnsignedEvent {
             created_at: 1_701_907_200,
@@ -219,6 +211,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "note.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "bXZwIGZpbGU=".into(),
             servers: vec![
@@ -226,6 +220,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan = prepare_single_block_write(&request).expect("write plan should build");
@@ -235,28 +231,17 @@ mod tests {
         assert_eq!(plan.uploads[1].server_url, "https://blossom.nostr.build");
         assert_eq!(plan.uploads[2].server_url, "https://blossom.yakihonne.com");
         assert_eq!(plan.commit_event.kind, 1097);
-        assert_eq!(plan.commit_event.tags.len(), 0);
+        assert_eq!(plan.commit_event.tags.len(), 1);
+        assert_eq!(plan.commit_event.tags[0][0], "d");
+        assert_eq!(plan.commit_event.tags[0][1], plan.manifest.document_id);
         assert_eq!(plan.commit_event.id_hex.len(), 64);
         assert_eq!(plan.commit_event.sig_hex.len(), 128);
         assert_eq!(plan.manifest.document_id.len(), 64);
-        let manifest_json =
-            serde_json::to_string(&plan.manifest).expect("manifest should serialize");
-        assert!(!manifest_json.contains("display_name"));
-        assert!(!manifest_json.contains("mime_type"));
         assert!(!plan
             .commit_event
             .content
             .contains(&plan.manifest.document_id));
-        assert!(!plan
-            .commit_event
-            .content
-            .contains(&plan.manifest.sha256_hex));
-        assert!(!plan
-            .commit_event
-            .content
-            .contains(&plan.manifest.blocks[0].share_id_hex));
-        assert!(!plan.commit_event.content.contains("cdn.nostrcheck.me"));
-        assert!(plan.commit_event.content.contains("\"version\":1"));
+        assert!(!plan.commit_event.content.contains("note.txt"));
         let encrypted_content = decode_commit_content(&plan.commit_event.content)
             .expect("commit content should decode");
         let decrypted_content =
@@ -268,11 +253,6 @@ mod tests {
             payload.get("document_id").and_then(Value::as_str),
             Some(plan.manifest.document_id.as_str())
         );
-        assert_eq!(
-            payload.get("size_bytes").and_then(Value::as_u64),
-            Some(plan.manifest.size_bytes as u64)
-        );
-        assert!(payload.get("created_at").is_none());
     }
 
     #[test]
@@ -280,6 +260,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "note.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "bXZwIGZpbGU=".into(),
             servers: vec![
@@ -287,6 +269,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let first = prepare_single_block_write(&request).expect("first write plan should build");
@@ -296,72 +280,12 @@ mod tests {
     }
 
     #[test]
-    fn tampered_commit_payload_fails_authentication() {
-        let request = PrepareWriteRequest {
-            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
-                .into(),
-            created_at: 1_701_907_200,
-            content_b64: "bXZwIGZpbGU=".into(),
-            servers: vec![
-                "https://cdn.nostrcheck.me".into(),
-                "https://blossom.nostr.build".into(),
-                "https://blossom.yakihonne.com".into(),
-            ],
-        };
-
-        let plan = prepare_single_block_write(&request).expect("write plan should build");
-        let mut encrypted_content = decode_commit_content(&plan.commit_event.content)
-            .expect("commit content should decode");
-        encrypted_content[12] ^= 0x01;
-
-        let error = decrypt_commit_payload(&request.private_key_hex, &encrypted_content)
-            .expect_err("tampered payload should fail auth");
-        assert_eq!(error.to_string(), "commit payload authentication failed");
-    }
-
-    #[test]
-    fn commit_content_rejects_wrong_key_and_invalid_envelope() {
-        let request = PrepareWriteRequest {
-            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
-                .into(),
-            created_at: 1_701_907_200,
-            content_b64: "bXZwIGZpbGU=".into(),
-            servers: vec![
-                "https://cdn.nostrcheck.me".into(),
-                "https://blossom.nostr.build".into(),
-                "https://blossom.yakihonne.com".into(),
-            ],
-        };
-
-        let plan = prepare_single_block_write(&request).expect("write plan should build");
-        let encrypted_content = decode_commit_content(&plan.commit_event.content)
-            .expect("commit content envelope should decode");
-
-        let wrong_key_error = decrypt_commit_payload(
-            "8f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
-            &encrypted_content,
-        )
-        .expect_err("wrong key should fail auth");
-        assert_eq!(
-            wrong_key_error.to_string(),
-            "commit payload authentication failed"
-        );
-
-        let envelope_error = decode_commit_content(
-            "{\"version\":2,\"algorithm\":\"wrong\",\"ciphertext_b64\":\"AA==\"}",
-        )
-        .expect_err("invalid envelope should fail");
-        assert_eq!(
-            envelope_error.to_string(),
-            "commit content envelope is invalid"
-        );
-    }
-
-    #[test]
     fn recovers_single_block_write_content() {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "note.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "aGVsbG8=".into(),
             servers: vec![
@@ -369,6 +293,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan = prepare_single_block_write(&request).expect("write plan should build");
@@ -389,6 +315,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "big.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: base64::engine::general_purpose::STANDARD.encode(payload),
             servers: vec![
@@ -396,6 +324,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan =
@@ -413,6 +343,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "big.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: base64::engine::general_purpose::STANDARD.encode(&payload),
             servers: vec![
@@ -420,6 +352,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan =

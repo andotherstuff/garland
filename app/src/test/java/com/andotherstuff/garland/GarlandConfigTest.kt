@@ -71,6 +71,54 @@ class GarlandConfigTest {
     }
 
     @Test
+    fun prepareWriteJsonIncludesPreviousEventIdWhenProvided() {
+        val json = GarlandConfig.buildPrepareWriteRequestJson(
+            privateKeyHex = "deadbeef",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            content = "hello".toByteArray(),
+            blossomServers = GarlandConfig.defaults.blossomServers,
+            createdAt = 123L,
+            previousEventId = "abc123def456",
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("abc123def456", payload.get("previous_event_id").asString)
+    }
+
+    @Test
+    fun prepareWriteJsonIncludesDocumentIdWhenProvided() {
+        val json = GarlandConfig.buildPrepareWriteRequestJson(
+            privateKeyHex = "deadbeef",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            content = "hello".toByteArray(),
+            blossomServers = GarlandConfig.defaults.blossomServers,
+            createdAt = 123L,
+            documentId = "f".repeat(64),
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("f".repeat(64), payload.get("document_id").asString)
+    }
+
+    @Test
+    fun prepareWriteJsonOmitsPreviousEventIdWhenNull() {
+        val json = GarlandConfig.buildPrepareWriteRequestJson(
+            privateKeyHex = "deadbeef",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            content = "hello".toByteArray(),
+            blossomServers = GarlandConfig.defaults.blossomServers,
+            createdAt = 123L,
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertFalse(payload.has("document_id"))
+        assertFalse(payload.has("previous_event_id"))
+    }
+
+    @Test
     fun buildsRecoverReadJson() {
         val json = GarlandConfig.buildRecoverReadRequestJson(
             privateKeyHex = "deadbeef",

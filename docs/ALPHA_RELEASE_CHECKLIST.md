@@ -26,16 +26,16 @@ Evidence to capture:
 - `./gradlew assembleDebug`
 - `./gradlew lintDebug`
 
-## 2. Connected-device verification
+## 2. GitHub test-release verification
 
-- [ ] Confirm `adb devices` shows a usable emulator or device
-- [ ] Run `./gradlew connectedDebugAndroidTest`
+- [ ] Publish a GitHub test release from the candidate commit
+- [ ] Install the published APK on a real Android device
 - [ ] Record pass or failure details for provider flow, pending sync worker flow, restore worker flow, and diagnostics flow
 
 Evidence to capture:
 
-- `adb devices`
-- `./gradlew connectedDebugAndroidTest`
+- GitHub release URL
+- APK version/build identifier used for testing
 - linked test report or copied failure output for any blocking case
 
 ## 3. Manual alpha checks
@@ -50,12 +50,12 @@ Evidence to capture:
 
 - screenshots from the diagnostics screen
 - copied diagnostics report text
-- note of the device build fingerprint
+- note of the device model / Android version used for testing
 - short notes for provider open, recent, search, and delete checks
 
 ## 4. Ship gate
 
 - [x] All no-device verification commands pass on the release candidate commit
-- [ ] Connected-device instrumentation passes or any failures are accepted and documented
+- [ ] GitHub test-release smoke testing passes or any failures are accepted and documented
 - [ ] Manual alpha checks are complete
 - [ ] `README.md`, `docs/CURRENT_STATUS.md`, and `NEXT_WAVE.md` match the release state

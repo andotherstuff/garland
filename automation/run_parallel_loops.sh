@@ -5,7 +5,7 @@ ROOT="/home/vibe/garland"
 RUN_ID="${RUN_ID:-loop-$(date +%Y%m%d-%H%M%S)}"
 PARENT="/home/vibe/garland-worktrees/$RUN_ID"
 ROUNDS="${1:-4}"
-LOOPS="${2:-3}"
+LOOPS="${2:-2}"
 
 if [ "$LOOPS" -lt 2 ] || [ "$LOOPS" -gt 3 ]; then
   echo "loop count must be 2 or 3"
