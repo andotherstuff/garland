@@ -17,11 +17,13 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     private val uploadResponseBodies = mutableMapOf<String, String>()
     private val uploadedShareIds = mutableListOf<String>()
     private val uploadedBodies = mutableListOf<ByteArray>()
+    private val uploadContentTypes = mutableListOf<String>()
     private val uploadAuthorizationJsons = mutableListOf<String>()
     private val relayEventIds = mutableListOf<String>()
     private val requestedDownloadPaths = mutableListOf<String>()
     private var relayMode: RelayMode = RelayMode.Accept("")
     private var requireUploadAuthorization = false
+    private var requiredUploadContentType: String? = null
 
     init {
         server.dispatcher = object : Dispatcher() {
@@ -79,6 +81,10 @@ class FakeGarlandNetworkHarness : AutoCloseable {
         requireUploadAuthorization = true
     }
 
+    fun requireUploadContentType(contentType: String) {
+        requiredUploadContentType = contentType
+    }
+
     fun acceptRelayEvents(reason: String = "") {
         relayMode = RelayMode.Accept(reason)
     }
@@ -99,6 +105,8 @@ class FakeGarlandNetworkHarness : AutoCloseable {
 
     fun uploadedBodies(): List<ByteArray> = uploadedBodies.map(ByteArray::clone)
 
+    fun uploadContentTypes(): List<String> = uploadContentTypes.toList()
+
     fun uploadAuthorizationJsons(): List<String> = uploadAuthorizationJsons.toList()
 
     fun receivedRelayEventIds(): List<String> = relayEventIds.toList()
@@ -113,14 +121,30 @@ class FakeGarlandNetworkHarness : AutoCloseable {
         val shareId = request.getHeader("X-SHA-256")
         shareId?.let(uploadedShareIds::add)
         uploadedBodies += request.body.readByteArray()
+        request.getHeader("Content-Type")?.let(uploadContentTypes::add)
         val authPayload = parseAuthorizationJson(request.getHeader("Authorization"))
         authPayload?.let(uploadAuthorizationJsons::add)
         if (requireUploadAuthorization && authPayload == null) {
             return MockResponse().setResponseCode(401).setBody("{\"error\":\"missing blossom auth\"}")
         }
+        val expectedContentType = requiredUploadContentType
+        if (expectedContentType != null && request.getHeader("Content-Type") != expectedContentType) {
+            return MockResponse().setResponseCode(400).setBody("{\"error\":\"file type not allowed\"}")
+        }
         val statusCode = uploadStatusCodes.removeFirstOrNull() ?: 200
-        val responseBody = shareId?.let(uploadResponseBodies::get) ?: "{}"
+        val responseBody = shareId?.let(uploadResponseBodies::get)
+            ?: shareId?.let { defaultUploadDescriptor(it) }
+            ?: "{}"
         return MockResponse().setResponseCode(statusCode).setBody(responseBody)
+    }
+
+    private fun defaultUploadDescriptor(shareIdHex: String): String {
+        return """
+            {
+              "url": "${server.url("/$shareIdHex")}",
+              "sha256": "$shareIdHex"
+            }
+        """.trimIndent()
     }
 
     private fun handleDownload(path: String): MockResponse {

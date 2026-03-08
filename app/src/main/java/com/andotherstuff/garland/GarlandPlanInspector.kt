@@ -10,6 +10,7 @@ data class GarlandPlanSummary(
     val sizeBytes: Long,
     val blockCount: Int,
     val serverCount: Int,
+    val shareCount: Int = 0,
     val sha256Hex: String,
     val servers: List<String>,
 )
@@ -37,7 +38,7 @@ object GarlandPlanInspector {
         val manifestField = plan.objectField("manifest")
         if (manifestField.malformed) return DecodeResult(summary = null, malformed = true)
         val manifest = manifestField.value ?: return DecodeResult(summary = null, malformed = false)
-        val summary = decodeSummary(manifest) ?: return DecodeResult(summary = null, malformed = true)
+        val summary = decodeSummary(plan, manifest) ?: return DecodeResult(summary = null, malformed = true)
         return DecodeResult(
             summary = summary,
             malformed = false,
@@ -48,7 +49,8 @@ object GarlandPlanInspector {
         return decodeResult(uploadPlanJson).summary
     }
 
-    private fun decodeSummary(manifest: JsonObject): GarlandPlanSummary? {
+    private fun decodeSummary(plan: JsonObject, manifest: JsonObject): GarlandPlanSummary? {
+        val uploads = plan.optionalArray("uploads")?.size()
         val documentId = manifest.requiredString("document_id")?.takeIf { it.isNotBlank() } ?: return null
         val mimeType = manifest.requiredString("mime_type")?.takeIf { it.isNotBlank() } ?: return null
         val sizeBytes = manifest.requiredLong("size_bytes")?.takeIf { it >= 0L } ?: return null
@@ -62,6 +64,7 @@ object GarlandPlanInspector {
             sizeBytes = sizeBytes,
             blockCount = blocks.size(),
             serverCount = servers.size,
+            shareCount = uploads ?: blocks.size(),
             sha256Hex = sha256Hex,
             servers = servers,
         )
@@ -93,6 +96,12 @@ object GarlandPlanInspector {
     }
 
     private fun JsonObject.requiredArray(fieldName: String): JsonArray? {
+        val value = get(fieldName) ?: return null
+        return value.takeIf { it.isJsonArray }?.asJsonArray
+    }
+
+    private fun JsonObject.optionalArray(fieldName: String): JsonArray? {
+        if (!has(fieldName)) return null
         val value = get(fieldName) ?: return null
         return value.takeIf { it.isJsonArray }?.asJsonArray
     }

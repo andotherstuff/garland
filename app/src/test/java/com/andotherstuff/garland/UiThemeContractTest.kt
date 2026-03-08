@@ -24,20 +24,19 @@ class UiThemeContractTest {
     }
 
     @Test
-    fun mainScreenUsesSectionCardsAndTroubleshootingLabel() {
+    fun mainScreenUsesFlatSectionsWithPrimaryActionsUpTopAndDiagnosticsAtBottom() {
         val mainLayout = projectFile("app", "src", "main", "res", "layout", "activity_main.xml")
 
-        assertTrue(mainLayout.contains("com.google.android.material.card.MaterialCardView"))
-        assertTrue(mainLayout.contains("@string/troubleshooting_actions_label"))
-        assertTrue(mainLayout.contains("@string/action_group_quick_checks_label"))
-        assertTrue(mainLayout.contains("@string/action_group_document_actions_label"))
-        assertTrue(mainLayout.contains("@string/action_group_danger_zone_label"))
+        assertFalse(mainLayout.contains("MaterialCardView"))
+        assertTrue(mainLayout.contains("@string/primary_actions_label"))
         assertTrue(mainLayout.contains("@+id/actionSafetyNoteText"))
         assertTrue(mainLayout.contains("@style/Widget.Garland.DangerButton"))
         assertTrue(mainLayout.contains("@+id/mainStatusChip"))
         assertTrue(mainLayout.contains("@+id/mainStatusHeadlineText"))
         assertTrue(mainLayout.contains("@+id/mainStatusSummaryText"))
         assertTrue(mainLayout.contains("@+id/mainNextStepsText"))
+        assertTrue(mainLayout.indexOf("@+id/openDiagnosticsButton") < mainLayout.indexOf("@+id/activeDocumentText"))
+        assertTrue(mainLayout.indexOf("@+id/activeDocumentDiagnosticsText") > mainLayout.indexOf("@+id/serverThreeInput"))
     }
 
     @Test
@@ -50,16 +49,21 @@ class UiThemeContractTest {
     }
 
     @Test
-    fun diagnosticsScreenUsesMissionControlStatusAndNextStepsPanels() {
+    fun diagnosticsScreenUsesFlatMissionControlStatusAndBottomTroubleshooting() {
         val diagnosticsLayout = projectFile("app", "src", "main", "res", "layout", "activity_diagnostics.xml")
 
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsStatusChip"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsHeadlineText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsSummaryText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsFailureFocusTitleText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsPipelineContainer"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsAgentReportText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsNextStepsText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsTroubleshootingSummaryText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsEvidenceHintText"))
-        assertTrue(diagnosticsLayout.contains("MaterialCardView"))
+        assertFalse(diagnosticsLayout.contains("MaterialCardView"))
+        assertTrue(diagnosticsLayout.indexOf("@+id/refreshDiagnosticsButton") < diagnosticsLayout.indexOf("@+id/diagnosticsOverviewText"))
+        assertTrue(diagnosticsLayout.indexOf("@+id/diagnosticsTroubleshootingText") > diagnosticsLayout.indexOf("@+id/diagnosticsHistoryText"))
     }
 
     @Test
@@ -69,7 +73,7 @@ class UiThemeContractTest {
         assertTrue(diagnosticsLayout.contains("diagnosticsStatusChip"))
         assertTrue(diagnosticsLayout.contains("diagnosticsHeadlineText"))
         assertTrue(diagnosticsLayout.contains("diagnosticsSummaryText"))
-        assertTrue(diagnosticsLayout.contains("@style/Widget.Garland.Card"))
+        assertTrue(diagnosticsLayout.contains("@style/Widget.Garland.Section"))
     }
 
     @Test
@@ -83,15 +87,17 @@ class UiThemeContractTest {
         assertTrue(dimensXml.contains("garland_card_spacing"))
         assertTrue(stylesXml.contains("TextAppearance.Garland.DisplayTitle"))
         assertTrue(stylesXml.contains("TextAppearance.Garland.BodySupport"))
-        assertTrue(mainLayout.contains("@dimen/garland_screen_padding"))
+        assertTrue(stylesXml.contains("@dimen/garland_screen_padding"))
         assertTrue(mainLayout.contains("@style/TextAppearance.Garland.DisplayTitle"))
         assertTrue(mainLayout.contains("@style/TextAppearance.Garland.BodySupport"))
-        assertTrue(diagnosticsLayout.contains("@dimen/garland_screen_padding"))
+        assertTrue(stylesXml.contains("@dimen/garland_screen_padding"))
         assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.DisplayTitle"))
         assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.BodySupport"))
         assertTrue(dimensXml.contains("garland_panel_padding"))
-        assertTrue(stylesXml.contains("Widget.Garland.Panel"))
+        assertTrue(stylesXml.contains("Widget.Garland.Section"))
         assertTrue(stylesXml.contains("TextAppearance.Garland.SupportLabel"))
+        assertTrue(stylesXml.contains("Widget.Garland.DebugPanel"))
+        assertTrue(stylesXml.contains("TextAppearance.Garland.DebugCode"))
     }
 
     @Test
@@ -118,15 +124,19 @@ class UiThemeContractTest {
 
         assertTrue(stylesXml.contains("TextAppearance.Garland.DiagnosticsBody"))
         assertTrue(mainLayout.contains("@style/TextAppearance.Garland.DiagnosticsBody"))
-        assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.DiagnosticsBody"))
+        assertTrue(stylesXml.contains("TextAppearance.Garland.DebugCode"))
+        assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.DebugCode"))
         assertTrue(mainLayout.contains("@+id/activeDocumentDiagnosticsText"))
+        assertTrue(mainLayout.contains("@+id/activeDocumentProgressContainer"))
         assertTrue(mainLayout.contains("@+id/activeDocumentUploadsText"))
         assertTrue(mainLayout.contains("@+id/activeDocumentRelaysText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsOverviewText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsPipelineContainer"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsUploadsText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsRelaysText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsHistoryText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsTroubleshootingText"))
+        assertTrue(diagnosticsLayout.contains("@+id/diagnosticsAgentReportText"))
     }
 
     @Test
@@ -145,8 +155,8 @@ class UiThemeContractTest {
         assertTrue(colorsXml.contains("garland_danger_surface"))
         assertTrue(colorsXml.contains("garland_surface_raised"))
         assertTrue(mainLayout.contains("@drawable/bg_garland_window"))
-        assertTrue(mainLayout.contains("@style/Widget.Garland.Panel"))
-        assertTrue(diagnosticsLayout.contains("@style/Widget.Garland.Panel"))
+        assertTrue(mainLayout.contains("@style/Widget.Garland.Section"))
+        assertTrue(diagnosticsLayout.contains("@style/Widget.Garland.Section"))
     }
 
     private fun projectFile(vararg segments: String): String {

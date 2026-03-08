@@ -16,6 +16,8 @@ class GarlandAlphaVerificationTest {
         val harness = FakeGarlandNetworkHarness()
 
         try {
+            val shareOne = sha256Hex("hello".toByteArray())
+            val shareTwo = shareOne
             harness.enqueueUploadSuccess(times = 2)
             harness.acceptRelayEvents()
             val document = store.upsertPreparedDocument(
@@ -25,22 +27,22 @@ class GarlandAlphaVerificationTest {
                 content = "hello world".toByteArray(),
                 uploadPlanJson = uploadPlanJson(
                     blossomServerUrl = harness.blossomBaseUrl(),
-                    shareIds = listOf("a1", "a2"),
+                    shareIds = listOf(shareOne, shareTwo),
                 ),
             )
             val client = OkHttpClient()
             val uploadExecutor = GarlandUploadExecutor(
                 store = store,
                 client = client,
-                relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+                relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 2_000),
             )
             val syncExecutor = GarlandSyncExecutor(store = store, uploadExecutor = uploadExecutor)
 
             val result = syncExecutor.syncPendingDocuments(listOf(harness.relayWebSocketUrl()))
 
-            assertEquals(1, result.successfulDocuments)
+            assertEquals("status=${store.readRecord(document.documentId)?.uploadStatus} message=${store.readRecord(document.documentId)?.lastSyncMessage}", 1, result.successfulDocuments)
             assertEquals("relay-published", store.readRecord(document.documentId)?.uploadStatus)
-            assertEquals(listOf("a1", "a2"), harness.uploadedShareIds())
+            assertEquals(listOf(shareOne, shareTwo), harness.uploadedShareIds())
             assertEquals(listOf("event123"), harness.receivedRelayEventIds())
 
             client.dispatcher.cancelAll()
@@ -59,6 +61,7 @@ class GarlandAlphaVerificationTest {
         val rejectingRelayHarness = FakeGarlandNetworkHarness()
 
         try {
+            val shareOne = sha256Hex("hello".toByteArray())
             uploadHarness.enqueueUploadSuccess(times = 1)
             uploadHarness.acceptRelayEvents()
             rejectingRelayHarness.rejectRelayEvents("blocked by policy")
@@ -69,14 +72,14 @@ class GarlandAlphaVerificationTest {
                 content = "hello world".toByteArray(),
                 uploadPlanJson = uploadPlanJson(
                     blossomServerUrl = uploadHarness.blossomBaseUrl(),
-                    shareIds = listOf("a1"),
+                    shareIds = listOf(shareOne),
                 ),
             )
             val client = OkHttpClient()
             val uploadExecutor = GarlandUploadExecutor(
                 store = store,
                 client = client,
-                relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+                relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 2_000),
             )
             val syncExecutor = GarlandSyncExecutor(store = store, uploadExecutor = uploadExecutor)
 
@@ -84,7 +87,7 @@ class GarlandAlphaVerificationTest {
                 listOf(uploadHarness.relayWebSocketUrl(), rejectingRelayHarness.relayWebSocketUrl()),
             )
 
-            assertEquals(1, result.successfulDocuments)
+            assertEquals("status=${store.readRecord(document.documentId)?.uploadStatus} message=${store.readRecord(document.documentId)?.lastSyncMessage}", 1, result.successfulDocuments)
             assertEquals("relay-published-partial", store.readRecord(document.documentId)?.uploadStatus)
             assertTrue(store.readRecord(document.documentId)?.lastSyncMessage?.contains("blocked by policy") == true)
 
@@ -238,30 +241,43 @@ class GarlandAlphaVerificationTest {
         val uploadsJson = shareIds.joinToString(",\n") { shareId ->
             "                  {\"server_url\":\"$blossomServerUrl\",\"share_id_hex\":\"$shareId\",\"body_b64\":\"aGVsbG8=\"}"
         }
-        return uploadPlanJson(blossomServerUrl, shareIds.first(), "aGVsbG8=", uploadsJson)
+        val blocksJson = shareIds.mapIndexed { index, shareId ->
+            "                    {\"index\":$index,\"share_id_hex\":\"$shareId\",\"servers\":[\"$blossomServerUrl\"]}"
+        }.joinToString(",\n")
+        return uploadPlanJson(uploadsJson, blocksJson)
     }
 
     private fun uploadPlanJson(blossomServerUrl: String, shareIdHex: String, bodyBase64: String): String {
         val uploadJson = "                  {\"server_url\":\"$blossomServerUrl\",\"share_id_hex\":\"$shareIdHex\",\"body_b64\":\"$bodyBase64\"}"
-        return uploadPlanJson(blossomServerUrl, shareIdHex, bodyBase64, uploadJson)
+        val blockJson = "                    {\"index\":0,\"share_id_hex\":\"$shareIdHex\",\"servers\":[\"$blossomServerUrl\"]}"
+        return uploadPlanJson(uploadJson, blockJson)
     }
 
-    private fun uploadPlanJson(blossomServerUrl: String, shareIdHex: String, bodyBase64: String, uploadsJson: String): String {
+    private fun uploadPlanJson(uploadsJson: String, blocksJson: String): String {
         return """
             {
               "ok": true,
               "plan": {
+                "manifest": {
+                  "document_id": "doc-alpha-sync",
+                  "mime_type": "text/plain",
+                  "size_bytes": 11,
+                  "sha256_hex": "${sha256Hex("hello world".toByteArray())}",
+                  "blocks": [
+$blocksJson
+                  ]
+                },
                 "uploads": [
 $uploadsJson
                 ],
                 "commit_event": {
                   "id_hex":"event123",
-                  "pubkey_hex":"pubkey123",
+                  "pubkey_hex":"${"b".repeat(64)}",
                   "created_at":1701907200,
                   "kind":1097,
                   "tags":[],
                   "content":"manifest",
-                  "sig_hex":"sig123"
+                  "sig_hex":"${"c".repeat(128)}"
                 }
               },
               "error": null
@@ -291,4 +307,5 @@ $uploadsJson
     private fun sha256Hex(body: ByteArray): String {
         return MessageDigest.getInstance("SHA-256").digest(body).joinToString("") { "%02x".format(it) }
     }
+
 }

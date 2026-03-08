@@ -9,8 +9,17 @@ object DocumentDiagnosticsFormatter {
     private val urlSchemePattern = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
     private val activeBackgroundStatuses = setOf("sync-queued", "sync-running", "restore-queued", "restore-running")
 
+    data class ProgressStep(
+        val state: String,
+        val label: String,
+        val detail: String,
+    )
+
     data class DetailSections(
         val overview: String,
+        val progressLabel: String?,
+        val progress: String?,
+        val progressSteps: List<ProgressStep>,
         val uploadsLabel: String?,
         val uploads: String?,
         val relaysLabel: String?,
@@ -81,6 +90,9 @@ object DocumentDiagnosticsFormatter {
         if (record == null) {
             return DetailSections(
                 overview = "Select a document to inspect diagnostics.",
+                progressLabel = null,
+                progress = null,
+                progressSteps = emptyList(),
                 uploadsLabel = null,
                 uploads = null,
                 relaysLabel = null,
@@ -116,6 +128,9 @@ object DocumentDiagnosticsFormatter {
         if (planMalformed) {
             lines += MALFORMED_UPLOAD_PLAN_LABEL
         }
+        val progressSteps = buildProgressSteps(record, summary, diagnostics, planMalformed)
+        val progress = progressSteps.takeIf { it.isNotEmpty() }
+            ?.joinToString("\n") { progressLine(it.state, it.label, it.detail) }
         val uploadDiagnostics = diagnostics?.uploads
             ?.takeIf { it.isNotEmpty() }
             ?.let(::prioritizeFailingEndpoints)
@@ -162,6 +177,9 @@ object DocumentDiagnosticsFormatter {
         }
         return DetailSections(
             overview = lines.joinToString("\n"),
+            progressLabel = progress?.let { "Pipeline progress" },
+            progress = progress,
+            progressSteps = progressSteps,
             uploadsLabel = uploadsLabel,
             uploads = uploads,
             relaysLabel = relaysLabel,
@@ -175,6 +193,7 @@ object DocumentDiagnosticsFormatter {
         val sections = detailSections(record, summary, planMalformed)
         return listOf(
             sections.overview,
+            sections.progress?.let { "${sections.progressLabel}:\n$it" },
             sections.uploads?.let { "${sections.uploadsLabel}:\n$it" },
             sections.relays?.let { "${sections.relaysLabel}:\n$it" },
             sections.history?.let { "${sections.historyLabel}:\n$it" },
@@ -188,6 +207,7 @@ object DocumentDiagnosticsFormatter {
             "Diagnostics report for ${record.displayName}",
             "Document ID: ${record.documentId}",
             sections.overview,
+            sections.progress?.let { "${sections.progressLabel}:\n$it" },
             sections.uploads?.let { "${sections.uploadsLabel}:\n$it" },
             sections.relays?.let { "${sections.relaysLabel}:\n$it" },
             sections.history?.let { "${sections.historyLabel}:\n$it" },
@@ -220,6 +240,137 @@ object DocumentDiagnosticsFormatter {
 
     private fun shouldShowPreservedDiagnosticsHint(status: String, uploads: String?, relays: String?): Boolean {
         return status in activeBackgroundStatuses && (!uploads.isNullOrBlank() || !relays.isNullOrBlank())
+    }
+
+    private fun buildProgressSteps(
+        record: LocalDocumentRecord,
+        summary: GarlandPlanSummary?,
+        diagnostics: DocumentSyncDiagnostics?,
+        planMalformed: Boolean,
+    ): List<ProgressStep> {
+        val uploadDiagnostics = diagnostics?.uploads.orEmpty()
+        val relayDiagnostics = diagnostics?.relays.orEmpty()
+        val planDiagnostics = diagnostics?.plan.orEmpty()
+        val uploadedShares = uploadDiagnostics.count { it.status == "ok" }
+        val relaySuccesses = relayDiagnostics.count { it.status == "ok" }
+        val relayAttempts = relayDiagnostics.size
+        val shareTarget = when {
+            summary?.shareCount != null && summary.shareCount > 0 -> summary.shareCount
+            uploadDiagnostics.isNotEmpty() -> uploadDiagnostics.size
+            else -> null
+        }
+        val chunkDetail = when {
+            summary != null && shareTarget != null -> "${summary.blockCount} block(s), $shareTarget planned share upload(s)"
+            summary != null -> "${summary.blockCount} block(s) prepared"
+            else -> null
+        }
+        val uploadFailure = uploadDiagnostics.firstOrNull { it.status != "ok" }?.detail
+            ?: record.lastSyncMessage?.takeIf { isUploadFailureStatus(record.uploadStatus) }
+        val relayFailure = relayDiagnostics.firstOrNull { it.status != "ok" }?.detail
+            ?: record.lastSyncMessage?.takeIf { isRelayFailureStatus(record.uploadStatus) }
+
+        val steps = mutableListOf<ProgressStep>()
+        steps += ProgressStep("done", "Capture test content", "${record.sizeBytes} byte(s) ready")
+
+        when {
+            record.uploadStatus == "upload-plan-failed" || planMalformed -> {
+                steps += ProgressStep("failed", "Encrypt + chunk locally", firstNonBlank(planFailureDetail(planDiagnostics), record.lastSyncMessage, "Garland could not prepare the local upload plan"))
+                steps += ProgressStep("pending", "Upload shares to Blossom", "Runs after local prep succeeds")
+                steps += ProgressStep("pending", "Publish commit event to relays", "Runs after share upload succeeds")
+                return steps
+            }
+            summary != null -> {
+                steps += ProgressStep("done", "Encrypt + chunk locally", chunkDetail ?: "Prepared local encrypted blocks")
+            }
+            else -> {
+                steps += ProgressStep("pending", "Encrypt + chunk locally", "Press Prepare encrypted draft to create a Garland snapshot")
+                steps += ProgressStep("pending", "Upload shares to Blossom", "Runs after local prep succeeds")
+                steps += ProgressStep("pending", "Publish commit event to relays", "Runs after share upload succeeds")
+                return steps
+            }
+        }
+
+        when {
+            isUploadFailureStatus(record.uploadStatus) -> {
+                steps += ProgressStep("failed", "Upload shares to Blossom", firstNonBlank(uploadProgressDetail(uploadedShares, shareTarget), uploadFailure, "Share upload failed"))
+                steps += ProgressStep("pending", "Publish commit event to relays", "Runs after share upload succeeds")
+                return steps
+            }
+            record.uploadStatus in setOf("sync-queued", "sync-running") -> {
+                steps += ProgressStep("active", "Upload shares to Blossom", firstNonBlank(uploadProgressDetail(uploadedShares, shareTarget), "Background worker is still uploading prepared shares"))
+                steps += ProgressStep("pending", "Publish commit event to relays", "Waiting for upload completion")
+                return steps
+            }
+            relayDiagnostics.isNotEmpty() || isRelayStatus(record.uploadStatus) -> {
+                steps += ProgressStep("done", "Upload shares to Blossom", firstNonBlank(uploadProgressDetail(maxOf(uploadedShares, shareTarget ?: 0), shareTarget), "All prepared shares uploaded"))
+            }
+            else -> {
+                steps += ProgressStep("pending", "Upload shares to Blossom", "Press Upload prepared draft when you want to test the network step")
+                steps += ProgressStep("pending", "Publish commit event to relays", "Runs after share upload succeeds")
+                return steps
+            }
+        }
+
+        when {
+            record.uploadStatus == "relay-published" -> {
+                steps += ProgressStep("done", "Publish commit event to relays", relayProgressDetail(relaySuccesses, relayAttempts))
+            }
+            record.uploadStatus == "relay-published-partial" || record.uploadStatus == "relay-publish-failed" -> {
+                steps += ProgressStep("failed", "Publish commit event to relays", firstNonBlank(relayProgressDetail(relaySuccesses, relayAttempts), relayFailure, "Relay publish failed"))
+            }
+            else -> {
+                steps += ProgressStep("pending", "Publish commit event to relays", "Relay publish starts after share upload finishes")
+            }
+        }
+        return steps
+    }
+
+    private fun progressLine(state: String, label: String, detail: String): String {
+        val marker = when (state) {
+            "done" -> "✓"
+            "active" -> "…"
+            "failed" -> "✗"
+            else -> "○"
+        }
+        return "$marker $label - ${detail.trim()}"
+    }
+
+    private fun planFailureDetail(planDiagnostics: List<DocumentPlanDiagnostic>): String? {
+        val failure = planDiagnostics.firstOrNull { it.status != "ok" } ?: return null
+        return "${normalizePlanField(failure.field)}: ${failure.detail}"
+    }
+
+    private fun uploadProgressDetail(uploadedShares: Int, shareTarget: Int?): String? {
+        if (uploadedShares <= 0 && shareTarget == null) return null
+        return if (shareTarget != null && shareTarget > 0) {
+            "$uploadedShares/$shareTarget share upload(s) finished"
+        } else {
+            "$uploadedShares share upload(s) finished"
+        }
+    }
+
+    private fun relayProgressDetail(successfulRelays: Int, attemptedRelays: Int): String {
+        return if (attemptedRelays > 0) {
+            "$successfulRelays/$attemptedRelays relay publish(es) accepted"
+        } else {
+            "$successfulRelays relay publish(es) accepted"
+        }
+    }
+
+    private fun firstNonBlank(vararg values: String?): String {
+        return values.firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+    }
+
+    private fun isUploadFailureStatus(status: String): Boolean {
+        return status.startsWith("upload-http-") || status == "upload-network-failed" || status == "upload-response-invalid"
+    }
+
+    private fun isRelayFailureStatus(status: String): Boolean {
+        return status == "relay-published-partial" || status == "relay-publish-failed"
+    }
+
+    private fun isRelayStatus(status: String): Boolean {
+        return status == "relay-published" || isRelayFailureStatus(status)
     }
 
     private fun formatEndpointDiagnostic(diagnostic: DocumentEndpointDiagnostic): String {

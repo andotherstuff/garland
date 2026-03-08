@@ -31,8 +31,38 @@ class GarlandPlanInspectorTest {
         assertEquals(5, summary.sizeBytes)
         assertEquals(1, summary.blockCount)
         assertEquals(3, summary.serverCount)
+        assertEquals(1, summary.shareCount)
         assertEquals("abc123", summary.sha256Hex)
         assertEquals(listOf("https://one", "https://two", "https://three"), summary.servers)
+    }
+
+    @Test
+    fun countsPreparedUploadsWhenPlanIncludesUploadEntries() {
+        val summary = GarlandPlanInspector.summarize(
+            """
+            {
+              "plan": {
+                "uploads": [
+                  {"server_url": "https://one", "share_id_hex": "aa", "body_b64": "YQ=="},
+                  {"server_url": "https://two", "share_id_hex": "bb", "body_b64": "Yg=="},
+                  {"server_url": "https://three", "share_id_hex": "cc", "body_b64": "Yw=="}
+                ],
+                "manifest": {
+                  "document_id": "doc123",
+                  "mime_type": "text/plain",
+                  "size_bytes": 5,
+                  "sha256_hex": "abc123",
+                  "blocks": [
+                    {"servers": ["https://one", "https://two", "https://three"]}
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        requireNotNull(summary)
+        assertEquals(3, summary.shareCount)
     }
 
     @Test

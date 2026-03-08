@@ -16,7 +16,12 @@ data class DocumentDiagnosticsScreenState(
     val statusLabel: String,
     val statusHeadline: String,
     val statusSummary: String,
+    val failureFocusTitle: String,
+    val failureFocusSummary: String,
     val overview: String,
+    val progressLabel: String?,
+    val progress: String?,
+    val progressSteps: List<DocumentDiagnosticsFormatter.ProgressStep>,
     val uploadsLabel: String?,
     val uploads: String?,
     val relaysLabel: String?,
@@ -28,6 +33,8 @@ data class DocumentDiagnosticsScreenState(
     val troubleshootingItems: List<String>,
     val evidenceHint: String?,
     val nextSteps: List<String>,
+    val reportHint: String,
+    val reportPreview: String,
     val exportText: String,
     val documentOptions: List<DocumentDiagnosticsOption>,
 )
@@ -47,6 +54,8 @@ object DocumentDiagnosticsScreenPresenter {
         val troubleshootingSummary = selectedRecord?.let { troubleshootingSummary(it, sections) }
         val evidenceHint = selectedRecord?.let { evidenceHint(it, sections) }
         val narrative = buildNarrative(selectedRecord)
+        val failureFocus = buildFailureFocus(selectedRecord, sections)
+        val exportText = DocumentDiagnosticsFormatter.exportText(selectedRecord, summary)
         return DocumentDiagnosticsScreenState(
             title = selectedRecord?.displayName?.let { "Diagnostics for $it" } ?: "Diagnostics",
             selectedDocumentId = selectedRecord?.documentId,
@@ -56,7 +65,12 @@ object DocumentDiagnosticsScreenPresenter {
             statusLabel = narrative.label,
             statusHeadline = narrative.headline,
             statusSummary = narrative.summary,
+            failureFocusTitle = failureFocus.first,
+            failureFocusSummary = failureFocus.second,
             overview = sections.overview,
+            progressLabel = sections.progressLabel,
+            progress = sections.progress,
+            progressSteps = sections.progressSteps,
             uploadsLabel = sections.uploadsLabel,
             uploads = sections.uploads,
             relaysLabel = sections.relaysLabel,
@@ -67,8 +81,10 @@ object DocumentDiagnosticsScreenPresenter {
             troubleshootingSummary = troubleshootingSummary,
             troubleshootingItems = troubleshootingItems,
             evidenceHint = evidenceHint,
-            nextSteps = troubleshootingItems,
-            exportText = DocumentDiagnosticsFormatter.exportText(selectedRecord, summary),
+            nextSteps = uploadTestSteps(selectedRecord),
+            reportHint = reportHint(selectedRecord, sections),
+            reportPreview = exportText,
+            exportText = exportText,
             documentOptions = sortedRecords.map { record ->
                 DocumentDiagnosticsOption(
                     documentId = record.documentId,
@@ -162,6 +178,61 @@ object DocumentDiagnosticsScreenPresenter {
         }
     }
 
+    private fun buildFailureFocus(
+        record: LocalDocumentRecord?,
+        sections: DocumentDiagnosticsFormatter.DetailSections,
+    ): Pair<String, String> {
+        if (record == null) {
+            return "No failure captured yet" to "Run one upload attempt, then come back here to inspect the exact stage that failed."
+        }
+
+        return when {
+            record.uploadStatus == "upload-plan-failed" -> {
+                "Blocked in local prep" to firstNonBlank(
+                    firstLine(sections.uploads),
+                    record.lastSyncMessage,
+                    "Garland could not build a valid upload plan from the local file."
+                )
+            }
+            isUploadFailureStatus(record.uploadStatus) -> {
+                "Blocked on Blossom upload" to firstNonBlank(
+                    firstLine(sections.uploads),
+                    record.lastSyncMessage,
+                    "A share upload failed before relay publish could start."
+                )
+            }
+            record.uploadStatus == "relay-published-partial" || record.uploadStatus == "relay-publish-failed" -> {
+                "Blocked on relay publish" to firstNonBlank(
+                    firstLine(sections.relays),
+                    record.lastSyncMessage,
+                    "The commit event did not make it to every configured relay."
+                )
+            }
+            record.uploadStatus == "download-failed" -> {
+                "Blocked on restore" to firstNonBlank(
+                    firstLine(sections.history),
+                    record.lastSyncMessage,
+                    "Remote shares could not be fetched or rebuilt into a local file."
+                )
+            }
+            record.uploadStatus in setOf("sync-queued", "sync-running", "restore-queued", "restore-running") -> {
+                "Worker still running" to "Wait for the background worker to finish, then refresh so this screen shows the final failing stage instead of in-flight state."
+            }
+            record.uploadStatus == "upload-plan-ready" -> {
+                "Ready to test upload" to "Local prep succeeded. The next real test is uploading shares to Blossom and then publishing the commit event to relays."
+            }
+            record.uploadStatus == "relay-published" -> {
+                "Last network attempt looks healthy" to "The latest trace shows completed share upload and relay publish. Copy the report if the bug is intermittent so you can compare runs."
+            }
+            else -> {
+                "Needs one concrete repro" to firstNonBlank(
+                    record.lastSyncMessage,
+                    "Trigger one upload or restore attempt so Garland records a precise failure trace."
+                )
+            }
+        }
+    }
+
     private fun troubleshootingItems(
         record: LocalDocumentRecord,
         sections: DocumentDiagnosticsFormatter.DetailSections,
@@ -183,6 +254,41 @@ object DocumentDiagnosticsScreenPresenter {
             items += "No active failure markers. Copy the report if behavior still looks wrong."
         }
         return items.distinct()
+    }
+
+    private fun uploadTestSteps(record: LocalDocumentRecord?): List<String> {
+        if (record == null) {
+            return listOf(
+                "Prepare a document from the main screen so Garland has a real upload target.",
+                "Run one upload attempt to generate endpoint diagnostics.",
+                "Refresh this view and copy the agent report before reproducing again.",
+            )
+        }
+
+        val actionStep = when {
+            record.uploadStatus == "upload-plan-ready" || record.uploadStatus == "local-ready" || record.uploadStatus == "pending-local-write" -> {
+                "Run one upload from the main screen to test Blossom delivery and relay publish end to end."
+            }
+            isUploadFailureStatus(record.uploadStatus) || record.uploadStatus == "relay-published-partial" || record.uploadStatus == "relay-publish-failed" -> {
+                "Refresh immediately after the failed run so the exact failing endpoint stays visible below."
+            }
+            record.uploadStatus in setOf("sync-queued", "sync-running", "restore-queued", "restore-running") -> {
+                "Wait for the active worker to finish, then refresh before judging the result."
+            }
+            record.uploadStatus == "download-failed" -> {
+                "Confirm upload and relay stages are green before retrying restore."
+            }
+            else -> {
+                "Trigger one fresh upload attempt if you need a new trace."
+            }
+        }
+
+        return listOf(
+            "Start with ${record.displayName} (${record.documentId.take(12)}).",
+            actionStep,
+            "Read Pipeline progress first, then compare Uploads and Relays to find the first failing stage.",
+            "Copy the agent report before retrying so the failing trace is preserved for debugging.",
+        )
     }
 
     private fun troubleshootingSummary(
@@ -231,6 +337,26 @@ object DocumentDiagnosticsScreenPresenter {
         }
     }
 
+    private fun reportHint(
+        record: LocalDocumentRecord?,
+        sections: DocumentDiagnosticsFormatter.DetailSections,
+    ): String {
+        if (record == null) {
+            return "Once you have a failed run, this report becomes the fastest handoff for debugging."
+        }
+        return when {
+            !sections.relays.isNullOrBlank() || !sections.uploads.isNullOrBlank() -> {
+                "Share this block with an agent. It includes the pipeline stage, endpoint trace, and recent history needed to diagnose the failure."
+            }
+            !sections.history.isNullOrBlank() -> {
+                "Share this block with an agent if you need help comparing the latest attempt to older runs."
+            }
+            else -> {
+                "Share this block with an agent after your next repro so the trace includes exact endpoint failures."
+            }
+        }
+    }
+
     private fun buildOptionSupportingText(record: LocalDocumentRecord): String {
         val label = buildNarrative(record).label
         val status = DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus)
@@ -240,5 +366,21 @@ object DocumentDiagnosticsScreenPresenter {
         } else {
             "$label - $message"
         }
+    }
+
+    private fun firstLine(text: String?): String? {
+        return text
+            ?.lineSequence()
+            ?.map { it.trim() }
+            ?.firstOrNull { it.isNotEmpty() }
+            ?.removePrefix("- ")
+    }
+
+    private fun firstNonBlank(vararg values: String?): String {
+        return values.firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+    }
+
+    private fun isUploadFailureStatus(status: String): Boolean {
+        return status.startsWith("upload-http-") || status == "upload-network-failed" || status == "upload-response-invalid"
     }
 }

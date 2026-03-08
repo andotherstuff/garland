@@ -1,5 +1,6 @@
 package com.andotherstuff.garland
 
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -15,6 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.CoreMatchers.containsString
 import org.junit.After
 import org.junit.Before
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -66,6 +68,7 @@ class MainActivityDiagnosticsTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withId(R.id.activeDocumentText)).check(matches(withText(containsString("note.txt"))))
             onView(withId(R.id.activeDocumentText)).check(matches(withText(containsString("Relay published partial"))))
+            onView(withId(R.id.activeDocumentProgressLabel)).check(matches(withText("Pipeline progress")))
             onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Status: Relay published partial"))))
             onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Blocks: 2"))))
             onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Servers: 2"))))
@@ -73,6 +76,65 @@ class MainActivityDiagnosticsTest {
             onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("blossom.one [OK] Uploaded share a1"))))
             onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (1/2 failed)")))
             onView(withId(R.id.activeDocumentRelaysText)).check(matches(withText(containsString("relay.two [Failed] timeout"))))
+        }
+    }
+
+    @Test
+    fun showsVisualPipelineChipsForRelayFailure() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(
+                    DocumentEndpointDiagnostic("https://blossom.one", "ok", "Uploaded share a1"),
+                    DocumentEndpointDiagnostic("https://blossom.two", "ok", "Uploaded share a2"),
+                ),
+                relays = listOf(
+                    DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event"),
+                    DocumentEndpointDiagnostic("wss://relay.two", "failed", "timeout"),
+                ),
+            )
+        )
+        val document = store.upsertPreparedDocument(
+            documentId = "doc-progress-chips",
+            displayName = "progress-chips.txt",
+            mimeType = "text/plain",
+            content = "hello world".toByteArray(),
+            uploadPlanJson = sampleUploadPlanJson(documentId = "doc-progress-chips"),
+        )
+        store.updateUploadDiagnostics(
+            documentId = document.documentId,
+            status = "relay-published-partial",
+            message = "Published to 1/2 relays; failed: wss://relay.two (timeout)",
+            diagnosticsJson = diagnosticsJson,
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val container = activity.findViewById<LinearLayout>(R.id.activeDocumentProgressContainer)
+                assertEquals(4, container.childCount)
+                assertProgressRow(container, 0, "DONE", "Capture test content")
+                assertProgressRow(container, 1, "DONE", "Encrypt + chunk locally")
+                assertProgressRow(container, 2, "DONE", "Upload shares to Blossom")
+                assertProgressRow(container, 3, "FAIL", "Publish commit event to relays")
+            }
+        }
+    }
+
+    @Test
+    fun preparingDraftShowsSnapshotSummaryAndWaitingPipelineStates() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withId(R.id.deriveButton)).perform(click())
+            onView(withId(R.id.prepareUploadButton)).perform(click())
+            onView(withId(R.id.preparedSnapshotText)).check(matches(withText(containsString("Prepared snapshot:"))))
+            onView(withId(R.id.preparedSnapshotText)).check(matches(withText(containsString("planned share upload"))))
+
+            scenario.onActivity { activity ->
+                val container = activity.findViewById<LinearLayout>(R.id.activeDocumentProgressContainer)
+                assertEquals(4, container.childCount)
+                assertProgressRow(container, 0, "DONE", "Capture test content")
+                assertProgressRow(container, 1, "DONE", "Encrypt + chunk locally")
+                assertProgressRow(container, 2, "WAIT", "Upload shares to Blossom")
+                assertProgressRow(container, 3, "WAIT", "Publish commit event to relays")
+            }
         }
     }
 
@@ -733,5 +795,15 @@ $blocksJson
             "Expected '$first' before '$second' in:\n$rendered",
             firstIndex < secondIndex,
         )
+    }
+
+    private fun assertProgressRow(container: LinearLayout, index: Int, chipLabel: String, titleText: String) {
+        val row = container.getChildAt(index) as LinearLayout
+        val chip = row.getChildAt(0) as TextView
+        val body = row.getChildAt(1) as LinearLayout
+        val title = body.getChildAt(0) as TextView
+
+        assertEquals(chipLabel, chip.text.toString())
+        assertEquals(titleText, title.text.toString())
     }
 }

@@ -10,302 +10,378 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="@dimen/garland_screen_padding"
         android:paddingBottom="32dp">
 
-        <com.google.android.material.card.MaterialCardView
-            style="@style/Widget.Garland.Card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/garland_hero_card_padding">
-
-                <TextView
-                    android:id="@+id/diagnosticsStatusChip"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_status_chip"
-                    android:paddingLeft="@dimen/garland_status_chip_padding_horizontal"
-                    android:paddingTop="@dimen/garland_status_chip_padding_vertical"
-                    android:paddingRight="@dimen/garland_status_chip_padding_horizontal"
-                    android:paddingBottom="@dimen/garland_status_chip_padding_vertical"
-                    android:text="@string/diagnostics_status_placeholder"
-                    android:textAppearance="@style/TextAppearance.Garland.StatusChip" />
-
-                <LinearLayout
-                    style="@style/Widget.Garland.Panel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_section_gap"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/diagnosticsHeadlineText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/diagnostics_headline_placeholder"
-                        android:textAppearance="@style/TextAppearance.Garland.DisplayTitle" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsSummaryText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/garland_tight_gap"
-                        android:text="@string/diagnostics_summary_placeholder"
-                        android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
-
-                    <TextView
-                        android:id="@+id/selectedDocumentText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/garland_panel_gap"
-                        android:text="@string/active_document_none"
-                        android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
-
-                    <TextView
-                        android:id="@+id/documentIdText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textAppearance="@style/TextAppearance.Garland.BodyMuted" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:orientation="vertical">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/refreshDiagnosticsButton"
-                        style="@style/Widget.Garland.ActionButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/diagnostics_refresh_button" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/copyDiagnosticsButton"
-                        style="@style/Widget.Garland.ActionButton.Primary"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/garland_button_gap"
-                        android:text="@string/diagnostics_copy_button" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/copyDocumentIdButton"
-                        style="@style/Widget.Garland.ActionButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/garland_button_gap"
-                        android:text="@string/diagnostics_copy_document_id_button" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            style="@style/Widget.Garland.Card"
+        <LinearLayout
+            style="@style/Widget.Garland.Section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/garland_card_spacing">
+            android:orientation="vertical"
+            android:paddingTop="32dp">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/diagnosticsStatusChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_status_chip"
+                android:paddingLeft="@dimen/garland_status_chip_padding_horizontal"
+                android:paddingTop="@dimen/garland_status_chip_padding_vertical"
+                android:paddingRight="@dimen/garland_status_chip_padding_horizontal"
+                android:paddingBottom="@dimen/garland_status_chip_padding_vertical"
+                android:text="@string/diagnostics_status_placeholder"
+                android:textAppearance="@style/TextAppearance.Garland.StatusChip" />
+
+            <TextView
+                android:id="@+id/diagnosticsHeadlineText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/garland_card_padding">
+                android:layout_marginTop="@dimen/garland_section_gap"
+                android:text="@string/diagnostics_headline_placeholder"
+                android:textAppearance="@style/TextAppearance.Garland.DisplayTitle" />
+
+            <TextView
+                android:id="@+id/diagnosticsSummaryText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_tight_gap"
+                android:text="@string/diagnostics_summary_placeholder"
+                android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+            <LinearLayout
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_section_gap"
+                android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/selectedDocumentText"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/diagnostics_next_steps_label"
+                    android:text="@string/active_document_none"
+                    android:textAppearance="@style/TextAppearance.Garland.DebugTitle" />
+
+                <TextView
+                    android:id="@+id/documentIdText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textAppearance="@style/TextAppearance.Garland.BodyMuted" />
+
+                <TextView
+                    android:id="@+id/diagnosticsFailureFocusLabelText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="@string/diagnostics_failure_focus_label"
                     android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
 
-                <LinearLayout
-                    style="@style/Widget.Garland.Panel"
+                <TextView
+                    android:id="@+id/diagnosticsFailureFocusTitleText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/diagnosticsNextStepsText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/diagnostics_next_steps_placeholder"
-                        android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            style="@style/Widget.Garland.Card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/garland_card_spacing">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/garland_card_padding">
+                    android:layout_marginTop="8dp"
+                    android:textAppearance="@style/TextAppearance.Garland.BodyStrong" />
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/active_document_diagnostics_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
-
-                <LinearLayout
-                    style="@style/Widget.Garland.Panel"
+                    android:id="@+id/diagnosticsFailureFocusSummaryText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/diagnosticsOverviewText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/active_document_diagnostics_none"
-                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody" />
-                </LinearLayout>
+                    android:layout_marginTop="6dp"
+                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
 
-        <com.google.android.material.card.MaterialCardView
-            style="@style/Widget.Garland.Card"
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/garland_outline_soft" />
+
+        <LinearLayout
+            style="@style/Widget.Garland.Section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/garland_card_spacing">
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/primary_actions_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_tight_gap"
+                android:text="@string/primary_actions_note"
+                android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/garland_card_padding">
+                android:layout_marginTop="@dimen/garland_content_gap"
+                android:orientation="horizontal">
 
-                <LinearLayout
-                    style="@style/Widget.Garland.Panel"
-                    android:layout_width="match_parent"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/refreshDiagnosticsButton"
+                    style="@style/Widget.Garland.ActionButton"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:layout_weight="1"
+                    android:text="@string/diagnostics_refresh_button" />
 
-                    <TextView
-                        android:id="@+id/diagnosticsUploadsLabel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/active_document_uploads_label"
-                        android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsUploadsText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsRelaysLabel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:text="@string/active_document_relays_label"
-                        android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsRelaysText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsHistoryLabel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:text="@string/diagnostics_history_label"
-                        android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsHistoryText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsTroubleshootingLabel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:text="@string/diagnostics_troubleshooting_label"
-                        android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsTroubleshootingSummaryText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:textAppearance="@style/TextAppearance.Garland.BodyStrong"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsTroubleshootingText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/diagnosticsEvidenceHintText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:textAppearance="@style/TextAppearance.Garland.BodyMuted"
-                        android:visibility="gone" />
-                </LinearLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/copyDocumentIdButton"
+                    style="@style/Widget.Garland.ActionButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/garland_button_gap"
+                    android:layout_weight="1"
+                    android:text="@string/diagnostics_copy_document_id_button" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
-        <com.google.android.material.card.MaterialCardView
-            style="@style/Widget.Garland.Card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/garland_card_spacing"
-            android:layout_marginBottom="12dp">
-
-            <LinearLayout
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/copyDiagnosticsButton"
+                style="@style/Widget.Garland.ActionButton.Primary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/garland_card_padding">
+                android:layout_marginTop="@dimen/garland_button_gap"
+                android:text="@string/diagnostics_copy_button" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/garland_outline_soft" />
+
+        <LinearLayout
+            style="@style/Widget.Garland.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/diagnostics_next_steps_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+            <TextView
+                android:id="@+id/diagnosticsNextStepsText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_content_gap"
+                android:text="@string/diagnostics_next_steps_placeholder"
+                android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_section_gap"
+                android:text="@string/diagnostics_pipeline_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+            <LinearLayout
+                android:id="@+id/diagnosticsPipelineContainer"
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_content_gap"
+                android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/diagnostics_documents_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
-
-                <LinearLayout
-                    android:id="@+id/diagnosticsDocumentListContainer"
+                    android:id="@+id/diagnosticsPipelineText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:orientation="vertical" />
+                    android:text=""
+                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/garland_outline_soft" />
+
+        <LinearLayout
+            style="@style/Widget.Garland.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/diagnostics_documents_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+            <LinearLayout
+                android:id="@+id/diagnosticsDocumentListContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_content_gap"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/garland_outline_soft" />
+
+        <LinearLayout
+            style="@style/Widget.Garland.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/active_document_diagnostics_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+            <TextView
+                android:id="@+id/diagnosticsOverviewText"
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_content_gap"
+                android:text="@string/active_document_diagnostics_none"
+                android:textAppearance="@style/TextAppearance.Garland.DebugCode" />
+
+            <TextView
+                android:id="@+id/diagnosticsUploadsLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/active_document_uploads_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsUploadsText"
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textAppearance="@style/TextAppearance.Garland.DebugCode"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsRelaysLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/active_document_relays_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsRelaysText"
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textAppearance="@style/TextAppearance.Garland.DebugCode"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsHistoryLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/diagnostics_history_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsHistoryText"
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textAppearance="@style/TextAppearance.Garland.DebugCode"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/garland_outline_soft" />
+
+        <LinearLayout
+            style="@style/Widget.Garland.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/diagnostics_agent_report_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+            <TextView
+                android:id="@+id/diagnosticsAgentReportHintText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_tight_gap"
+                android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+            <TextView
+                android:id="@+id/diagnosticsAgentReportText"
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/garland_content_gap"
+                android:text="@string/diagnostics_agent_report_placeholder"
+                android:textAppearance="@style/TextAppearance.Garland.DebugCode" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/garland_outline_soft" />
+
+        <LinearLayout
+            style="@style/Widget.Garland.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="36dp">
+
+            <TextView
+                android:id="@+id/diagnosticsTroubleshootingLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/diagnostics_troubleshooting_label"
+                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsTroubleshootingSummaryText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textAppearance="@style/TextAppearance.Garland.BodyStrong"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsTroubleshootingText"
+                style="@style/Widget.Garland.DebugPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textAppearance="@style/TextAppearance.Garland.DebugCode"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/diagnosticsEvidenceHintText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textAppearance="@style/TextAppearance.Garland.BodyMuted"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
