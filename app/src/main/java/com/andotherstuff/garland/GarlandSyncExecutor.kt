@@ -53,6 +53,7 @@ class GarlandSyncExecutor(
             record.uploadStatus == "sync-queued" ||
             record.uploadStatus == "relay-publish-failed" ||
             record.uploadStatus == "relay-published-partial" ||
+            record.uploadStatus == "upload-network-failed" ||
             record.uploadStatus.startsWith("upload-http-")
     }
 }

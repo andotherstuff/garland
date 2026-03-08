@@ -26,6 +26,8 @@ This repo intentionally targets the smallest Android MVP that can:
 - restore jobs read the loaded identity from session state instead of persisting the private key in WorkManager input
 - per-document upload and relay diagnostics preserved across queued and running status transitions
 - dedicated diagnostics reports now include recent per-document history and a copyable tester report
+- transient upload and download requests now retry in-place before Garland gives up on a document
+- background retry classification now stops malformed upload responses and missing-share restores from looping forever
 - manifest validation now rejects duplicate or invalid server entries across upload and restore paths
 - restore now prefers server-returned retrieval URLs and explains downloaded-share mismatches before crypto recovery
 - provider MIME fallback naming now covers wildcard non-image creates such as `text/*` and `application/*`

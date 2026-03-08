@@ -76,6 +76,22 @@ class GarlandSyncExecutorTest {
         assertEquals(listOf(failing.documentId), result.failedDocumentIds)
         assertFalse(result.message.isBlank())
     }
+
+    @Test
+    fun retriesDocumentsMarkedWithNetworkUploadFailure() {
+        val tempDir = Files.createTempDirectory("garland-sync-network-failure-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val pending = store.createDocument("pending.txt", "text/plain")
+        store.updateUploadStatus(pending.documentId, "upload-network-failed")
+
+        val uploadExecutor = RecordingUploadExecutor(store)
+        val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
+
+        val result = syncExecutor.syncPendingDocuments(listOf("wss://relay.example"))
+
+        assertEquals(1, result.attemptedDocuments)
+        assertEquals(listOf(pending.documentId), uploadExecutor.uploadedIds)
+    }
 }
 
 private class RecordingUploadExecutor(store: LocalDocumentStoreImpl) : GarlandUploadExecutor(store) {

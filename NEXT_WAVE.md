@@ -13,6 +13,8 @@ This file tracks the next integration wave after the current Garland MVP.
 - provider path lookup, root capability flags, stricter invalid-request handling, and image thumbnail support
 - WorkManager-backed sync and restore with unique work lanes and permanent-vs-transient retry rules
 - preserved upload/relay diagnostics across queued, running, restore, and retry status changes
+- transient upload and download requests now retry before Garland records a document-level failure
+- missing-share restores and malformed upload descriptors now stop background retry loops with clearer operator-facing messages
 
 ## Current Status
 
@@ -31,6 +33,7 @@ This file tracks the next integration wave after the current Garland MVP.
 - manifest validation now rejects duplicate or invalid server entries and restore-side plan failures now surface structured diagnostics
 - provider MIME fallback naming now covers wildcard non-image creates such as `text/*` and `application/*`
 - configured relays and Blossom servers are now trimmed, deduplicated, and defaulted before upload or relay work starts
+- upload retry follow-through now preserves retryable network failures for the next worker pass without touching the diagnostics UI surface
 
 ## Alpha Blockers
 
@@ -88,6 +91,7 @@ This file tracks the next integration wave after the current Garland MVP.
 - [x] Add a local fake Blossom/relay harness for end-to-end verification
 - [x] Add a dedicated diagnostics screen for alpha testers
 - [x] Write an alpha release checklist
+- [x] Harden upload/download retry handling and operator diagnostics without UI churn
 
 ## Clean Next Steps
 

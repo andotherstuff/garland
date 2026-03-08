@@ -15,6 +15,9 @@ class RestoreWorkResultPolicyTest {
         assertFalse(RestoreWorkResultPolicy.shouldRetry("Manifest has no blocks"))
         assertFalse(RestoreWorkResultPolicy.shouldRetry("Recovery failed"))
         assertFalse(RestoreWorkResultPolicy.shouldRetry("Invalid Blossom server URL: Expected URL scheme 'http' or 'https' but was 'ftp'"))
+        assertFalse(RestoreWorkResultPolicy.shouldRetry("Share deadbeef was not found on any configured server (2 URL(s) tried)"))
+        assertFalse(RestoreWorkResultPolicy.shouldRetry("Downloaded share from https://blossom.one/blob/deadbeef did not match expected share ID deadbeef"))
+        assertFalse(RestoreWorkResultPolicy.shouldRetry("Downloaded share from https://blossom.one/blob/deadbeef had invalid encrypted block length 3"))
     }
 
     @Test

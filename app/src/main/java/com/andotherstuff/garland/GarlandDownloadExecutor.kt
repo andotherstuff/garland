@@ -8,6 +8,7 @@ import com.google.gson.JsonSyntaxException
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.Base64
 
@@ -26,6 +27,7 @@ class GarlandDownloadExecutor(
 ) {
     private companion object {
         const val ENCRYPTED_BLOCK_SIZE = 262_144
+        const val MAX_DOWNLOAD_ATTEMPTS_PER_URL = 3
     }
 
     constructor(
@@ -61,14 +63,15 @@ class GarlandDownloadExecutor(
         val blocks = manifest.blocks.orEmpty()
 
         val restoredContent = mutableListOf<Byte>()
+        var attemptedRequests = 0
         blocks.forEach { block ->
-            val blockServers = block.servers.orEmpty()
             val blockIndex = block.index ?: 0
             val fetchResult = fetchEncryptedBody(block, response.plan.uploads.orEmpty())
+            attemptedRequests += fetchResult.attemptedRequests
             val encryptedBody = fetchResult.body
                 ?: return DownloadExecutionResult(
                     false,
-                    blockServers.size,
+                    attemptedRequests,
                     restoredContent.size,
                     fetchResult.error ?: "Unable to fetch share from configured servers"
                 ).also {
@@ -79,12 +82,12 @@ class GarlandDownloadExecutor(
             if (!fetchedShareId.equals(shareIdHex, ignoreCase = true)) {
                 val message = "Downloaded share from ${fetchResult.sourceUrl ?: "configured server"} did not match expected share ID $shareIdHex"
                 store.updateUploadStatus(documentId, "download-failed", message)
-                return DownloadExecutionResult(false, blockServers.size, restoredContent.size, message)
+                return DownloadExecutionResult(false, attemptedRequests, restoredContent.size, message)
             }
             if (encryptedBody.size != ENCRYPTED_BLOCK_SIZE) {
                 val message = "Downloaded share from ${fetchResult.sourceUrl ?: "configured server"} had invalid encrypted block length ${encryptedBody.size}"
                 store.updateUploadStatus(documentId, "download-failed", message)
-                return DownloadExecutionResult(false, blockServers.size, restoredContent.size, message)
+                return DownloadExecutionResult(false, attemptedRequests, restoredContent.size, message)
             }
 
             val requestJson = GarlandConfig.buildRecoverReadRequestJson(
@@ -94,17 +97,17 @@ class GarlandDownloadExecutor(
                 encryptedBlock = encryptedBody,
             )
             val recovery = parseRecoveryEnvelope(recoverBlock(requestJson))
-                ?: return DownloadExecutionResult(false, blockServers.size, restoredContent.size, "Invalid recovery response").also {
+                ?: return DownloadExecutionResult(false, attemptedRequests, restoredContent.size, "Invalid recovery response").also {
                     store.updateUploadStatus(documentId, "download-failed", it.message)
                 }
             if (!recovery.ok) {
                 val message = recovery.error ?: "Recovery failed"
                 store.updateUploadStatus(documentId, "download-failed", message)
-                return DownloadExecutionResult(false, blockServers.size, restoredContent.size, message)
+                return DownloadExecutionResult(false, attemptedRequests, restoredContent.size, message)
             }
 
             val recoveredBytes = decodeRecoveredContent(recovery.contentBase64)
-                ?: return DownloadExecutionResult(false, blockServers.size, restoredContent.size, "Invalid recovery response").also {
+                ?: return DownloadExecutionResult(false, attemptedRequests, restoredContent.size, "Invalid recovery response").also {
                     store.updateUploadStatus(documentId, "download-failed", it.message)
                 }
             restoredContent += recoveredBytes.toList()
@@ -113,10 +116,9 @@ class GarlandDownloadExecutor(
         val content = restoredContent.toByteArray()
         store.contentFile(documentId).writeBytes(content)
         store.updateFromContent(documentId)
-        val attemptedServers = blocks.sumOf { it.servers.orEmpty().size }
         val message = "Restored ${content.size} bytes from ${blocks.size} Garland block(s)"
         store.updateUploadStatus(documentId, "download-restored", message)
-        return DownloadExecutionResult(true, attemptedServers, content.size, message)
+        return DownloadExecutionResult(true, attemptedRequests, content.size, message)
     }
 
     private fun parseRecoveryEnvelope(rawJson: String): DownloadRecoveryEnvelope? {
@@ -151,32 +153,98 @@ class GarlandDownloadExecutor(
     }
 
     private fun fetchEncryptedBody(block: ManifestBlockEnvelope, uploads: List<StoredUploadBodyEnvelope>): FetchEncryptedBodyResult {
+        val candidateUrls = block.candidateDownloadUrls(uploads)
         var invalidUrlMessage: String? = null
-        var attemptedValidRequest = false
-        for (url in block.candidateDownloadUrls(uploads)) {
-            runCatching {
-                val request = Request.Builder().url(url).get().build()
-                attemptedValidRequest = true
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        return FetchEncryptedBodyResult(body = response.body?.bytes(), sourceUrl = url)
-                    }
-                }
-            }.onFailure { error ->
-                if (error is IllegalArgumentException && !attemptedValidRequest) {
-                    invalidUrlMessage = invalidBlossomServerUrlMessage(error)
-                }
+        var attemptedRequests = 0
+        var notFoundRequests = 0
+        var lastFailure: String? = null
+        for (url in candidateUrls) {
+            val request = try {
+                Request.Builder().url(url).get().build()
+            } catch (error: IllegalArgumentException) {
+                invalidUrlMessage = invalidBlossomServerUrlMessage(error)
+                continue
             }
+
+            for (attempt in 1..MAX_DOWNLOAD_ATTEMPTS_PER_URL) {
+                attemptedRequests += 1
+                var retrySameUrl = false
+                var moveToNextUrl = false
+                try {
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body?.bytes()
+                            if (body != null) {
+                                return FetchEncryptedBodyResult(body = body, sourceUrl = url, attemptedRequests = attemptedRequests)
+                            }
+                            lastFailure = downloadAttemptSummary("Download from $url returned an empty body", attempt)
+                            moveToNextUrl = true
+                            return@use
+                        }
+
+                        if (response.code == 404) {
+                            notFoundRequests += 1
+                            lastFailure = "Download failed on $url with HTTP 404"
+                            moveToNextUrl = true
+                            return@use
+                        }
+
+                        lastFailure = downloadAttemptSummary(downloadFailureMessage(url, response.code), attempt)
+                        if (shouldRetryDownloadResponse(response.code) && attempt < MAX_DOWNLOAD_ATTEMPTS_PER_URL) {
+                            retrySameUrl = true
+                            return@use
+                        }
+                        moveToNextUrl = true
+                    }
+                } catch (error: IOException) {
+                    lastFailure = downloadAttemptSummary(downloadNetworkFailureMessage(url, error), attempt)
+                    if (attempt < MAX_DOWNLOAD_ATTEMPTS_PER_URL) {
+                        continue
+                    }
+                    moveToNextUrl = true
+                }
+                if (retrySameUrl) continue
+                if (moveToNextUrl) break
+            }
+        }
+        if (candidateUrls.isNotEmpty() && notFoundRequests == candidateUrls.size) {
+            return FetchEncryptedBodyResult(
+                body = null,
+                error = "Share ${block.shareIdHex.orEmpty()} was not found on any configured server (${candidateUrls.size} URL(s) tried)",
+                attemptedRequests = attemptedRequests,
+            )
         }
         return FetchEncryptedBodyResult(
             body = null,
-            error = if (!attemptedValidRequest) invalidUrlMessage else null,
+            error = when {
+                attemptedRequests == 0 -> invalidUrlMessage
+                lastFailure != null -> lastFailure
+                else -> null
+            },
+            attemptedRequests = attemptedRequests,
         )
     }
 
     private fun invalidBlossomServerUrlMessage(error: IllegalArgumentException): String {
         val detail = error.message?.trim().orEmpty()
         return if (detail.isBlank()) "Invalid Blossom server URL" else "Invalid Blossom server URL: $detail"
+    }
+
+    private fun downloadFailureMessage(url: String, statusCode: Int): String {
+        return "Download failed on $url with HTTP $statusCode"
+    }
+
+    private fun downloadNetworkFailureMessage(url: String, error: IOException): String {
+        val detail = error.message?.trim().orEmpty().ifBlank { error.javaClass.simpleName }
+        return "Download failed on $url with network error: $detail"
+    }
+
+    private fun downloadAttemptSummary(message: String, attempt: Int): String {
+        return if (attempt <= 1) message else "$message after $attempt attempts"
+    }
+
+    private fun shouldRetryDownloadResponse(statusCode: Int): Boolean {
+        return statusCode == 408 || statusCode == 425 || statusCode == 429 || statusCode in 500..599
     }
 
     private fun decodeRecoveredContent(contentBase64: String?): ByteArray? {
@@ -210,6 +278,7 @@ private data class FetchEncryptedBodyResult(
     val body: ByteArray?,
     val error: String? = null,
     val sourceUrl: String? = null,
+    val attemptedRequests: Int = 0,
 )
 
 private data class ParsedOptionalString(

@@ -18,6 +18,9 @@ internal object RestoreWorkResultPolicy {
         if (
             normalized in permanentFailures ||
             normalized.startsWith("Invalid Blossom server URL") ||
+            normalized.startsWith("Share ") ||
+            normalized.contains("did not match expected share ID") ||
+            normalized.contains("invalid encrypted block length") ||
             normalized == "Manifest block indexes must start at 0 and stay contiguous" ||
             normalized == "Manifest is missing document ID" ||
             normalized.startsWith("Manifest block ")

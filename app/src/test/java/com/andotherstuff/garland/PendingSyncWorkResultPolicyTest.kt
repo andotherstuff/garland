@@ -12,6 +12,7 @@ class PendingSyncWorkResultPolicyTest {
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", null))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", "No upload plan found"))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", "Invalid upload plan"))))
+        assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-response-invalid", "Upload response validation failed"))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("relay-publish-failed", "Upload plan is missing commit event"))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-http-404", "Upload failed on server with HTTP 404"))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("relay-publish-failed", "No relays configured"))))
@@ -25,6 +26,7 @@ class PendingSyncWorkResultPolicyTest {
     fun retriesTransientSyncFailures() {
         assertTrue(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-http-500", "Upload failed on server with HTTP 500"))))
         assertTrue(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-http-429", "Upload failed on server with HTTP 429"))))
+        assertTrue(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-network-failed", "Upload failed on server with network error: timeout after 3 attempts"))))
         assertTrue(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("relay-publish-failed", "All relays failed: timeout"))))
         assertTrue(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("relay-publish-failed", "Published to 0/1 relays; failed: wss://relay.example (rate-limited: slow down)"))))
         assertTrue(PendingSyncWorkResultPolicy.shouldRetry(emptyList()))

@@ -398,6 +398,113 @@ class GarlandDownloadExecutorTest {
     }
 
     @Test
+    fun retriesTransientDownloadFailuresOnSameUrl() {
+        val tempDir = Files.createTempDirectory("garland-download-retry-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        val encryptedShare = encryptedShare(fillByte = 12)
+        val shareIdHex = sha256Hex(encryptedShare)
+        server.enqueue(MockResponse().setResponseCode(503))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(encryptedShare)))
+        server.start()
+
+        val document = store.createDocument("note.txt", "text/plain")
+        val serverUrl = server.url("").toString().removeSuffix("/")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123",
+                  "blocks": [
+                    {
+                      "index": 0,
+                      "share_id_hex": "$shareIdHex",
+                      "servers": ["$serverUrl"]
+                    }
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        val client = OkHttpClient()
+        val executor = GarlandDownloadExecutor(
+            store = store,
+            client = client,
+            recoverBlock = {
+                "{\"ok\":true,\"content_b64\":\"${Base64.getEncoder().encodeToString("hello".toByteArray())}\",\"error\":null}"
+            },
+        )
+
+        val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+        assertTrue(result.success)
+        assertEquals(2, result.attemptedServers)
+
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
+        server.shutdown()
+    }
+
+    @Test
+    fun reportsMissingShareWhenAllConfiguredDownloadUrlsReturnNotFound() {
+        val tempDir = Files.createTempDirectory("garland-download-missing-share-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        val encryptedShare = encryptedShare(fillByte = 13)
+        val shareIdHex = sha256Hex(encryptedShare)
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.start()
+
+        try {
+            val document = store.createDocument("note.txt", "text/plain")
+            val serverUrl = server.url("").toString().removeSuffix("/")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "plan": {
+                    "manifest": {
+                      "document_id": "doc123",
+                      "blocks": [
+                        {
+                          "index": 0,
+                          "share_id_hex": "$shareIdHex",
+                          "servers": ["$serverUrl"]
+                        }
+                      ]
+                    }
+                  }
+                }
+                """.trimIndent(),
+            )
+
+            val client = OkHttpClient()
+            val executor = GarlandDownloadExecutor(
+                store = store,
+                client = client,
+                recoverBlock = { error("should not recover") },
+            )
+
+            val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+            assertFalse(result.success)
+            assertEquals("Share $shareIdHex was not found on any configured server (2 URL(s) tried)", result.message)
+            assertEquals(2, result.attemptedServers)
+            assertEquals("download-failed", store.readRecord(document.documentId)?.uploadStatus)
+
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun restoresDocumentAcrossMultipleBlocks() {
         val tempDir = Files.createTempDirectory("garland-download-multi-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)

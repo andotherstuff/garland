@@ -517,6 +517,111 @@ class GarlandUploadExecutorTest {
     }
 
     @Test
+    fun retriesTransientUploadFailuresBeforePublishingCommitEvent() {
+        val tempDir = Files.createTempDirectory("garland-upload-retry-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(503))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        server.enqueue(
+            MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                    webSocket.close(1000, null)
+                }
+            })
+        )
+        server.start()
+
+        try {
+            val document = store.createDocument("retry.txt", "text/plain")
+            val uploadUrl = server.url("").toString().removeSuffix("/")
+            val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(store, client)
+            val result = executor.executeDocumentUpload(document.documentId, listOf(relayUrl))
+
+            assertTrue(result.success)
+            assertEquals(1, result.uploadedShares)
+            val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+            assertEquals("Uploaded share a1 after 2 attempts", diagnostics?.uploads?.first()?.detail)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun storesNetworkFailureStatusAfterUploadRetriesAreExhausted() {
+        val tempDir = Files.createTempDirectory("garland-upload-network-failure-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("offline.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"http://127.0.0.1:1","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent(),
+        )
+
+        val client = OkHttpClient()
+        val executor = GarlandUploadExecutor(store, client)
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-network-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertTrue(result.message.contains("network error"))
+        assertTrue(result.message.contains("after 3 attempts"))
+
+        client.dispatcher.cancelAll()
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
+    }
+
+    @Test
     fun marksPartialPublishWhenNotAllRelaysAccept() {
         val tempDir = Files.createTempDirectory("garland-upload-partial-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
