@@ -1,6 +1,8 @@
 # Garland Alpha Release Checklist
 
-This checklist freezes the command path and evidence needed for alpha sign-off.
+This checklist freezes the command path and evidence needed for the `v0.0.2-alpha` release cut.
+
+For this cut, connected-device instrumentation and manual picker/provider checks are explicitly deferred until after publish. They remain required follow-through work, but they are not ship blockers for the no-device release path.
 
 Release target: `v0.0.2-alpha`
 
@@ -26,10 +28,10 @@ Evidence to capture:
 - `./gradlew assembleDebug`
 - `./gradlew lintDebug`
 
-## 2. GitHub test-release verification
+## 2. Deferred post-release device validation
 
-- [ ] Publish a GitHub test release from the candidate commit
-- [ ] Install the published APK on a real Android device
+- [ ] Publish a GitHub release from the candidate commit after the no-device release run completes
+- [ ] Install the published APK on a real Android device when one is available
 - [ ] Record pass or failure details for provider flow, pending sync worker flow, restore worker flow, and diagnostics flow
 
 Evidence to capture:
@@ -38,7 +40,7 @@ Evidence to capture:
 - APK version/build identifier used for testing
 - linked test report or copied failure output for any blocking case
 
-## 3. Manual alpha checks
+## 3. Deferred post-release manual alpha checks
 
 - [ ] Upload a small text file and confirm relay publish status reaches the diagnostics screen
 - [ ] Retry a failed upload and confirm diagnostics remain readable after the status transition, including recent history
@@ -56,6 +58,8 @@ Evidence to capture:
 ## 4. Ship gate
 
 - [x] All no-device verification commands pass on the release candidate commit
-- [ ] GitHub test-release smoke testing passes or any failures are accepted and documented
-- [ ] Manual alpha checks are complete
+- [x] Deferred device-validation risk is documented in the release docs and handoff
+- [ ] `automation/release_alpha.sh v0.0.2-alpha` runs from a fresh clean worktree aligned with `origin/main`
+- [ ] Signed APK path, SHA-256 path, and GitHub prerelease URL are captured
+- [ ] A named owner is assigned for post-release connected and manual validation
 - [ ] `README.md`, `docs/CURRENT_STATUS.md`, and `NEXT_WAVE.md` match the release state
