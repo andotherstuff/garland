@@ -82,7 +82,8 @@ Verification rules:
 - Run the smallest correct verification commands for the files you changed.
 - If tests fail, fix them before ending the round.
 - Prefer empirical verification over code inspection.
-- If a Gradle daemon disappears, retry the same verification with `./gradlew --no-daemon ...` before declaring failure.
+- Use `./automation/gradle_capped.sh ...` for every Gradle command so builds stay on the repo's low-priority single-worker path.
+- If a capped Gradle run still fails because of daemon/process instability, retry the same verification once with `./automation/gradle_capped.sh ...` before declaring failure.
 - Before running `connectedDebugAndroidTest`, check whether a device is available with `adb devices`.
 - If no device is connected, do not fail the round for that alone; run compile-time Android test verification instead and record the device block clearly.
 
