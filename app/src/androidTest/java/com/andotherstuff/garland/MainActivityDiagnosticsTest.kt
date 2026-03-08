@@ -4,7 +4,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.Visibility.GONE
@@ -14,6 +16,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.CoreMatchers.containsString
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
@@ -121,18 +124,25 @@ class MainActivityDiagnosticsTest {
 
     @Test
     fun preparingDraftShowsSnapshotSummaryAndWaitingPipelineStates() {
+        seedLoadedIdentity()
+
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            onView(withId(R.id.deriveButton)).perform(click())
-            onView(withId(R.id.prepareUploadButton)).perform(click())
-            onView(withId(R.id.preparedSnapshotText)).check(matches(withText(containsString("Prepared snapshot:"))))
-            onView(withId(R.id.preparedSnapshotText)).check(matches(withText(containsString("planned share upload"))))
+            onView(withId(R.id.createFileButton)).perform(click())
+            onView(withId(R.id.contentInput)).perform(replaceText("hello from instrumentation"), closeSoftKeyboard())
+            onView(withId(R.id.saveButton)).perform(click())
+
+            onView(withId(R.id.activeDocumentText)).check(matches(withText(containsString("note.txt"))))
+            onView(withId(R.id.activeDocumentText)).check(matches(withText(containsString("Sync queued"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Status: Sync queued"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Blocks: 1"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Servers: 1"))))
 
             scenario.onActivity { activity ->
                 val container = activity.findViewById<LinearLayout>(R.id.activeDocumentProgressContainer)
                 assertEquals(4, container.childCount)
                 assertProgressRow(container, 0, "DONE", "Capture test content")
                 assertProgressRow(container, 1, "DONE", "Encrypt + chunk locally")
-                assertProgressRow(container, 2, "WAIT", "Upload shares to Blossom")
+                assertProgressRow(container, 2, "LIVE", "Upload shares to Blossom")
                 assertProgressRow(container, 3, "WAIT", "Publish commit event to relays")
             }
         }
@@ -782,6 +792,17 @@ $blocksJson
     private fun clearAppState() {
         targetContext.deleteSharedPreferences("garland-session")
         targetContext.filesDir.resolve("garland-documents").deleteRecursively()
+    }
+
+    private fun seedLoadedIdentity() {
+        val identity = JSONObject(
+            NativeBridge.deriveIdentity(
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+                "",
+            )
+        )
+        assertTrue(identity.optBoolean("ok"))
+        GarlandSessionStore(targetContext).savePrivateKeyHex(identity.getString("private_key_hex"))
     }
 
     private fun assertLineOrder(textView: TextView, first: String, second: String) {
