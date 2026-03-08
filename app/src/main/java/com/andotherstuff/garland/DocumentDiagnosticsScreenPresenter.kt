@@ -3,6 +3,7 @@ package com.andotherstuff.garland
 data class DocumentDiagnosticsOption(
     val documentId: String,
     val label: String,
+    val supportingText: String,
     val selected: Boolean,
 )
 
@@ -72,6 +73,7 @@ object DocumentDiagnosticsScreenPresenter {
                 DocumentDiagnosticsOption(
                     documentId = record.documentId,
                     label = record.displayName,
+                    supportingText = buildOptionSupportingText(record),
                     selected = record.documentId == selectedRecord?.documentId,
                 )
             },
@@ -226,6 +228,17 @@ object DocumentDiagnosticsScreenPresenter {
             else -> {
                 "Copy the report if the screen looks wrong and you want a snapshot for comparison."
             }
+        }
+    }
+
+    private fun buildOptionSupportingText(record: LocalDocumentRecord): String {
+        val label = buildNarrative(record).label
+        val status = DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus)
+        val message = record.lastSyncMessage?.trim().takeUnless { it.isNullOrBlank() }
+        return if (message == null) {
+            "$label - $status"
+        } else {
+            "$label - $message"
         }
     }
 }

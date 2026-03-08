@@ -72,6 +72,9 @@ class DocumentDiagnosticsScreenPresenterTest {
         assertTrue(state.troubleshootingItems.contains("Retry relay publish after confirming relay connectivity and auth."))
         assertTrue(state.nextSteps.contains("Retry relay publish after confirming relay connectivity and auth."))
         assertEquals(listOf("selected.txt", "other.txt"), state.documentOptions.map { it.label })
+        assertEquals("Relay attention - Published to 0/1 relays; failed: wss://relay.one (timeout)", state.documentOptions.first().supportingText)
+        assertTrue(state.documentOptions.first().selected)
+        assertEquals("Needs review - Pending local write", state.documentOptions[1].supportingText)
     }
 
     @Test

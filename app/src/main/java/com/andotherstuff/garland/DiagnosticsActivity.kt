@@ -6,11 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
-import android.widget.Toast
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.andotherstuff.garland.databinding.ActivityDiagnosticsBinding
@@ -127,14 +127,37 @@ class DiagnosticsActivity : AppCompatActivity() {
                 }
                 isAllCaps = false
                 textAlignment = View.TEXT_ALIGNMENT_VIEW_START
-                text = option.label
-                isEnabled = !option.selected
+                text = "${option.label}\n${option.supportingText}"
+                setPaddingRelative(
+                    (16 * resources.displayMetrics.density).toInt(),
+                    (14 * resources.displayMetrics.density).toInt(),
+                    (16 * resources.displayMetrics.density).toInt(),
+                    (14 * resources.displayMetrics.density).toInt(),
+                )
+                gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                styleDocumentOptionButton(this, option.selected)
                 setOnClickListener {
-                    selectedDocumentId = option.documentId
-                    render()
+                    if (!option.selected) {
+                        selectedDocumentId = option.documentId
+                        render()
+                    }
                 }
             }
             binding.diagnosticsDocumentListContainer.addView(button)
+        }
+    }
+
+    private fun styleDocumentOptionButton(button: MaterialButton, isSelected: Boolean) {
+        val backgroundColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_surface_alt else R.color.garland_surface)
+        val strokeColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_leaf else R.color.garland_outline)
+        val textColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_ink else R.color.garland_muted)
+        button.backgroundTintList = ColorStateList.valueOf(backgroundColor)
+        button.strokeColor = ColorStateList.valueOf(strokeColor)
+        button.setTextColor(textColor)
+        button.strokeWidth = if (isSelected) {
+            (2 * resources.displayMetrics.density).toInt()
+        } else {
+            resources.displayMetrics.density.toInt().coerceAtLeast(1)
         }
     }
 
