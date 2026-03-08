@@ -71,6 +71,58 @@ class GarlandConfigTest {
     }
 
     @Test
+    fun buildsPrepareCommitChainJson() {
+        val json = GarlandConfig.buildPrepareCommitChainRequestJson(
+            privateKeyHex = "deadbeef",
+            passphrase = "bucket-passphrase",
+            blossomServers = GarlandConfig.defaults.blossomServers,
+            createdAt = 123L,
+            prevEventId = "ab".repeat(32),
+            prevSeq = 7,
+            entryNames = listOf("note.txt"),
+            message = "snapshot",
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("deadbeef", payload.get("private_key_hex").asString)
+        assertEquals("bucket-passphrase", payload.get("passphrase").asString)
+        assertEquals("snapshot", payload.get("message").asString)
+        assertEquals(1, payload.getAsJsonArray("entry_names").size())
+        assertEquals(3, payload.getAsJsonArray("servers").size())
+    }
+
+    @Test
+    fun buildsResolveCommitChainHeadJson() {
+        val json = GarlandConfig.buildResolveCommitChainHeadRequestJson(
+            privateKeyHex = "deadbeef",
+            passphrase = "bucket-passphrase",
+            eventsJson = listOf("{" + "\"id_hex\":\"event123\",\"pubkey_hex\":\"pubkey123\",\"created_at\":1,\"kind\":1097,\"tags\":[],\"content\":\"content\",\"sig_hex\":\"sig123\"}"),
+            trustedEventId = "event123",
+            trustedSeq = 4,
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("event123", payload.get("trusted_event_id").asString)
+        assertEquals(4, payload.get("trusted_seq").asLong)
+        assertEquals(1, payload.getAsJsonArray("events").size())
+    }
+
+    @Test
+    fun buildsReadDirectoryEntriesJson() {
+        val json = GarlandConfig.buildReadDirectoryEntriesRequestJson(
+            privateKeyHex = "deadbeef",
+            passphrase = "bucket-passphrase",
+            rootInodeJson = "{" + "\"format\":\"single\",\"hash\":\"ab\",\"erasure\":{\"algorithm\":\"reed-solomon\",\"k\":1,\"n\":3,\"field\":\"gf256\"},\"shares\":[]}",
+            uploadsJson = listOf("{" + "\"server_url\":\"https://one.example\",\"share_id_hex\":\"ab\",\"body_b64\":\"aGVsbG8=\"}"),
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        assertEquals("deadbeef", payload.get("private_key_hex").asString)
+        assertTrue(payload.has("root_inode"))
+        assertEquals(1, payload.getAsJsonArray("uploads").size())
+    }
+
+    @Test
     fun buildsRecoverReadJson() {
         val json = GarlandConfig.buildRecoverReadRequestJson(
             privateKeyHex = "deadbeef",

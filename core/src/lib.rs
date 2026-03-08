@@ -1,3 +1,4 @@
+pub mod commit_chain;
 pub mod commit_crypto;
 pub mod crypto;
 pub mod identity;
@@ -12,6 +13,10 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::Value;
 
+    use crate::commit_chain::{
+        prepare_commit_chain_snapshot, read_directory_entries, resolve_commit_chain_head,
+        PrepareCommitChainRequest, ReadDirectoryEntriesRequest, ResolveCommitChainHeadRequest,
+    };
     use crate::commit_crypto::{decode_commit_content, decrypt_commit_payload};
     use crate::crypto::{
         decrypt_block, encrypt_block, prepare_replication_upload, BlossomServer, REPLICATION_FACTOR,
@@ -446,5 +451,236 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(recovered, payload);
+    }
+
+    #[test]
+    fn prepares_commit_chain_snapshot_contract() {
+        let request = PrepareCommitChainRequest {
+            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
+                .into(),
+            passphrase: "bucket-passphrase".into(),
+            created_at: 1_701_907_200,
+            prev_event_id: Some("ab".repeat(32)),
+            prev_seq: Some(7),
+            servers: vec![
+                "https://cdn.nostrcheck.me".into(),
+                "https://blossom.nostr.build".into(),
+                "https://blossom.yakihonne.com".into(),
+            ],
+            entry_names: vec!["note.txt".into(), "todo.txt".into()],
+            message: Some("snapshot".into()),
+        };
+
+        let snapshot = prepare_commit_chain_snapshot(&request).expect("snapshot should build");
+
+        assert_eq!(snapshot.payload.prev, request.prev_event_id);
+        assert_eq!(snapshot.payload.seq, 8);
+        assert_eq!(snapshot.payload.message.as_deref(), Some("snapshot"));
+        assert_eq!(snapshot.root_directory.entries.len(), 2);
+        assert_eq!(snapshot.uploads.len(), 3);
+        assert_eq!(snapshot.commit_event.kind, 1097);
+        assert_eq!(snapshot.commit_event.tags.len(), 0);
+        assert_eq!(snapshot.root_inode.format, "single");
+        assert_eq!(snapshot.root_inode.erasure.k, 1);
+        assert_eq!(snapshot.root_inode.erasure.n, 3);
+    }
+
+    #[test]
+    fn resolves_latest_valid_commit_chain_head() {
+        let private_key_hex =
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a".to_string();
+        let passphrase = "bucket-passphrase".to_string();
+        let servers = vec![
+            "https://cdn.nostrcheck.me".to_string(),
+            "https://blossom.nostr.build".to_string(),
+            "https://blossom.yakihonne.com".to_string(),
+        ];
+        let first = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_200,
+            prev_event_id: None,
+            prev_seq: None,
+            servers: servers.clone(),
+            entry_names: vec!["note.txt".into()],
+            message: Some("genesis".into()),
+        })
+        .expect("genesis should build");
+        let second = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_260,
+            prev_event_id: Some(first.commit_event.id_hex.clone()),
+            prev_seq: Some(first.payload.seq),
+            servers,
+            entry_names: vec!["note.txt".into(), "todo.txt".into()],
+            message: Some("second".into()),
+        })
+        .expect("second snapshot should build");
+
+        let resolved = resolve_commit_chain_head(&ResolveCommitChainHeadRequest {
+            private_key_hex,
+            passphrase,
+            events: vec![first.commit_event, second.commit_event.clone()],
+            trusted_event_id: None,
+            trusted_seq: None,
+        })
+        .expect("head should resolve");
+
+        assert_eq!(resolved.head.event_id, second.commit_event.id_hex);
+        assert_eq!(resolved.head.payload.seq, 1);
+        assert_eq!(resolved.valid_event_ids.len(), 2);
+    }
+
+    #[test]
+    fn rejects_forked_or_stale_commit_heads() {
+        let private_key_hex =
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a".to_string();
+        let passphrase = "bucket-passphrase".to_string();
+        let servers = vec![
+            "https://cdn.nostrcheck.me".to_string(),
+            "https://blossom.nostr.build".to_string(),
+            "https://blossom.yakihonne.com".to_string(),
+        ];
+        let genesis = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_200,
+            prev_event_id: None,
+            prev_seq: None,
+            servers: servers.clone(),
+            entry_names: vec!["note.txt".into()],
+            message: None,
+        })
+        .expect("genesis should build");
+        let branch_a = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_260,
+            prev_event_id: Some(genesis.commit_event.id_hex.clone()),
+            prev_seq: Some(genesis.payload.seq),
+            servers: servers.clone(),
+            entry_names: vec!["note-a.txt".into()],
+            message: None,
+        })
+        .expect("branch a should build");
+        let branch_b = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_320,
+            prev_event_id: Some(genesis.commit_event.id_hex.clone()),
+            prev_seq: Some(genesis.payload.seq),
+            servers: servers.clone(),
+            entry_names: vec!["note-b.txt".into()],
+            message: None,
+        })
+        .expect("branch b should build");
+
+        let fork_error = resolve_commit_chain_head(&ResolveCommitChainHeadRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            events: vec![
+                genesis.commit_event.clone(),
+                branch_a.commit_event.clone(),
+                branch_b.commit_event,
+            ],
+            trusted_event_id: None,
+            trusted_seq: None,
+        })
+        .expect_err("forked tips should fail");
+        assert_eq!(fork_error.to_string(), "commit chain is forked");
+
+        let stale_error = resolve_commit_chain_head(&ResolveCommitChainHeadRequest {
+            private_key_hex,
+            passphrase,
+            events: vec![genesis.commit_event, branch_a.commit_event.clone()],
+            trusted_event_id: Some(branch_a.commit_event.id_hex.clone()),
+            trusted_seq: Some(branch_a.payload.seq + 1),
+        })
+        .expect_err("lower sequence than trusted head should fail");
+        assert_eq!(stale_error.to_string(), "candidate head is stale");
+    }
+
+    #[test]
+    fn reads_directory_entries_from_snapshot_uploads() {
+        let private_key_hex =
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a".to_string();
+        let passphrase = "bucket-passphrase".to_string();
+        let snapshot = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_200,
+            prev_event_id: None,
+            prev_seq: None,
+            servers: vec![
+                "https://cdn.nostrcheck.me".into(),
+                "https://blossom.nostr.build".into(),
+                "https://blossom.yakihonne.com".into(),
+            ],
+            entry_names: vec!["note.txt".into(), "todo.txt".into()],
+            message: None,
+        })
+        .expect("snapshot should build");
+
+        let directory = read_directory_entries(&ReadDirectoryEntriesRequest {
+            private_key_hex,
+            passphrase,
+            root_inode: snapshot.root_inode.clone(),
+            uploads: snapshot.uploads.clone(),
+        })
+        .expect("directory should decode");
+
+        assert_eq!(
+            directory.entries,
+            vec!["note.txt".to_string(), "todo.txt".to_string()]
+        );
+        assert_eq!(directory.directory.entries.len(), 2);
+    }
+
+    #[test]
+    fn rejects_cyclic_commit_graphs() {
+        let private_key_hex =
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a".to_string();
+        let passphrase = "bucket-passphrase".to_string();
+        let servers = vec![
+            "https://cdn.nostrcheck.me".to_string(),
+            "https://blossom.nostr.build".to_string(),
+            "https://blossom.yakihonne.com".to_string(),
+        ];
+        let mut first = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_200,
+            prev_event_id: Some("b".repeat(64)),
+            prev_seq: Some(0),
+            servers: servers.clone(),
+            entry_names: vec!["note.txt".into()],
+            message: None,
+        })
+        .expect("first cyclic snapshot should build");
+        let mut second = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_260,
+            prev_event_id: Some("a".repeat(64)),
+            prev_seq: Some(0),
+            servers,
+            entry_names: vec!["todo.txt".into()],
+            message: None,
+        })
+        .expect("second cyclic snapshot should build");
+        first.commit_event.id_hex = "a".repeat(64);
+        second.commit_event.id_hex = "b".repeat(64);
+
+        let error = resolve_commit_chain_head(&ResolveCommitChainHeadRequest {
+            private_key_hex,
+            passphrase,
+            events: vec![first.commit_event, second.commit_event],
+            trusted_event_id: None,
+            trusted_seq: None,
+        })
+        .expect_err("cyclic commit graph should be rejected");
+
+        assert_eq!(error.to_string(), "no valid commit head found");
     }
 }

@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
         bindDefaults()
         binding.statusText.text = getString(R.string.app_boot_status)
         privateKeyHex = session.loadPrivateKeyHex()
+        binding.passphraseInput.setText(session.loadPassphrase())
         bindLatestDocument()
 
         binding.deriveButton.setOnClickListener {
@@ -46,15 +47,18 @@ class MainActivity : AppCompatActivity() {
                 if (derivedPrivateKey == null) {
                     privateKeyHex = null
                     session.clearPrivateKeyHex()
+                    session.clearPassphrase()
                     getString(R.string.identity_error, "missing private key")
                 } else {
                     privateKeyHex = derivedPrivateKey
                     session.savePrivateKeyHex(derivedPrivateKey)
+                    session.savePassphrase(binding.passphraseInput.text?.toString().orEmpty())
                     getString(R.string.identity_loaded, response.optString("nsec"))
                 }
             } else {
                 privateKeyHex = null
                 session.clearPrivateKeyHex()
+                session.clearPassphrase()
                 getString(R.string.identity_error, response.optString("error"))
             }
         }

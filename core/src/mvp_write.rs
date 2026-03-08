@@ -44,7 +44,7 @@ pub struct WriteManifest {
     pub blocks: Vec<ManifestBlock>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UploadInstruction {
     pub server_url: String,
     pub share_id_hex: String,

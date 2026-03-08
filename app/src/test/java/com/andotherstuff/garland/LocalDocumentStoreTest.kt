@@ -161,4 +161,45 @@ class LocalDocumentStoreTest {
         assertEquals("status-9", history?.first()?.status)
         assertEquals("status-2", history?.last()?.status)
     }
+
+    @Test
+    fun persistsCommitChainCheckpointSeparatelyFromDocumentRecords() {
+        val tempDir = Files.createTempDirectory("garland-store-commit-chain-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+
+        store.saveCommitChainCheckpoint(
+            CommitChainCheckpoint(
+                acceptedHeadEventId = "ab".repeat(32),
+                acceptedHeadSeq = 7,
+                conflictMessage = null,
+                updatedAt = 123L,
+            )
+        )
+
+        val checkpoint = store.readCommitChainCheckpoint()
+
+        assertEquals("ab".repeat(32), checkpoint?.acceptedHeadEventId)
+        assertEquals(7L, checkpoint?.acceptedHeadSeq)
+        assertEquals(document.documentId, store.listDocuments().single().documentId)
+    }
+
+    @Test
+    fun clearsCommitChainCheckpoint() {
+        val tempDir = Files.createTempDirectory("garland-store-commit-chain-clear-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+
+        store.saveCommitChainCheckpoint(
+            CommitChainCheckpoint(
+                acceptedHeadEventId = "ab".repeat(32),
+                acceptedHeadSeq = 7,
+                conflictMessage = "fork detected",
+                updatedAt = 123L,
+            )
+        )
+
+        store.clearCommitChainCheckpoint()
+
+        assertNull(store.readCommitChainCheckpoint())
+    }
 }

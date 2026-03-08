@@ -17,6 +17,13 @@ data class LocalDocumentRecord(
     val syncHistoryJson: String? = null,
 )
 
+data class CommitChainCheckpoint(
+    val acceptedHeadEventId: String? = null,
+    val acceptedHeadSeq: Long? = null,
+    val conflictMessage: String? = null,
+    val updatedAt: Long,
+)
+
 class LocalDocumentStore(private val context: Context) {
     private val baseDir = File(context.filesDir, "garland-documents")
     private val notifier = ProviderChangeNotifier(context.applicationContext)
@@ -58,6 +65,12 @@ class LocalDocumentStore(private val context: Context) {
         clearDiagnostics: Boolean = false,
     ) = impl.updateUploadDiagnostics(documentId, status, message, diagnosticsJson, clearDiagnostics)
 
+    fun saveCommitChainCheckpoint(checkpoint: CommitChainCheckpoint) = impl.saveCommitChainCheckpoint(checkpoint)
+
+    fun readCommitChainCheckpoint(): CommitChainCheckpoint? = impl.readCommitChainCheckpoint()
+
+    fun clearCommitChainCheckpoint() = impl.clearCommitChainCheckpoint()
+
     fun deleteDocument(documentId: String) = impl.deleteDocument(documentId)
 }
 
@@ -67,6 +80,7 @@ class LocalDocumentStoreImpl(
 ) {
     private companion object {
         const val MAX_SYNC_HISTORY_ENTRIES = 8
+        const val COMMIT_CHAIN_STATE_FILE_NAME = "bucket-state.json"
     }
 
     private val blobDir = File(baseDir, "blobs")
@@ -212,6 +226,20 @@ class LocalDocumentStoreImpl(
         onDocumentChanged?.invoke(documentId)
     }
 
+    fun saveCommitChainCheckpoint(checkpoint: CommitChainCheckpoint) {
+        commitChainStateFile().writeText(gson.toJson(checkpoint))
+    }
+
+    fun readCommitChainCheckpoint(): CommitChainCheckpoint? {
+        val file = commitChainStateFile()
+        if (!file.exists()) return null
+        return gson.fromJson(file.readText(), CommitChainCheckpoint::class.java)
+    }
+
+    fun clearCommitChainCheckpoint() {
+        commitChainStateFile().delete()
+    }
+
     private fun writeRecord(record: LocalDocumentRecord) {
         metadataFile(record.documentId).writeText(gson.toJson(record))
     }
@@ -237,8 +265,11 @@ class LocalDocumentStoreImpl(
 
     private fun isRecordMetadataFile(file: File): Boolean {
         return file.extension == "json" && !file.name.endsWith(".upload.json")
+            && file.name != COMMIT_CHAIN_STATE_FILE_NAME
     }
 
     private fun metadataFile(documentId: String): File = File(metaDir, "$documentId.json")
     private fun uploadPlanFile(documentId: String): File = File(metaDir, "$documentId.upload.json")
+
+    private fun commitChainStateFile(): File = File(metaDir, COMMIT_CHAIN_STATE_FILE_NAME)
 }

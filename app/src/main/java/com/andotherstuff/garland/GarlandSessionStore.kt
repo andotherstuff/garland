@@ -19,6 +19,16 @@ class GarlandSessionStore(context: Context) {
         prefs.edit().remove(KEY_PRIVATE_KEY_HEX).apply()
     }
 
+    fun savePassphrase(passphrase: String) {
+        prefs.edit().putString(KEY_PASSPHRASE, passphrase).apply()
+    }
+
+    fun loadPassphrase(): String = prefs.getString(KEY_PASSPHRASE, "").orEmpty()
+
+    fun clearPassphrase() {
+        prefs.edit().remove(KEY_PASSPHRASE).apply()
+    }
+
     fun saveBlossomServers(servers: List<String>) {
         prefs.edit()
             .putString(KEY_SERVER_ONE, servers.getOrNull(0)?.trim())
@@ -63,6 +73,7 @@ class GarlandSessionStore(context: Context) {
 
     companion object {
         private const val KEY_PRIVATE_KEY_HEX = "private_key_hex"
+        private const val KEY_PASSPHRASE = "passphrase"
         private const val KEY_SERVER_ONE = "server_one"
         private const val KEY_SERVER_TWO = "server_two"
         private const val KEY_SERVER_THREE = "server_three"

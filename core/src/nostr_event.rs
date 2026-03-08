@@ -1,11 +1,11 @@
 use hkdf::Hkdf;
 use nostr::event::{Kind, Tag, UnsignedEvent as NostrUnsignedEvent};
 use nostr::{Keys, SecretKey, Timestamp};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnsignedEvent {
     pub created_at: u64,
     pub kind: u64,
@@ -13,7 +13,7 @@ pub struct UnsignedEvent {
     pub content: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignedEvent {
     pub id_hex: String,
     pub pubkey_hex: String,
