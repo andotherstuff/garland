@@ -1,15 +1,22 @@
 <resources>
-    <color name="garland_bg">#09110F</color>
-    <color name="garland_surface">#101B18</color>
-    <color name="garland_surface_alt">#162522</color>
-    <color name="garland_surface_soft">#13201D</color>
-    <color name="garland_surface_strong">#32534B</color>
-    <color name="garland_ink">#E6F2ED</color>
-    <color name="garland_muted">#A1B8AF</color>
-    <color name="garland_leaf">#62C08B</color>
-    <color name="garland_gold">#D6B36D</color>
-    <color name="garland_outline">#28433D</color>
+    <color name="garland_bg">#07100D</color>
+    <color name="garland_bg_top">#10211A</color>
+    <color name="garland_bg_bottom">#060B09</color>
+    <color name="garland_surface">#101916</color>
+    <color name="garland_surface_alt">#16221E</color>
+    <color name="garland_surface_soft">#13201C</color>
+    <color name="garland_surface_raised">#1B2A25</color>
+    <color name="garland_surface_strong">#35584F</color>
+    <color name="garland_panel_tint">#1A2A25</color>
+    <color name="garland_input_surface">#0F1714</color>
+    <color name="garland_ink">#EEF6F1</color>
+    <color name="garland_muted">#A6BAB2</color>
+    <color name="garland_muted_soft">#81958E</color>
+    <color name="garland_leaf">#74C998</color>
+    <color name="garland_gold">#D7BA7E</color>
+    <color name="garland_outline">#2A423B</color>
+    <color name="garland_outline_soft">#20332E</color>
     <color name="garland_warning">#FFB86B</color>
     <color name="garland_error">#FF8A80</color>
-    <color name="garland_danger_surface">#251313</color>
+    <color name="garland_danger_surface">#241414</color>
 </resources>

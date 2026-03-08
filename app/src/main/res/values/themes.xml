@@ -9,7 +9,7 @@
         <item name="colorOnSecondary">@color/garland_bg</item>
         <item name="colorSurface">@color/garland_surface</item>
         <item name="colorOnSurface">@color/garland_ink</item>
-        <item name="colorSurfaceVariant">@color/garland_surface_alt</item>
+        <item name="colorSurfaceVariant">@color/garland_surface_raised</item>
         <item name="colorOnSurfaceVariant">@color/garland_muted</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>

@@ -127,7 +127,7 @@ class DiagnosticsActivity : AppCompatActivity() {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                 ).also { params ->
-                    params.bottomMargin = (8 * resources.displayMetrics.density).toInt()
+                    params.bottomMargin = resources.getDimensionPixelSize(R.dimen.garland_list_item_gap)
                 }
                 isAllCaps = false
                 textAlignment = View.TEXT_ALIGNMENT_VIEW_START
@@ -153,13 +153,13 @@ class DiagnosticsActivity : AppCompatActivity() {
     }
 
     private fun styleDocumentOptionButton(button: MaterialButton, isSelected: Boolean) {
-        val backgroundColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_surface_alt else R.color.garland_surface)
-        val strokeColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_leaf else R.color.garland_outline)
+        val backgroundColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_surface_raised else R.color.garland_surface_soft)
+        val strokeColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_leaf else R.color.garland_outline_soft)
         val textColor = ContextCompat.getColor(this, if (isSelected) R.color.garland_ink else R.color.garland_muted)
         button.backgroundTintList = ColorStateList.valueOf(backgroundColor)
         button.strokeColor = ColorStateList.valueOf(strokeColor)
         button.setTextColor(textColor)
-        button.cornerRadius = resources.getDimensionPixelSize(R.dimen.garland_card_padding)
+        button.cornerRadius = resources.getDimensionPixelSize(R.dimen.garland_panel_padding) + resources.getDimensionPixelSize(R.dimen.garland_content_gap)
         button.strokeWidth = if (isSelected) {
             (2 * resources.displayMetrics.density).toInt()
         } else {

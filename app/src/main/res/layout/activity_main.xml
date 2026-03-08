@@ -2,14 +2,16 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/garland_bg"
+    android:background="@drawable/bg_garland_window"
+    android:clipToPadding="false"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="@dimen/garland_screen_padding">
+        android:padding="@dimen/garland_screen_padding"
+        android:paddingBottom="32dp">
 
         <com.google.android.material.card.MaterialCardView
             style="@style/Widget.Garland.Card"
@@ -44,48 +46,56 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_content_gap"
                     android:background="@drawable/bg_status_chip"
-                    android:paddingLeft="12dp"
-                    android:paddingTop="6dp"
-                    android:paddingRight="12dp"
-                    android:paddingBottom="6dp"
+                    android:paddingLeft="@dimen/garland_status_chip_padding_horizontal"
+                    android:paddingTop="@dimen/garland_status_chip_padding_vertical"
+                    android:paddingRight="@dimen/garland_status_chip_padding_horizontal"
+                    android:paddingBottom="@dimen/garland_status_chip_padding_vertical"
                     android:text="Status"
                     android:textAppearance="@style/TextAppearance.Garland.StatusChip" />
 
-                <TextView
-                    android:id="@+id/mainStatusHeadlineText"
+                <LinearLayout
+                    style="@style/Widget.Garland.Panel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:gravity="center"
-                    android:text="Garland status headline"
-                    android:textAppearance="@style/TextAppearance.Garland.DisplayTitle" />
+                    android:layout_marginTop="@dimen/garland_section_gap"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/mainStatusSummaryText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_tight_gap"
-                    android:gravity="center"
-                    android:text="Garland status summary"
-                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+                    <TextView
+                        android:id="@+id/mainStatusHeadlineText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="Garland status headline"
+                        android:textAppearance="@style/TextAppearance.Garland.DisplayTitle" />
 
-                <TextView
-                    android:id="@+id/mainNextStepsText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:gravity="center"
-                    android:text="Next steps"
-                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+                    <TextView
+                        android:id="@+id/mainStatusSummaryText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_tight_gap"
+                        android:gravity="center"
+                        android:text="Garland status summary"
+                        android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
-                <TextView
-                    android:id="@+id/statusText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:gravity="center"
-                    android:text="@string/app_boot_status"
-                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+                    <TextView
+                        android:id="@+id/mainNextStepsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_content_gap"
+                        android:gravity="center"
+                        android:text="Next steps"
+                        android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_content_gap"
+                        android:gravity="center"
+                        android:text="@string/app_boot_status"
+                        android:textAppearance="@style/TextAppearance.Garland.SupportLabel" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -123,54 +133,61 @@
                     android:text="@string/active_document_details_none"
                     android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
-                <TextView
+                <LinearLayout
+                    style="@style/Widget.Garland.Panel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_section_gap"
-                    android:text="@string/active_document_diagnostics_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/activeDocumentDiagnosticsText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:text="@string/active_document_diagnostics_none"
-                    android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/active_document_diagnostics_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
 
-                <TextView
-                    android:id="@+id/activeDocumentUploadsLabel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/active_document_uploads_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
-                    android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/activeDocumentDiagnosticsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_content_gap"
+                        android:text="@string/active_document_diagnostics_none"
+                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody" />
 
-                <TextView
-                    android:id="@+id/activeDocumentUploadsText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
-                    android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/activeDocumentUploadsLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_panel_gap"
+                        android:text="@string/active_document_uploads_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
+                        android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/activeDocumentRelaysLabel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/active_document_relays_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
-                    android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/activeDocumentUploadsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
+                        android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/activeDocumentRelaysText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
-                    android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/activeDocumentRelaysLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_panel_gap"
+                        android:text="@string/active_document_relays_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/activeDocumentRelaysText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Garland.DiagnosticsBody"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/openDiagnosticsButton"
@@ -208,103 +225,124 @@
                     android:text="@string/action_safety_note"
                     android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
-                <TextView
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    style="@style/Widget.Garland.Panel"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_section_gap"
-                    android:text="@string/action_group_quick_checks_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
+                    android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_tight_gap"
-                    android:text="@string/action_group_quick_checks_note"
-                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/refreshDocumentsButton"
-                        style="@style/Widget.Garland.ActionButton"
-                        android:layout_width="0dp"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/refresh_documents_button" />
+                        android:text="@string/action_group_quick_checks_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/syncDocumentsButton"
-                        style="@style/Widget.Garland.ActionButton.Primary"
-                        android:layout_width="0dp"
+                    <TextView
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/sync_documents_button" />
+                        android:layout_marginTop="@dimen/garland_tight_gap"
+                        android:text="@string/action_group_quick_checks_note"
+                        android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_content_gap"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/refreshDocumentsButton"
+                            style="@style/Widget.Garland.ActionButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/refresh_documents_button" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/syncDocumentsButton"
+                            style="@style/Widget.Garland.ActionButton.Primary"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/garland_button_gap"
+                            android:layout_weight="1"
+                            android:text="@string/sync_documents_button" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_section_gap"
-                    android:text="@string/action_group_document_actions_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_tight_gap"
-                    android:text="@string/action_group_document_actions_note"
-                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
-
                 <LinearLayout
+                    style="@style/Widget.Garland.Panel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_content_gap"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="@dimen/garland_panel_gap"
+                    android:orientation="vertical">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/retryUploadButton"
-                        style="@style/Widget.Garland.ActionButton"
-                        android:layout_width="0dp"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/retry_upload_button" />
+                        android:text="@string/action_group_document_actions_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/restoreDocumentButton"
-                        style="@style/Widget.Garland.ActionButton"
-                        android:layout_width="0dp"
+                    <TextView
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/restore_document_button" />
+                        android:layout_marginTop="@dimen/garland_tight_gap"
+                        android:text="@string/action_group_document_actions_note"
+                        android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_content_gap"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/retryUploadButton"
+                            style="@style/Widget.Garland.ActionButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/retry_upload_button" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/restoreDocumentButton"
+                            style="@style/Widget.Garland.ActionButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/garland_button_gap"
+                            android:layout_weight="1"
+                            android:text="@string/restore_document_button" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_section_gap"
-                    android:text="@string/action_group_danger_zone_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
-
-                <TextView
+                <LinearLayout
+                    style="@style/Widget.Garland.Panel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_tight_gap"
-                    android:text="@string/action_group_danger_zone_note"
-                    android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+                    android:layout_marginTop="@dimen/garland_panel_gap"
+                    android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/deleteDocumentButton"
-                    style="@style/Widget.Garland.DangerButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/garland_button_gap"
-                    android:text="@string/delete_document_button" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/action_group_danger_zone_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_tight_gap"
+                        android:text="@string/action_group_danger_zone_note"
+                        android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/deleteDocumentButton"
+                        style="@style/Widget.Garland.DangerButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/garland_button_gap"
+                        android:text="@string/delete_document_button" />
+                </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"
@@ -341,13 +379,15 @@
                     android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/garland_content_gap"
                     android:hint="@string/mnemonic_label">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/mnemonicInput"
+                        style="@style/Widget.Garland.InputEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textMultiLine"
@@ -357,13 +397,15 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/garland_button_gap"
                     android:hint="@string/passphrase_label">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/passphraseInput"
+                        style="@style/Widget.Garland.InputEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textPassword" />
@@ -397,91 +439,117 @@
                     android:text="@string/network_section_label"
                     android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
 
-                <TextView
+                <LinearLayout
+                    style="@style/Widget.Garland.Panel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/relay_defaults_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
+                    android:layout_marginTop="@dimen/garland_content_gap"
+                    android:orientation="vertical">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="Relay 1">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/relayOneInput"
+                    <TextView
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_height="wrap_content"
+                        android:text="@string/relay_defaults_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="Relay 2">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/relayTwoInput"
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Garland.InputLayout"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="Relay 1">
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="Relay 3">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/relayOneInput"
+                            style="@style/Widget.Garland.InputEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/relayThreeInput"
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Garland.InputLayout"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="Relay 2">
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:text="@string/blossom_defaults_label"
-                    android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/relayTwoInput"
+                            style="@style/Widget.Garland.InputEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="Blossom server 1">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/serverOneInput"
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Garland.InputLayout"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="Relay 3">
 
-                <com.google.android.material.textfield.TextInputLayout
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/relayThreeInput"
+                            style="@style/Widget.Garland.InputEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    style="@style/Widget.Garland.Panel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="Blossom server 2">
+                    android:layout_marginTop="@dimen/garland_panel_gap"
+                    android:orientation="vertical">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/serverTwoInput"
+                    <TextView
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_height="wrap_content"
+                        android:text="@string/blossom_defaults_label"
+                        android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
 
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="Blossom server 3">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/serverThreeInput"
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Garland.InputLayout"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="Blossom server 1">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/serverOneInput"
+                            style="@style/Widget.Garland.InputEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Garland.InputLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="Blossom server 2">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/serverTwoInput"
+                            style="@style/Widget.Garland.InputEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Garland.InputLayout"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="Blossom server 3">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/serverThreeInput"
+                            style="@style/Widget.Garland.InputEditText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -505,19 +573,22 @@
                     android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/garland_content_gap"
                     android:hint="File name">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/fileNameInput"
+                        style="@style/Widget.Garland.InputEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="note.txt" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -525,12 +596,14 @@
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/mimeTypeInput"
+                        style="@style/Widget.Garland.InputEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="text/plain" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -538,6 +611,7 @@
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/contentInput"
+                        style="@style/Widget.Garland.InputEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textMultiLine"
@@ -559,7 +633,7 @@
                     style="@style/Widget.Garland.ActionButton.Primary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="@dimen/garland_button_gap"
                     android:text="@string/execute_upload_button" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

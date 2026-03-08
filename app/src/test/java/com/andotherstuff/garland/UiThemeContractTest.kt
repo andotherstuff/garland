@@ -89,6 +89,9 @@ class UiThemeContractTest {
         assertTrue(diagnosticsLayout.contains("@dimen/garland_screen_padding"))
         assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.DisplayTitle"))
         assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.BodySupport"))
+        assertTrue(dimensXml.contains("garland_panel_padding"))
+        assertTrue(stylesXml.contains("Widget.Garland.Panel"))
+        assertTrue(stylesXml.contains("TextAppearance.Garland.SupportLabel"))
     }
 
     @Test
@@ -130,13 +133,20 @@ class UiThemeContractTest {
     fun styleAndColorTokensExposeSemanticDiagnosticStates() {
         val stylesXml = projectFile("app", "src", "main", "res", "values", "styles.xml")
         val colorsXml = projectFile("app", "src", "main", "res", "values", "colors.xml")
+        val mainLayout = projectFile("app", "src", "main", "res", "layout", "activity_main.xml")
+        val diagnosticsLayout = projectFile("app", "src", "main", "res", "layout", "activity_diagnostics.xml")
 
         assertTrue(stylesXml.contains("Widget.Garland.DangerButton"))
         assertTrue(stylesXml.contains("Widget.Garland.SubtleButton"))
+        assertTrue(stylesXml.contains("Widget.Garland.InputLayout"))
         assertTrue(stylesXml.contains("TextAppearance.Garland.StatusChip"))
         assertTrue(colorsXml.contains("garland_surface_soft"))
         assertTrue(colorsXml.contains("garland_surface_strong"))
         assertTrue(colorsXml.contains("garland_danger_surface"))
+        assertTrue(colorsXml.contains("garland_surface_raised"))
+        assertTrue(mainLayout.contains("@drawable/bg_garland_window"))
+        assertTrue(mainLayout.contains("@style/Widget.Garland.Panel"))
+        assertTrue(diagnosticsLayout.contains("@style/Widget.Garland.Panel"))
     }
 
     private fun projectFile(vararg segments: String): String {

@@ -1,39 +1,47 @@
 <resources>
     <style name="Widget.Garland.Card" parent="Widget.Material3.CardView.Elevated">
         <item name="cardBackgroundColor">@color/garland_surface</item>
-        <item name="strokeColor">@color/garland_outline</item>
+        <item name="strokeColor">@color/garland_outline_soft</item>
         <item name="strokeWidth">1dp</item>
-        <item name="cardCornerRadius">24dp</item>
-        <item name="cardElevation">0dp</item>
+        <item name="cardCornerRadius">28dp</item>
+        <item name="cardElevation">2dp</item>
+    </style>
+
+    <style name="Widget.Garland.Panel" parent="">
+        <item name="android:background">@drawable/bg_panel_inset</item>
+        <item name="android:padding">@dimen/garland_panel_padding</item>
     </style>
 
     <style name="Widget.Garland.ActionButton" parent="Widget.Material3.Button.OutlinedButton">
         <item name="strokeColor">@color/garland_outline</item>
         <item name="android:textColor">@color/garland_ink</item>
-        <item name="backgroundTint">@color/garland_surface_alt</item>
-        <item name="cornerRadius">18dp</item>
+        <item name="backgroundTint">@color/garland_surface_soft</item>
+        <item name="cornerRadius">20dp</item>
         <item name="android:minHeight">52dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <style name="Widget.Garland.ActionButton.Primary" parent="Widget.Material3.Button">
         <item name="backgroundTint">@color/garland_leaf</item>
         <item name="android:textColor">@color/garland_bg</item>
-        <item name="cornerRadius">18dp</item>
+        <item name="cornerRadius">20dp</item>
         <item name="android:minHeight">52dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <style name="Widget.Garland.DocumentPickerButton" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="strokeColor">@color/garland_outline</item>
+        <item name="strokeColor">@color/garland_outline_soft</item>
         <item name="android:textColor">@color/garland_muted</item>
-        <item name="backgroundTint">@color/garland_surface</item>
+        <item name="backgroundTint">@color/garland_surface_soft</item>
         <item name="cornerRadius">22dp</item>
         <item name="android:minHeight">68dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
+        <item name="android:textStyle">normal</item>
     </style>
 
     <style name="Widget.Garland.SubtleButton" parent="Widget.Material3.Button.OutlinedButton">
@@ -51,6 +59,25 @@
     <style name="Widget.Garland.PrimaryButton" parent="Widget.Material3.Button">
         <item name="backgroundTint">@color/garland_leaf</item>
         <item name="android:textColor">@color/garland_bg</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:minHeight">52dp</item>
+    </style>
+
+    <style name="Widget.Garland.InputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundColor">@color/garland_input_surface</item>
+        <item name="boxStrokeColor">@color/garland_outline</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">2dp</item>
+        <item name="boxCornerRadiusTopStart">18dp</item>
+        <item name="boxCornerRadiusTopEnd">18dp</item>
+        <item name="boxCornerRadiusBottomStart">18dp</item>
+        <item name="boxCornerRadiusBottomEnd">18dp</item>
+        <item name="hintTextColor">@color/garland_muted_soft</item>
+    </style>
+
+    <style name="Widget.Garland.InputEditText" parent="Widget.Material3.TextInputEditText.OutlinedBox">
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="android:textColorHint">@color/garland_muted_soft</item>
     </style>
 
     <style name="TextAppearance.Garland.SectionEyebrow" parent="TextAppearance.Material3.LabelMedium">
@@ -78,6 +105,11 @@
 
     <style name="TextAppearance.Garland.BodyMuted" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/garland_muted</item>
+    </style>
+
+    <style name="TextAppearance.Garland.SupportLabel" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">@color/garland_muted_soft</item>
+        <item name="android:letterSpacing">0.02</item>
     </style>
 
     <style name="TextAppearance.Garland.BodySupport" parent="TextAppearance.Material3.BodyLarge">
