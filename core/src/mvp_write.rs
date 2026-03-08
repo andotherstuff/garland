@@ -246,12 +246,6 @@ fn decode_document_id(document_id: &str) -> Result<[u8; 32], hex::FromHexError> 
     Ok(array)
 }
 
-fn random_document_id_hex() -> String {
-    let mut document_id = [0_u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut document_id);
-    hex::encode(document_id)
-}
-
 fn random_nonce() -> [u8; 12] {
     let mut nonce = [0_u8; 12];
     rand::rngs::OsRng.fill_bytes(&mut nonce);

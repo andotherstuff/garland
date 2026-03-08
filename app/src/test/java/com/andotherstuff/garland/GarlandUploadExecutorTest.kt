@@ -661,8 +661,8 @@ class GarlandUploadExecutorTest {
                   "ok": true,
                   "plan": {
                     "uploads": [
-                      {"server_url":"$firstUploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="},
-                      {"server_url":"$secondUploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                      {"server_url":"$firstUploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                      {"server_url":"$secondUploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                     ],
                     "commit_event": {
                       "id_hex":"event123",
