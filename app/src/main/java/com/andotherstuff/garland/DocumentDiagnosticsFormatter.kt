@@ -36,30 +36,54 @@ object DocumentDiagnosticsFormatter {
             append(formatStatus(record.uploadStatus))
             append("]")
         }
-        val serversLine = listSuccessfulServers(record, summary)
-        return listOf(header, serversLine)
+        val diagnostics = mutableListOf<String>()
+        summary?.let {
+            diagnostics += "blocks ${it.blockCount}"
+            diagnostics += "servers ${it.serverCount}"
+        }
+        val decodeResult = DocumentSyncDiagnosticsCodec.decodeResult(record.lastSyncDetailsJson)
+        val details = decodeResult.diagnostics
+        val planFailures = details?.plan?.count { it.status == "ok" }?.let { details.plan.size - it } ?: 0
+        val uploadFailures = details?.uploads?.count { it.status != "ok" } ?: 0
+        val relayFailures = details?.relays?.count { it.status != "ok" } ?: 0
+        if (!details?.plan.isNullOrEmpty()) {
+            diagnostics += if (planFailures == 0) {
+                "plan ok"
+            } else {
+                listPlanFailureSummary(planFailures, details!!.plan)
+            }
+        }
+        if (!details?.uploads.isNullOrEmpty()) {
+            diagnostics += if (uploadFailures == 0) {
+                "uploads ok"
+            } else {
+                listFailureSummary("upload", uploadFailures, details!!.uploads)
+            }
+        }
+        if (!details?.relays.isNullOrEmpty()) {
+            diagnostics += if (relayFailures == 0) {
+                "relays ok"
+            } else {
+                listFailureSummary("relay", relayFailures, details!!.relays)
+            }
+        }
+        if (decodeResult.malformed) {
+            diagnostics += "diagnostics unreadable"
+        }
+        if (planMalformed) {
+            diagnostics += "plan unreadable"
+        }
+        if (details == null) {
+            legacyListSummary(record.lastSyncMessage)
+                ?.let { diagnostics += it }
+                ?: record.lastSyncMessage
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { diagnostics += it.replace("\n", " ").take(72) }
+        }
+        return listOf(header, diagnostics.joinToString(" - ").takeIf { it.isNotBlank() })
             .filterNotNull()
             .joinToString("\n")
-    }
-
-    private fun listSuccessfulServers(record: LocalDocumentRecord, summary: GarlandPlanSummary?): String? {
-        // Prefer servers confirmed ok from runtime diagnostics
-        val details = DocumentSyncDiagnosticsCodec.decodeResult(record.lastSyncDetailsJson).diagnostics
-        val okServers = details?.uploads
-            ?.filter { it.status == "ok" }
-            ?.map { normalizeEndpointTarget(it.target) }
-            ?.distinct()
-            ?.takeIf { it.isNotEmpty() }
-        if (okServers != null) return "Uploaded to ${okServers.joinToString(" ")}"
-
-        // Fall back to planned servers from the upload plan
-        val plannedServers = summary?.servers
-            ?.map { normalizeEndpointTarget(it) }
-            ?.distinct()
-            ?.takeIf { it.isNotEmpty() }
-        if (plannedServers != null) return "Uploading to ${plannedServers.joinToString(" ")}"
-
-        return null
     }
 
     fun detailSections(record: LocalDocumentRecord?, summary: GarlandPlanSummary?, planMalformed: Boolean = false): DetailSections {
