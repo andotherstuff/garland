@@ -2,6 +2,7 @@ package com.andotherstuff.garland
 
 import android.content.res.ColorStateList
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -176,8 +177,15 @@ class MainActivity : AppCompatActivity() {
         val relays = currentRelays()
         session.saveRelays(relays)
         workScheduler.enqueuePendingSync(relays, documentId)
-        selectDocument(store.readRecord(documentId), false)
+        refreshSelectedDocumentState(documentId)
         binding.statusText.text = getString(R.string.upload_queued, documentId)
+    }
+
+    private fun refreshSelectedDocumentState(documentId: String) {
+        val record = store.readRecord(documentId)
+        preparedDocumentId = record?.documentId
+        updateActiveDocument(record)
+        refreshDocumentList(record?.documentId)
     }
 
     private fun currentBlossomServers(): List<String> {
@@ -232,8 +240,20 @@ class MainActivity : AppCompatActivity() {
             )
         }
         binding.activeDocumentDiagnosticsText.text = diagnostics.overview
+        renderProgressSection(binding.activeDocumentProgressLabel, binding.activeDocumentProgressContainer, diagnostics.progressLabel, diagnostics.progressSteps)
         bindDiagnosticSection(binding.activeDocumentUploadsLabel, binding.activeDocumentUploadsText, diagnostics.uploadsLabel, diagnostics.uploads)
         bindDiagnosticSection(binding.activeDocumentRelaysLabel, binding.activeDocumentRelaysText, diagnostics.relaysLabel, diagnostics.relays)
+        binding.preparedSnapshotText.text = if (record == null || summary == null) {
+            getString(R.string.prepared_snapshot_none)
+        } else {
+            getString(
+                R.string.prepared_snapshot_ready,
+                record.displayName,
+                summary.sizeBytes,
+                summary.blockCount,
+                summary.shareCount,
+            )
+        }
         binding.activeDocumentDetailText.text = if (record == null) {
             getString(R.string.active_document_details_none)
         } else {
@@ -341,6 +361,94 @@ class MainActivity : AppCompatActivity() {
         if (visible) {
             labelView.text = label
             textView.text = content
+        }
+    }
+
+    private fun renderProgressSection(
+        labelView: TextView,
+        container: LinearLayout,
+        label: String?,
+        steps: List<DocumentDiagnosticsFormatter.ProgressStep>,
+    ) {
+        val visible = steps.isNotEmpty()
+        labelView.visibility = if (visible) View.VISIBLE else View.GONE
+        container.visibility = if (visible) View.VISIBLE else View.GONE
+        container.removeAllViews()
+        if (!visible) return
+
+        labelView.text = label
+        steps.forEach { step ->
+            container.addView(buildProgressRow(step))
+        }
+    }
+
+    private fun buildProgressRow(step: DocumentDiagnosticsFormatter.ProgressStep): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).also { params ->
+                params.bottomMargin = resources.getDimensionPixelSize(R.dimen.garland_tight_gap)
+            }
+        }
+        val chip = TextView(this).apply {
+            text = progressChipLabel(step.state)
+            setTextAppearance(R.style.TextAppearance_Garland_StatusChip)
+            setPaddingRelative(
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_horizontal),
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_vertical),
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_horizontal),
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_vertical),
+            )
+            background = ContextCompat.getDrawable(context, R.drawable.bg_status_chip)?.mutate()
+            backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, progressChipBackgroundColor(step.state)))
+            setTextColor(ContextCompat.getColor(context, progressChipTextColor(step.state)))
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { params ->
+                params.marginStart = resources.getDimensionPixelSize(R.dimen.garland_content_gap)
+            }
+        }
+        val title = TextView(this).apply {
+            text = step.label
+            setTextAppearance(R.style.TextAppearance_Garland_BodyStrong)
+        }
+        val detail = TextView(this).apply {
+            text = step.detail
+            setTextAppearance(R.style.TextAppearance_Garland_BodySupport)
+        }
+        body.addView(title)
+        body.addView(detail)
+        row.addView(chip)
+        row.addView(body)
+        return row
+    }
+
+    private fun progressChipLabel(state: String): String {
+        return when (state) {
+            "done" -> "DONE"
+            "active" -> "LIVE"
+            "failed" -> "FAIL"
+            else -> "WAIT"
+        }
+    }
+
+    private fun progressChipBackgroundColor(state: String): Int {
+        return when (state) {
+            "done" -> R.color.garland_leaf
+            "active" -> R.color.garland_gold
+            "failed" -> R.color.garland_error
+            else -> R.color.garland_surface_strong
+        }
+    }
+
+    private fun progressChipTextColor(state: String): Int {
+        return when (state) {
+            "done", "active", "failed" -> R.color.garland_bg
+            else -> R.color.garland_ink
         }
     }
 

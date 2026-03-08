@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -51,8 +52,11 @@ class DiagnosticsActivity : AppCompatActivity() {
         binding.selectedDocumentText.text = state.selectedLabel
         binding.documentIdText.text = state.documentIdLabel
         binding.documentIdText.visibility = if (state.documentIdLabel.isNullOrBlank()) View.GONE else View.VISIBLE
+        binding.diagnosticsFailureFocusTitleText.text = state.failureFocusTitle
+        binding.diagnosticsFailureFocusSummaryText.text = state.failureFocusSummary
         binding.diagnosticsOverviewText.text = state.overview
         binding.diagnosticsNextStepsText.text = state.nextSteps.joinToString("\n") { "- $it" }
+        renderProgressSection(binding.diagnosticsPipelineContainer, state.progressSteps)
         bindDiagnosticSection(binding.diagnosticsUploadsLabel, binding.diagnosticsUploadsText, state.uploadsLabel, state.uploads)
         bindDiagnosticSection(binding.diagnosticsRelaysLabel, binding.diagnosticsRelaysText, state.relaysLabel, state.relays)
         bindDiagnosticSection(binding.diagnosticsHistoryLabel, binding.diagnosticsHistoryText, state.historyLabel, state.history)
@@ -64,6 +68,8 @@ class DiagnosticsActivity : AppCompatActivity() {
         )
         bindText(binding.diagnosticsTroubleshootingSummaryText, state.troubleshootingSummary)
         bindText(binding.diagnosticsEvidenceHintText, state.evidenceHint)
+        binding.diagnosticsAgentReportHintText.text = state.reportHint
+        binding.diagnosticsAgentReportText.text = state.reportPreview
         renderDocumentOptions(state.documentOptions)
         binding.copyDiagnosticsButton.isEnabled = state.selectedDocumentId != null
         binding.copyDiagnosticsButton.tag = state.exportText
@@ -182,6 +188,87 @@ class DiagnosticsActivity : AppCompatActivity() {
         textView.visibility = if (visible) View.VISIBLE else View.GONE
         if (visible) {
             textView.text = content
+        }
+    }
+
+    private fun renderProgressSection(
+        container: LinearLayout,
+        steps: List<DocumentDiagnosticsFormatter.ProgressStep>,
+    ) {
+        container.visibility = if (steps.isEmpty()) View.GONE else View.VISIBLE
+        container.removeAllViews()
+        steps.forEach { step ->
+            container.addView(buildProgressRow(step))
+        }
+    }
+
+    private fun buildProgressRow(step: DocumentDiagnosticsFormatter.ProgressStep): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).also { params ->
+                params.bottomMargin = resources.getDimensionPixelSize(R.dimen.garland_tight_gap)
+            }
+        }
+        val chip = TextView(this).apply {
+            text = progressChipLabel(step.state)
+            setTextAppearance(R.style.TextAppearance_Garland_StatusChip)
+            setPaddingRelative(
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_horizontal),
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_vertical),
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_horizontal),
+                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_vertical),
+            )
+            background = ContextCompat.getDrawable(context, R.drawable.bg_status_chip)?.mutate()
+            backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, progressChipBackgroundColor(step.state)))
+            setTextColor(ContextCompat.getColor(context, progressChipTextColor(step.state)))
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { params ->
+                params.marginStart = resources.getDimensionPixelSize(R.dimen.garland_content_gap)
+            }
+        }
+        val title = TextView(this).apply {
+            text = step.label
+            setTextAppearance(R.style.TextAppearance_Garland_BodyStrong)
+        }
+        val detail = TextView(this).apply {
+            text = step.detail
+            setTextAppearance(R.style.TextAppearance_Garland_BodySupport)
+        }
+        body.addView(title)
+        body.addView(detail)
+        row.addView(chip)
+        row.addView(body)
+        return row
+    }
+
+    private fun progressChipLabel(state: String): String {
+        return when (state) {
+            "done" -> "DONE"
+            "active" -> "LIVE"
+            "failed" -> "FAIL"
+            else -> "WAIT"
+        }
+    }
+
+    private fun progressChipBackgroundColor(state: String): Int {
+        return when (state) {
+            "done" -> R.color.garland_leaf
+            "active" -> R.color.garland_gold
+            "failed" -> R.color.garland_error
+            else -> R.color.garland_surface_strong
+        }
+    }
+
+    private fun progressChipTextColor(state: String): Int {
+        return when (state) {
+            "done", "active", "failed" -> R.color.garland_bg
+            else -> R.color.garland_ink
         }
     }
 

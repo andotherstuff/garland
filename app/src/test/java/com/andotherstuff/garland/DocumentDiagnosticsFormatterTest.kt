@@ -339,6 +339,77 @@ class DocumentDiagnosticsFormatterTest {
     }
 
     @Test
+    fun showsPipelineProgressForPreparedDraftBeforeUploadStarts() {
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "upload-plan-ready",
+            lastSyncMessage = null,
+        )
+        val summary = GarlandPlanSummary(
+            documentId = "doc123",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            blockCount = 2,
+            serverCount = 3,
+            shareCount = 6,
+            sha256Hex = "abc123",
+            servers = listOf("https://one", "https://two", "https://three"),
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary)
+
+        assertEquals("Pipeline progress", sections.progressLabel)
+        assertTrue(sections.progress?.contains("✓ Capture test content - 42 byte(s) ready") == true)
+        assertTrue(sections.progress?.contains("✓ Encrypt + chunk locally - 2 block(s), 6 planned share upload(s)") == true)
+        assertTrue(sections.progress?.contains("○ Upload shares to Blossom") == true)
+    }
+
+    @Test
+    fun showsPipelineFailureAtRelayPublishStep() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(
+                    DocumentEndpointDiagnostic("https://blossom.one", "ok", "Uploaded share aa"),
+                    DocumentEndpointDiagnostic("https://blossom.two", "ok", "Uploaded share bb"),
+                ),
+                relays = listOf(
+                    DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event"),
+                    DocumentEndpointDiagnostic("wss://relay.two", "failed", "timeout"),
+                ),
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "relay-published-partial",
+            lastSyncMessage = "Published to 1/2 relays; failed: wss://relay.two (timeout)",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+        val summary = GarlandPlanSummary(
+            documentId = "doc123",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            blockCount = 1,
+            serverCount = 2,
+            shareCount = 2,
+            sha256Hex = "abc123",
+            servers = listOf("https://blossom.one", "https://blossom.two"),
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary)
+
+        assertTrue(sections.progress?.contains("✓ Upload shares to Blossom - 2/2 share upload(s) finished") == true)
+        assertTrue(sections.progress?.contains("✗ Publish commit event to relays - 1/2 relay publish(es) accepted") == true)
+    }
+
+    @Test
     fun splitsOverviewUploadsAndRelaysIntoSeparateSections() {
         val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
             DocumentSyncDiagnostics(
