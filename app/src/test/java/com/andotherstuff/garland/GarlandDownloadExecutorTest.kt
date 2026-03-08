@@ -131,6 +131,57 @@ class GarlandDownloadExecutorTest {
     }
 
     @Test
+    fun supportsInjectedBlockFetcherForFocusedRestoreFailures() {
+        val tempDir = Files.createTempDirectory("garland-download-injected-fetcher-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123",
+                  "blocks": [
+                    {
+                      "index": 0,
+                      "share_id_hex": "$HELLO_SHARE_ID",
+                      "servers": ["https://blossom.one"]
+                    }
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandDownloadExecutor(
+            store = store,
+            blockFetcher = object : GarlandEncryptedBlockFetcher {
+                override fun fetch(
+                    block: ManifestBlockEnvelope,
+                    uploads: List<StoredUploadBodyEnvelope>,
+                ): FetchEncryptedBodyResult {
+                    return FetchEncryptedBodyResult(
+                        body = ByteArray(32) { 7 },
+                        sourceUrl = "https://fetcher.test/share",
+                        attemptedRequests = 2,
+                    )
+                }
+            },
+            recoverBlock = { error("should not recover invalid encrypted share") },
+        )
+
+        val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+        assertFalse(result.success)
+        assertEquals(2, result.attemptedServers)
+        assertEquals(
+            "Downloaded share from https://fetcher.test/share did not match expected share ID $HELLO_SHARE_ID",
+            result.message,
+        )
+    }
+
+    @Test
     fun marksRestoreAsFailedWhenManifestBlockIndexesSkipAhead() {
         val tempDir = Files.createTempDirectory("garland-download-index-gap-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
