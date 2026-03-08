@@ -13,6 +13,11 @@ import java.nio.file.Files
 import com.google.gson.JsonParser
 
 class GarlandUploadExecutorTest {
+    private companion object {
+        const val HELLO_SHARE_ID = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        const val WORLD_SHARE_ID = "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7"
+    }
+
     @Test
     fun marksUploadPlanFailureWhenPlanJsonIsMalformed() {
         val tempDir = Files.createTempDirectory("garland-upload-malformed-plan-test").toFile()
@@ -91,7 +96,7 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"ftp://server.example","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                  {"server_url":"ftp://server.example","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -220,7 +225,7 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"https://server.example","share_id_hex":"a1","body_b64":"%%%not-base64%%%"}
+                  {"server_url":"https://server.example","share_id_hex":"$HELLO_SHARE_ID","body_b64":"%%%not-base64%%%"}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -246,6 +251,46 @@ class GarlandUploadExecutorTest {
     }
 
     @Test
+    fun marksUploadPlanFailureWhenShareBodyDoesNotMatchShareId() {
+        val tempDir = Files.createTempDirectory("garland-upload-share-hash-mismatch-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"https://server.example","share_id_hex":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Upload plan entry 1 share body does not match share ID", store.readRecord(document.documentId)?.lastSyncMessage)
+        val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+        assertEquals("plan.uploads[1].share_id_hex", diagnostics?.plan?.first()?.field)
+        assertEquals("invalid", diagnostics?.plan?.first()?.status)
+    }
+
+    @Test
     fun marksUploadPlanFailureWhenManifestBlockIndexesSkipAhead() {
         val tempDir = Files.createTempDirectory("garland-upload-manifest-gap-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
@@ -264,19 +309,19 @@ class GarlandUploadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "a1",
+                      "share_id_hex": "$HELLO_SHARE_ID",
                       "servers": ["https://server.example"]
                     },
                     {
                       "index": 2,
-                      "share_id_hex": "b2",
+                      "share_id_hex": "$WORLD_SHARE_ID",
                       "servers": ["https://server.example"]
                     }
                   ]
                 },
                 "uploads": [
-                  {"server_url":"https://server.example","share_id_hex":"a1","body_b64":"aGVsbG8="},
-                  {"server_url":"https://server.example","share_id_hex":"b2","body_b64":"d29ybGQ="}
+                  {"server_url":"https://server.example","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"https://server.example","share_id_hex":"$WORLD_SHARE_ID","body_b64":"d29ybGQ="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -323,13 +368,13 @@ class GarlandUploadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "a1",
+                      "share_id_hex": "$HELLO_SHARE_ID",
                       "servers": ["https://server.example"]
                     }
                   ]
                 },
                 "uploads": [
-                  {"server_url":"https://server.example","share_id_hex":"b2","body_b64":"aGVsbG8="}
+                  {"server_url":"https://server.example","share_id_hex":"$WORLD_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -376,13 +421,13 @@ class GarlandUploadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "a1",
+                      "share_id_hex": "$HELLO_SHARE_ID",
                       "servers": ["https://server.example", "https://server.example"]
                     }
                   ]
                 },
                 "uploads": [
-                  {"server_url":"https://server.example","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                  {"server_url":"https://server.example","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -427,7 +472,7 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": null
               },
@@ -479,9 +524,9 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="},
-                  {"server_url":"$uploadUrl","share_id_hex":"a2","body_b64":"aGVsbG8="},
-                  {"server_url":"$uploadUrl","share_id_hex":"a3","body_b64":"aGVsbG8="}
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -544,7 +589,7 @@ class GarlandUploadExecutorTest {
                   "ok": true,
                   "plan": {
                     "uploads": [
-                      {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                      {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                     ],
                     "commit_event": {
                       "id_hex":"event123",
@@ -562,13 +607,13 @@ class GarlandUploadExecutorTest {
             )
 
             val client = OkHttpClient()
-            val executor = GarlandUploadExecutor(store, client)
+            val executor = GarlandUploadExecutor(store, client, retrySleep = {})
             val result = executor.executeDocumentUpload(document.documentId, listOf(relayUrl))
 
             assertTrue(result.success)
             assertEquals(1, result.uploadedShares)
             val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
-            assertEquals("Uploaded share a1 after 2 attempts", diagnostics?.uploads?.first()?.detail)
+            assertEquals("Uploaded share $HELLO_SHARE_ID after 2 attempts", diagnostics?.uploads?.first()?.detail)
 
             client.dispatcher.cancelAll()
             client.dispatcher.executorService.shutdown()
@@ -590,7 +635,7 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"http://127.0.0.1:1","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                  {"server_url":"http://127.0.0.1:1","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -608,7 +653,7 @@ class GarlandUploadExecutorTest {
         )
 
         val client = OkHttpClient()
-        val executor = GarlandUploadExecutor(store, client)
+        val executor = GarlandUploadExecutor(store, client, retrySleep = {})
         val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
 
         assertFalse(result.success)
@@ -649,9 +694,9 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="},
-                  {"server_url":"$uploadUrl","share_id_hex":"a2","body_b64":"aGVsbG8="},
-                  {"server_url":"$uploadUrl","share_id_hex":"a3","body_b64":"aGVsbG8="}
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -703,7 +748,7 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -763,12 +808,12 @@ class GarlandUploadExecutorTest {
               "ok": true,
               "plan": {
                 "uploads": [
-                  {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="},
-                  {"server_url":"$uploadUrl","share_id_hex":"a2","body_b64":"aGVsbG8="},
-                  {"server_url":"$uploadUrl","share_id_hex":"a3","body_b64":"aGVsbG8="},
-                  {"server_url":"$uploadUrl","share_id_hex":"b1","body_b64":"d29ybGQ="},
-                  {"server_url":"$uploadUrl","share_id_hex":"b2","body_b64":"d29ybGQ="},
-                  {"server_url":"$uploadUrl","share_id_hex":"b3","body_b64":"d29ybGQ="}
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$WORLD_SHARE_ID","body_b64":"d29ybGQ="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$WORLD_SHARE_ID","body_b64":"d29ybGQ="},
+                  {"server_url":"$uploadUrl","share_id_hex":"$WORLD_SHARE_ID","body_b64":"d29ybGQ="}
                 ],
                 "commit_event": {
                   "id_hex":"event123",
@@ -809,7 +854,7 @@ class GarlandUploadExecutorTest {
         try {
             harness.requireUploadAuthorization()
             harness.enqueueUploadSuccess()
-            harness.enqueueUploadDescriptor("a1", "/blob/a1")
+            harness.enqueueUploadDescriptor(HELLO_SHARE_ID, "/blob/$HELLO_SHARE_ID")
             harness.acceptRelayEvents()
             val document = store.createDocument("note.txt", "text/plain")
             store.saveUploadPlan(
@@ -819,7 +864,7 @@ class GarlandUploadExecutorTest {
                   "ok": true,
                   "plan": {
                     "uploads": [
-                      {"server_url":"${harness.blossomBaseUrl()}","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                      {"server_url":"${harness.blossomBaseUrl()}","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                     ],
                     "commit_event": {
                       "id_hex":"event123",
@@ -864,8 +909,89 @@ class GarlandUploadExecutorTest {
             val authJson = JsonParser.parseString(harness.uploadAuthorizationJsons().single()).asJsonObject
             assertEquals(24242, authJson.get("kind").asInt)
             assertEquals("upload", authJson.getAsJsonArray("tags")[0].asJsonArray[1].asString)
-            assertEquals("a1", authJson.getAsJsonArray("tags")[1].asJsonArray[1].asString)
-            assertTrue(store.readUploadPlan(document.documentId)?.contains("\"retrieval_url\":\"${harness.blossomBaseUrl()}/blob/a1\"") == true)
+            assertEquals(HELLO_SHARE_ID, authJson.getAsJsonArray("tags")[1].asJsonArray[1].asString)
+            assertTrue(store.readUploadPlan(document.documentId)?.contains("\"retrieval_url\":\"${harness.blossomBaseUrl()}/blob/$HELLO_SHARE_ID\"") == true)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            harness.close()
+        }
+    }
+
+    @Test
+    fun usesManifestMimeTypeForUploadRequest() {
+        val tempDir = Files.createTempDirectory("garland-upload-content-type-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val harness = FakeGarlandNetworkHarness()
+
+        try {
+            harness.requireUploadAuthorization()
+            harness.requireUploadContentType("text/plain")
+            harness.enqueueUploadSuccess()
+            harness.enqueueUploadDescriptor(HELLO_SHARE_ID, "/blob/$HELLO_SHARE_ID")
+            harness.acceptRelayEvents()
+            val document = store.createDocument("note.txt", "text/plain")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "manifest": {
+                      "document_id": "${document.documentId}",
+                      "mime_type": "text/plain",
+                      "size_bytes": 5,
+                      "sha256_hex": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+                      "blocks": [
+                        {"index":0,"share_id_hex":"$HELLO_SHARE_ID","servers":["${harness.blossomBaseUrl()}"]}
+                      ]
+                    },
+                    "uploads": [
+                      {"server_url":"${harness.blossomBaseUrl()}","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"${"b".repeat(64)}",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"${"c".repeat(128)}"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(
+                store = store,
+                client = client,
+                relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+                privateKeyProvider = { "deadbeef".repeat(8) },
+                authEventSigner = BlossomAuthEventSigner { _, shareIdHex, createdAt, expiration ->
+                    SignedRelayEvent(
+                        id = "a".repeat(64),
+                        pubkey = "b".repeat(64),
+                        createdAt = createdAt,
+                        kind = 24242,
+                        tags = listOf(
+                            listOf("t", "upload"),
+                            listOf("x", shareIdHex),
+                            listOf("expiration", expiration.toString()),
+                        ),
+                        content = "garland upload authorization",
+                        sig = "c".repeat(128),
+                    )
+                },
+            )
+
+            val result = executor.executeDocumentUpload(document.documentId, listOf(harness.relayWebSocketUrl()))
+
+            assertTrue(result.success)
+            assertEquals(listOf("text/plain"), harness.uploadContentTypes())
 
             client.dispatcher.cancelAll()
             client.dispatcher.executorService.shutdown()
@@ -891,7 +1017,7 @@ class GarlandUploadExecutorTest {
                   "ok": true,
                   "plan": {
                     "uploads": [
-                      {"server_url":"${harness.blossomBaseUrl()}","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                      {"server_url":"${harness.blossomBaseUrl()}","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
                     ],
                     "commit_event": {
                       "id_hex":"event123",

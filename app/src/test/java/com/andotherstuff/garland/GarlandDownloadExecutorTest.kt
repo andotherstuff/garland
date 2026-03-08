@@ -13,6 +13,11 @@ import java.util.Base64
 import okio.Buffer
 
 class GarlandDownloadExecutorTest {
+    private companion object {
+        const val HELLO_SHARE_ID = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        const val WORLD_SHARE_ID = "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7"
+    }
+
     @Test
     fun marksRestoreAsFailedWhenUploadPlanIsMissing() {
         val tempDir = Files.createTempDirectory("garland-download-missing-plan-test").toFile()
@@ -42,7 +47,7 @@ class GarlandDownloadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "a1b2c3",
+                      "share_id_hex": "$HELLO_SHARE_ID",
                       "servers": ["ftp://invalid-server"]
                     }
                   ]
@@ -140,12 +145,12 @@ class GarlandDownloadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "aa",
+                      "share_id_hex": "$HELLO_SHARE_ID",
                       "servers": ["https://blossom.one"]
                     },
                     {
                       "index": 2,
-                      "share_id_hex": "bb",
+                      "share_id_hex": "$WORLD_SHARE_ID",
                       "servers": ["https://blossom.two"]
                     }
                   ]
@@ -178,7 +183,7 @@ class GarlandDownloadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "aa",
+                      "share_id_hex": "$HELLO_SHARE_ID",
                       "servers": []
                     }
                   ]
@@ -240,7 +245,7 @@ class GarlandDownloadExecutorTest {
                   "blocks": [
                     {
                       "index": 0,
-                      "share_id_hex": "aa",
+                      "share_id_hex": "$HELLO_SHARE_ID",
                       "servers": ["https://blossom.one", "https://blossom.one"]
                     }
                   ]

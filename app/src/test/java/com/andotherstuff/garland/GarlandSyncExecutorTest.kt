@@ -9,6 +9,12 @@ import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
 class GarlandSyncExecutorTest {
+    private companion object {
+        const val HELLO_SHARE_ID = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        const val QUEUED_SHARE_ID = "d36be6494248ee06ac18f38ea1119dfe4699fdcfcbbcc30a2e4f1ccbce68dfac"
+        const val OTHER_SHARE_ID = "d9298a10d1b0735837dc4bd85dac641b0f3cef27a47e5d53a54f2f3f5b2fcffa"
+    }
+
     @Test
     fun syncsOnlyPendingDocuments() {
         val tempDir = Files.createTempDirectory("garland-sync-test").toFile()
@@ -21,7 +27,7 @@ class GarlandSyncExecutorTest {
         try {
             harness.enqueueUploadSuccess()
             harness.acceptRelayEvents()
-            store.saveUploadPlan(pending.documentId, uploadPlanJson(harness.blossomBaseUrl(), pending.documentId, "a1", "aGVsbG8="))
+            store.saveUploadPlan(pending.documentId, uploadPlanJson(harness.blossomBaseUrl(), pending.documentId, HELLO_SHARE_ID, "aGVsbG8="))
             store.updateUploadStatus(pending.documentId, "upload-plan-ready")
             val client = OkHttpClient()
 
@@ -37,7 +43,7 @@ class GarlandSyncExecutorTest {
 
                 assertEquals(1, result.attemptedDocuments)
                 assertEquals(1, result.successfulDocuments)
-                assertEquals(listOf("a1"), harness.uploadedShareIds())
+                assertEquals(listOf(HELLO_SHARE_ID), harness.uploadedShareIds())
                 assertEquals("hello", harness.uploadedBodies().single().toString(Charsets.UTF_8))
                 assertEquals("relay-published", store.readRecord(pending.documentId)?.uploadStatus)
                 assertEquals("relay-published", store.readRecord(complete.documentId)?.uploadStatus)
@@ -74,8 +80,8 @@ class GarlandSyncExecutorTest {
         try {
             harness.enqueueUploadSuccess(times = 1)
             harness.acceptRelayEvents()
-            store.saveUploadPlan(queued.documentId, uploadPlanJson(harness.blossomBaseUrl(), queued.documentId, "a1", "cXVldWVk"))
-            store.saveUploadPlan(other.documentId, uploadPlanJson(harness.blossomBaseUrl(), other.documentId, "b2", "b3RoZXI="))
+            store.saveUploadPlan(queued.documentId, uploadPlanJson(harness.blossomBaseUrl(), queued.documentId, QUEUED_SHARE_ID, "cXVldWVk"))
+            store.saveUploadPlan(other.documentId, uploadPlanJson(harness.blossomBaseUrl(), other.documentId, OTHER_SHARE_ID, "b3RoZXI="))
             store.updateUploadStatus(other.documentId, "upload-plan-ready")
             val client = OkHttpClient()
 
@@ -94,7 +100,7 @@ class GarlandSyncExecutorTest {
 
                 assertEquals(1, result.attemptedDocuments)
                 assertEquals(1, result.successfulDocuments)
-                assertEquals(listOf("a1"), harness.uploadedShareIds())
+                assertEquals(listOf(QUEUED_SHARE_ID), harness.uploadedShareIds())
                 assertEquals("relay-published", store.readRecord(queued.documentId)?.uploadStatus)
                 assertEquals("upload-plan-ready", store.readRecord(other.documentId)?.uploadStatus)
             } finally {
@@ -131,7 +137,7 @@ class GarlandSyncExecutorTest {
 
         store.saveUploadPlan(
             pending.documentId,
-            uploadPlanJson("http://127.0.0.1:1", pending.documentId, "a1", "aGVsbG8="),
+            uploadPlanJson("http://127.0.0.1:1", pending.documentId, HELLO_SHARE_ID, "aGVsbG8="),
         )
         val uploadExecutor = GarlandUploadExecutor(store)
         val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)

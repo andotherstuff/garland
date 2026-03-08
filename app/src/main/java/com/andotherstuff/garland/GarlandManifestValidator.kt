@@ -28,7 +28,7 @@ internal data class GarlandUploadInfo(
 )
 
 internal object GarlandManifestValidator {
-    private val shareIdHexRegex = Regex("^[0-9a-fA-F]+$")
+    private val shareIdHexRegex = Regex("^[0-9a-f]{64}$")
 
     fun validateForDownload(manifest: GarlandManifestInfo): GarlandManifestValidationFailure? {
         return validateManifest(manifest)
