@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.Base64
 
 data class UploadExecutionResult(
@@ -32,7 +33,7 @@ open class GarlandUploadExecutor(
     private companion object {
         const val MAX_UPLOAD_ATTEMPTS = 3
         const val UNREADABLE_UPLOAD_PLAN_MESSAGE = "Unreadable upload plan metadata"
-        val SHARE_ID_HEX_REGEX = Regex("^[0-9a-fA-F]+$")
+        val SHARE_ID_HEX_REGEX = Regex("^[0-9a-f]{64}$")
     }
 
     private data class PreparedUploadRequest(
@@ -277,6 +278,17 @@ open class GarlandUploadExecutor(
                 errorMessage = "Upload plan entry $index has invalid base64 share body",
             )
         }
+        val computedShareIdHex = sha256Hex(body)
+        if (computedShareIdHex != upload.shareIdHex) {
+            return PreparedUploadResult(
+                diagnostic = planDiagnostic(
+                    "plan.uploads[$index].share_id_hex",
+                    "invalid",
+                    "Upload plan entry $index share body does not match share ID",
+                ),
+                errorMessage = "Upload plan entry $index share body does not match share ID",
+            )
+        }
 
         return PreparedUploadResult(
             request = PreparedUploadRequest(
@@ -490,6 +502,13 @@ open class GarlandUploadExecutor(
 
     private fun planDiagnostic(field: String, status: String, detail: String): DocumentPlanDiagnostic {
         return DocumentPlanDiagnostic(field = field, status = status, detail = detail)
+    }
+
+    private fun sha256Hex(body: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(body)
+        val hex = StringBuilder(digest.size * 2)
+        digest.forEach { byte -> hex.append("%02x".format(byte.toInt() and 0xff)) }
+        return hex.toString()
     }
 
     private fun JsonObject.optionalString(fieldName: String): String? {

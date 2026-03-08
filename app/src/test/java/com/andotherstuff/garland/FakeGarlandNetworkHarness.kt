@@ -18,6 +18,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     private val uploadedShareIds = mutableListOf<String>()
     private val uploadedBodies = mutableListOf<ByteArray>()
     private val uploadContentTypes = mutableListOf<String>()
+    private val uploadAuthorizationHeaders = mutableListOf<String>()
     private val uploadAuthorizationJsons = mutableListOf<String>()
     private val relayEventIds = mutableListOf<String>()
     private val requestedDownloadPaths = mutableListOf<String>()
@@ -107,6 +108,8 @@ class FakeGarlandNetworkHarness : AutoCloseable {
 
     fun uploadContentTypes(): List<String> = uploadContentTypes.toList()
 
+    fun uploadAuthorizationHeaders(): List<String> = uploadAuthorizationHeaders.toList()
+
     fun uploadAuthorizationJsons(): List<String> = uploadAuthorizationJsons.toList()
 
     fun receivedRelayEventIds(): List<String> = relayEventIds.toList()
@@ -122,7 +125,8 @@ class FakeGarlandNetworkHarness : AutoCloseable {
         shareId?.let(uploadedShareIds::add)
         uploadedBodies += request.body.readByteArray()
         request.getHeader("Content-Type")?.let(uploadContentTypes::add)
-        val authPayload = parseAuthorizationJson(request.getHeader("Authorization"))
+        request.getHeader("Authorization")?.let(uploadAuthorizationHeaders::add)
+        val authPayload = parseAuthorizationJson(request.getHeader("Authorization"), shareId)
         authPayload?.let(uploadAuthorizationJsons::add)
         if (requireUploadAuthorization && authPayload == null) {
             return MockResponse().setResponseCode(401).setBody("{\"error\":\"missing blossom auth\"}")
@@ -189,17 +193,33 @@ class FakeGarlandNetworkHarness : AutoCloseable {
         }.getOrNull()
     }
 
-    private fun parseAuthorizationJson(header: String?): String? {
+    private fun parseAuthorizationJson(header: String?, expectedShareId: String?): String? {
         if (header.isNullOrBlank() || !header.startsWith("Nostr ")) return null
         return runCatching {
             val encoded = header.removePrefix("Nostr ").trim()
-            decodeAuthorizationPayload(encoded).toString(Charsets.UTF_8)
+            if (encoded.isEmpty() || encoded.contains('=') || encoded.any { it == '+' || it == '/' || it.isWhitespace() }) {
+                return null
+            }
+            val padded = encoded.padEnd(((encoded.length + 3) / 4) * 4, '=')
+            val payload = Base64.getUrlDecoder().decode(padded).toString(Charsets.UTF_8)
+            val json = JsonParser.parseString(payload).asJsonObject
+            if (json.get("kind")?.asInt != 24242) return null
+            val tags = json.getAsJsonArray("tags") ?: return null
+            val hasUploadTag = tags.any { element ->
+                val tag = element.asJsonArray
+                tag.size() >= 2 && tag[0].asString == "t" && tag[1].asString == "upload"
+            }
+            val hasExpiration = tags.any { element ->
+                val tag = element.asJsonArray
+                tag.size() >= 2 && tag[0].asString == "expiration" && tag[1].asString.isNotBlank()
+            }
+            val hasMatchingBlob = expectedShareId != null && tags.any { element ->
+                val tag = element.asJsonArray
+                tag.size() >= 2 && tag[0].asString == "x" && tag[1].asString == expectedShareId
+            }
+            if (!hasUploadTag || !hasExpiration || !hasMatchingBlob) return null
+            payload
         }.getOrNull()
-    }
-
-    private fun decodeAuthorizationPayload(encoded: String): ByteArray {
-        return runCatching { Base64.getUrlDecoder().decode(encoded) }
-            .getOrElse { Base64.getDecoder().decode(encoded) }
     }
 
     private sealed interface RelayMode {
