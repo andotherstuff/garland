@@ -23,4 +23,4 @@ run_step "Debug APK build" "${GRADLE_RUNNER[@]}" assembleDebug
 run_step "Android lint" "${GRADLE_RUNNER[@]}" lintDebug
 
 printf '\nNo-device alpha verification passed.\n'
-printf 'Remaining release gates: connected Android instrumentation and manual device sign-off.\n'
+printf 'Remaining release gates: GitHub test-release smoke testing and manual device sign-off.\n'

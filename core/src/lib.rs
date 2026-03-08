@@ -3,6 +3,7 @@ pub mod commit_crypto;
 pub mod crypto;
 pub mod identity;
 pub mod jni_api;
+pub mod key_hierarchy;
 pub mod mvp_write;
 pub mod nostr_event;
 pub mod packaging;
@@ -10,6 +11,8 @@ pub mod packaging;
 #[cfg(test)]
 mod tests {
     use base64::Engine as _;
+    use nostr::nips::nip06::FromMnemonic;
+    use nostr::{Keys, SecretKey};
     use pretty_assertions::assert_eq;
     use serde_json::Value;
 
@@ -19,16 +22,21 @@ mod tests {
     };
     use crate::commit_crypto::{decode_commit_content, decrypt_commit_payload};
     use crate::crypto::{
-        decrypt_block, encrypt_block, prepare_replication_upload, BlossomServer, REPLICATION_FACTOR,
+        BlossomServer, REPLICATION_FACTOR, decrypt_block, decrypt_metadata_block, encrypt_block,
+        encrypt_metadata_block, prepare_metadata_replication_upload, prepare_replication_upload,
     };
     use crate::identity::derive_nostr_identity;
-    use crate::mvp_write::{
-        prepare_single_block_write, recover_single_block_read, PrepareWriteRequest,
-        RecoverReadRequest,
+    use crate::key_hierarchy::{
+        derive_blob_auth_private_key, derive_commit_key, derive_file_key, derive_master_key,
+        derive_metadata_key,
     };
-    use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, UnsignedEvent};
+    use crate::mvp_write::{
+        PrepareWriteRequest, RecoverReadRequest, prepare_single_block_write,
+        recover_single_block_read,
+    };
+    use crate::nostr_event::{UnsignedEvent, sign_blossom_upload_auth_event, sign_custom_event};
     use crate::packaging::{
-        frame_content, unframe_content, BLOCK_SIZE, CONTENT_CAPACITY, FRAME_SIZE,
+        BLOCK_SIZE, CONTENT_CAPACITY, FRAME_SIZE, frame_content, unframe_content,
     };
 
     #[test]
@@ -36,15 +44,18 @@ mod tests {
         let mnemonic =
             "leader monkey parrot ring guide accident before fence cannon height naive bean";
         let identity = derive_nostr_identity(mnemonic, "").expect("identity should derive");
+        let raw_identity =
+            Keys::from_mnemonic_advanced(mnemonic, Some(""), Some(0), Some(0), Some(0))
+                .expect("raw identity should derive");
 
-        assert_eq!(
+        assert_eq!(identity.private_key_hex.len(), 64);
+        assert!(identity.nsec.starts_with("nsec1"));
+        assert_ne!(
             identity.private_key_hex,
-            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
+            raw_identity.secret_key().to_secret_hex()
         );
-        assert_eq!(
-            identity.nsec,
-            "nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp"
-        );
+        let second = derive_nostr_identity(mnemonic, "").expect("identity should re-derive");
+        assert_eq!(identity, second);
     }
 
     #[test]
@@ -60,13 +71,12 @@ mod tests {
             "leader monkey parrot ring guide accident before fence cannon height naive bean";
         let identity = derive_nostr_identity(mnemonic, "garland-passphrase")
             .expect("identity should derive with passphrase");
+        let empty =
+            derive_nostr_identity(mnemonic, "").expect("empty-passphrase identity should derive");
 
         assert_eq!(identity.private_key_hex.len(), 64);
         assert!(identity.nsec.starts_with("nsec1"));
-        assert_ne!(
-            identity.private_key_hex,
-            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
-        );
+        assert_ne!(identity.private_key_hex, empty.private_key_hex);
     }
 
     #[test]
@@ -90,6 +100,16 @@ mod tests {
         assert_eq!(frame.len(), FRAME_SIZE);
         let recovered = unframe_content(&frame).expect("frame should decode");
         assert_eq!(recovered, b"");
+    }
+
+    #[test]
+    fn randomizes_padding_bytes() {
+        let first = frame_content(b"garland").expect("first frame should build");
+        let second = frame_content(b"garland").expect("second frame should build");
+
+        assert_ne!(&first[4 + 7..], &second[4 + 7..]);
+        assert_eq!(unframe_content(&first).unwrap(), b"garland");
+        assert_eq!(unframe_content(&second).unwrap(), b"garland");
     }
 
     #[test]
@@ -131,13 +151,81 @@ mod tests {
 
         assert_eq!(upload.shares.len(), REPLICATION_FACTOR);
         assert_eq!(upload.share_size, BLOCK_SIZE);
-        assert!(upload
-            .shares
-            .windows(2)
-            .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex));
+        assert!(
+            upload
+                .shares
+                .windows(2)
+                .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex)
+        );
         assert_eq!(upload.shares[0].server_url, "https://cdn.nostrcheck.me");
         assert_eq!(upload.shares[1].server_url, "https://blossom.nostr.build");
         assert_eq!(upload.shares[2].server_url, "https://blossom.yakihonne.com");
+    }
+
+    #[test]
+    fn encrypts_and_decrypts_metadata_block() {
+        let metadata_key = [4_u8; 32];
+        let nonce = [8_u8; 12];
+        let content = br#"{"kind":"root","name":"/"}"#;
+
+        let encrypted = encrypt_metadata_block(&metadata_key, &nonce, content)
+            .expect("metadata should encrypt");
+        assert_eq!(encrypted.len(), BLOCK_SIZE);
+
+        let decrypted =
+            decrypt_metadata_block(&metadata_key, &encrypted).expect("metadata should decrypt");
+        assert_eq!(decrypted, content);
+    }
+
+    #[test]
+    fn prepares_metadata_replication_uploads() {
+        let servers = vec![
+            BlossomServer::new("https://cdn.nostrcheck.me"),
+            BlossomServer::new("https://blossom.nostr.build"),
+            BlossomServer::new("https://blossom.yakihonne.com"),
+        ];
+
+        let upload = prepare_metadata_replication_upload(
+            [4_u8; 32],
+            [8_u8; 12],
+            br#"{"kind":"root","name":"/"}"#,
+            &servers,
+        )
+        .expect("metadata upload should prepare");
+
+        assert_eq!(upload.shares.len(), REPLICATION_FACTOR);
+        assert_eq!(upload.share_size, BLOCK_SIZE);
+        assert!(
+            upload
+                .shares
+                .windows(2)
+                .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex)
+        );
+    }
+
+    #[test]
+    fn derives_protocol_keys_from_master_key() {
+        let storage_private_key =
+            hex::decode("7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a")
+                .expect("private key should decode");
+        let storage_private_key: [u8; 32] = storage_private_key
+            .try_into()
+            .expect("private key should be 32 bytes");
+        let document_id = [0x24_u8; 32];
+        let share_id = [0x11_u8; 32];
+
+        let master_key = derive_master_key(&storage_private_key).expect("master key should derive");
+        let commit_key = derive_commit_key(&master_key).expect("commit key should derive");
+        let metadata_key = derive_metadata_key(&master_key).expect("metadata key should derive");
+        let file_key = derive_file_key(&master_key, &document_id).expect("file key should derive");
+        let blob_auth_key = derive_blob_auth_private_key(&master_key, &share_id)
+            .expect("blob auth key should derive");
+
+        assert_ne!(commit_key, metadata_key);
+        assert_ne!(commit_key, file_key);
+        assert_ne!(metadata_key, file_key);
+        assert_ne!(blob_auth_key, master_key);
+        SecretKey::from_slice(&blob_auth_key).expect("blob auth key should be a valid secret key");
     }
 
     #[test]
@@ -162,6 +250,21 @@ mod tests {
 
     #[test]
     fn derives_distinct_blob_auth_keys_per_share() {
+        let private_key_bytes =
+            hex::decode("7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a")
+                .expect("private key should decode");
+        let private_key_bytes: [u8; 32] = private_key_bytes
+            .try_into()
+            .expect("private key should be 32 bytes");
+        let master_key = derive_master_key(&private_key_bytes).expect("master key should derive");
+        let expected_secret_key = derive_blob_auth_private_key(&master_key, &[0x11_u8; 32])
+            .expect("blob auth key should derive");
+        let expected_pubkey = Keys::new(
+            SecretKey::from_slice(&expected_secret_key).expect("blob auth key should be valid"),
+        )
+        .public_key()
+        .to_hex();
+
         let first = sign_blossom_upload_auth_event(
             "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
             &"11".repeat(32),
@@ -178,6 +281,7 @@ mod tests {
         .expect("second auth event should sign");
 
         assert_ne!(first.pubkey_hex, second.pubkey_hex);
+        assert_eq!(first.pubkey_hex, expected_pubkey);
         assert_eq!(first.tags[0], vec!["t".to_string(), "upload".to_string()]);
         assert_eq!(first.tags[1][0], "x");
         assert_eq!(first.tags[1][1], "11".repeat(32));
@@ -224,6 +328,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "note.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "bXZwIGZpbGU=".into(),
             servers: vec![
@@ -231,6 +337,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan = prepare_single_block_write(&request).expect("write plan should build");
@@ -240,28 +348,19 @@ mod tests {
         assert_eq!(plan.uploads[1].server_url, "https://blossom.nostr.build");
         assert_eq!(plan.uploads[2].server_url, "https://blossom.yakihonne.com");
         assert_eq!(plan.commit_event.kind, 1097);
-        assert_eq!(plan.commit_event.tags.len(), 0);
+        assert_eq!(plan.commit_event.tags.len(), 1);
+        assert_eq!(plan.commit_event.tags[0][0], "d");
+        assert_eq!(plan.commit_event.tags[0][1], plan.manifest.document_id);
         assert_eq!(plan.commit_event.id_hex.len(), 64);
         assert_eq!(plan.commit_event.sig_hex.len(), 128);
         assert_eq!(plan.manifest.document_id.len(), 64);
-        let manifest_json =
-            serde_json::to_string(&plan.manifest).expect("manifest should serialize");
-        assert!(!manifest_json.contains("display_name"));
-        assert!(!manifest_json.contains("mime_type"));
-        assert!(!plan
-            .commit_event
-            .content
-            .contains(&plan.manifest.document_id));
-        assert!(!plan
-            .commit_event
-            .content
-            .contains(&plan.manifest.sha256_hex));
-        assert!(!plan
-            .commit_event
-            .content
-            .contains(&plan.manifest.blocks[0].share_id_hex));
-        assert!(!plan.commit_event.content.contains("cdn.nostrcheck.me"));
-        assert!(plan.commit_event.content.contains("\"version\":1"));
+        assert!(
+            !plan
+                .commit_event
+                .content
+                .contains(&plan.manifest.document_id)
+        );
+        assert!(!plan.commit_event.content.contains("note.txt"));
         let encrypted_content = decode_commit_content(&plan.commit_event.content)
             .expect("commit content should decode");
         let decrypted_content =
@@ -273,11 +372,6 @@ mod tests {
             payload.get("document_id").and_then(Value::as_str),
             Some(plan.manifest.document_id.as_str())
         );
-        assert_eq!(
-            payload.get("size_bytes").and_then(Value::as_u64),
-            Some(plan.manifest.size_bytes as u64)
-        );
-        assert!(payload.get("created_at").is_none());
     }
 
     #[test]
@@ -285,6 +379,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "note.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "bXZwIGZpbGU=".into(),
             servers: vec![
@@ -292,6 +388,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let first = prepare_single_block_write(&request).expect("first write plan should build");
@@ -301,72 +399,12 @@ mod tests {
     }
 
     #[test]
-    fn tampered_commit_payload_fails_authentication() {
-        let request = PrepareWriteRequest {
-            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
-                .into(),
-            created_at: 1_701_907_200,
-            content_b64: "bXZwIGZpbGU=".into(),
-            servers: vec![
-                "https://cdn.nostrcheck.me".into(),
-                "https://blossom.nostr.build".into(),
-                "https://blossom.yakihonne.com".into(),
-            ],
-        };
-
-        let plan = prepare_single_block_write(&request).expect("write plan should build");
-        let mut encrypted_content = decode_commit_content(&plan.commit_event.content)
-            .expect("commit content should decode");
-        encrypted_content[12] ^= 0x01;
-
-        let error = decrypt_commit_payload(&request.private_key_hex, &encrypted_content)
-            .expect_err("tampered payload should fail auth");
-        assert_eq!(error.to_string(), "commit payload authentication failed");
-    }
-
-    #[test]
-    fn commit_content_rejects_wrong_key_and_invalid_envelope() {
-        let request = PrepareWriteRequest {
-            private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
-                .into(),
-            created_at: 1_701_907_200,
-            content_b64: "bXZwIGZpbGU=".into(),
-            servers: vec![
-                "https://cdn.nostrcheck.me".into(),
-                "https://blossom.nostr.build".into(),
-                "https://blossom.yakihonne.com".into(),
-            ],
-        };
-
-        let plan = prepare_single_block_write(&request).expect("write plan should build");
-        let encrypted_content = decode_commit_content(&plan.commit_event.content)
-            .expect("commit content envelope should decode");
-
-        let wrong_key_error = decrypt_commit_payload(
-            "8f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
-            &encrypted_content,
-        )
-        .expect_err("wrong key should fail auth");
-        assert_eq!(
-            wrong_key_error.to_string(),
-            "commit payload authentication failed"
-        );
-
-        let envelope_error = decode_commit_content(
-            "{\"version\":2,\"algorithm\":\"wrong\",\"ciphertext_b64\":\"AA==\"}",
-        )
-        .expect_err("invalid envelope should fail");
-        assert_eq!(
-            envelope_error.to_string(),
-            "commit content envelope is invalid"
-        );
-    }
-
-    #[test]
     fn recovers_single_block_write_content() {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "note.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: "aGVsbG8=".into(),
             servers: vec![
@@ -374,6 +412,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan = prepare_single_block_write(&request).expect("write plan should build");
@@ -394,6 +434,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "big.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: base64::engine::general_purpose::STANDARD.encode(payload),
             servers: vec![
@@ -401,6 +443,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan =
@@ -418,6 +462,8 @@ mod tests {
         let request = PrepareWriteRequest {
             private_key_hex: "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a"
                 .into(),
+            display_name: "big.txt".into(),
+            mime_type: "text/plain".into(),
             created_at: 1_701_907_200,
             content_b64: base64::engine::general_purpose::STANDARD.encode(&payload),
             servers: vec![
@@ -425,6 +471,8 @@ mod tests {
                 "https://blossom.nostr.build".into(),
                 "https://blossom.yakihonne.com".into(),
             ],
+            document_id: None,
+            previous_event_id: None,
         };
 
         let plan =

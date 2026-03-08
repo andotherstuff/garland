@@ -15,6 +15,7 @@ data class LocalDocumentRecord(
     val lastSyncMessage: String? = null,
     val lastSyncDetailsJson: String? = null,
     val syncHistoryJson: String? = null,
+    val lastCommitEventId: String? = null,
 )
 
 data class CommitChainCheckpoint(
@@ -70,6 +71,8 @@ class LocalDocumentStore(private val context: Context) {
     fun readCommitChainCheckpoint(): CommitChainCheckpoint? = impl.readCommitChainCheckpoint()
 
     fun clearCommitChainCheckpoint() = impl.clearCommitChainCheckpoint()
+
+    fun saveLastCommitEventId(documentId: String, eventId: String) = impl.saveLastCommitEventId(documentId, eventId)
 
     fun deleteDocument(documentId: String) = impl.deleteDocument(documentId)
 }
@@ -136,6 +139,7 @@ class LocalDocumentStoreImpl(
         uploadPlanJson: String,
     ): LocalDocumentRecord {
         val now = System.currentTimeMillis()
+        val existing = readRecord(documentId)
         contentFile(documentId).writeBytes(content)
         saveUploadPlan(documentId, uploadPlanJson)
         val record = LocalDocumentRecord(
@@ -145,6 +149,7 @@ class LocalDocumentStoreImpl(
             sizeBytes = content.size.toLong(),
             updatedAt = now,
             uploadStatus = "upload-plan-ready",
+            lastCommitEventId = existing?.lastCommitEventId,
         )
         writeRecord(record)
         onDocumentChanged?.invoke(documentId)
@@ -217,6 +222,11 @@ class LocalDocumentStoreImpl(
             )
         )
         onDocumentChanged?.invoke(documentId)
+    }
+
+    fun saveLastCommitEventId(documentId: String, eventId: String) {
+        val current = readRecord(documentId) ?: return
+        writeRecord(current.copy(lastCommitEventId = eventId))
     }
 
     fun deleteDocument(documentId: String) {

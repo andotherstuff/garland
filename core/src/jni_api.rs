@@ -1,7 +1,7 @@
 use base64::Engine as _;
+use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
-use jni::JNIEnv;
 use serde::{Deserialize, Serialize};
 
 use crate::commit_chain::{
@@ -10,9 +10,9 @@ use crate::commit_chain::{
 };
 use crate::identity::derive_nostr_identity;
 use crate::mvp_write::{
-    prepare_single_block_write, recover_single_block_read, PrepareWriteRequest, RecoverReadRequest,
+    PrepareWriteRequest, RecoverReadRequest, prepare_single_block_write, recover_single_block_read,
 };
-use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, UnsignedEvent};
+use crate::nostr_event::{UnsignedEvent, sign_blossom_upload_auth_event, sign_custom_event};
 
 #[derive(Serialize)]
 struct IdentityResponse {
@@ -53,9 +53,15 @@ struct CommitChainResponse {
 #[derive(Deserialize)]
 struct PrepareWriteJson {
     private_key_hex: String,
+    display_name: String,
+    mime_type: String,
     created_at: u64,
     content_b64: String,
     servers: Vec<String>,
+    #[serde(default)]
+    document_id: Option<String>,
+    #[serde(default)]
+    previous_event_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -141,9 +147,13 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_prepareSingle
         Ok(request) => {
             let request = PrepareWriteRequest {
                 private_key_hex: request.private_key_hex,
+                display_name: request.display_name,
+                mime_type: request.mime_type,
                 created_at: request.created_at,
                 content_b64: request.content_b64,
                 servers: request.servers,
+                document_id: request.document_id,
+                previous_event_id: request.previous_event_id,
             };
             match prepare_single_block_write(&request) {
                 Ok(plan) => WritePlanResponse {

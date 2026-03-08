@@ -229,6 +229,7 @@ open class GarlandUploadExecutor(
             )
         }
 
+        store.saveLastCommitEventId(documentId, commitEvent.id)
         val relayStatus = if (relayResult.successfulRelays == relayResult.attemptedRelays) {
             "relay-published"
         } else {
@@ -561,6 +562,7 @@ open class GarlandUploadExecutor(
             server.host == retrieval.host &&
             server.port == retrieval.port
     }
+
     private fun JsonObject.optionalString(fieldName: String): String? {
         val field = get(fieldName) ?: return null
         if (!field.isJsonPrimitive || !field.asJsonPrimitive.isString) return null

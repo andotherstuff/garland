@@ -32,6 +32,8 @@ object GarlandConfig {
         content: ByteArray,
         blossomServers: List<String>,
         createdAt: Long,
+        documentId: String? = null,
+        previousEventId: String? = null,
     ): String {
         val normalizedServers = normalizeConfiguredEndpoints(blossomServers, defaults.blossomServers)
         val payload = JsonObject().apply {
@@ -41,6 +43,12 @@ object GarlandConfig {
             add("servers", JsonArray().apply {
                 normalizedServers.forEach(::add)
             })
+            if (!documentId.isNullOrBlank()) {
+                addProperty("document_id", documentId)
+            }
+            if (!previousEventId.isNullOrBlank()) {
+                addProperty("previous_event_id", previousEventId)
+            }
         }
         return gson.toJson(payload)
     }

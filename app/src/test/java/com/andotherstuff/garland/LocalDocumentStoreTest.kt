@@ -202,4 +202,47 @@ class LocalDocumentStoreTest {
 
         assertNull(store.readCommitChainCheckpoint())
     }
+
+    @Test
+    fun savesAndReadsLastCommitEventId() {
+        val tempDir = Files.createTempDirectory("garland-store-chain-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+
+        assertNull(store.readRecord(document.documentId)?.lastCommitEventId)
+
+        store.saveLastCommitEventId(document.documentId, "abc123def456")
+
+        assertEquals("abc123def456", store.readRecord(document.documentId)?.lastCommitEventId)
+    }
+
+    @Test
+    fun lastCommitEventIdSurvivesStatusUpdates() {
+        val tempDir = Files.createTempDirectory("garland-store-chain-persist-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+
+        store.saveLastCommitEventId(document.documentId, "event1hex")
+        store.updateUploadStatus(document.documentId, "relay-published", "Published")
+
+        assertEquals("event1hex", store.readRecord(document.documentId)?.lastCommitEventId)
+    }
+
+    @Test
+    fun upsertPreparedDocumentPreservesExistingCommitEventId() {
+        val tempDir = Files.createTempDirectory("garland-store-chain-upsert-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+
+        store.saveLastCommitEventId(document.documentId, "event-chain-1")
+        store.upsertPreparedDocument(
+            documentId = document.documentId,
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            content = "updated".toByteArray(),
+            uploadPlanJson = "{\"ok\":true}",
+        )
+
+        assertEquals("event-chain-1", store.readRecord(document.documentId)?.lastCommitEventId)
+    }
 }

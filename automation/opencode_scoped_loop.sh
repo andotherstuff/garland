@@ -80,6 +80,7 @@ Anti-drift rules:
 
 Verification rules:
 - Run the smallest correct verification commands for the files you changed.
+- Do not default to `./gradlew assembleDebug` for routine app edits; prefer tests or compile-only gates unless the change really needs an APK build.
 - If tests fail, fix them before ending the round.
 - Prefer empirical verification over code inspection.
 - Use `./automation/gradle_capped.sh ...` for every Gradle command so builds stay on the repo's low-priority single-worker path.

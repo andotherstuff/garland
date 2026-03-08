@@ -24,6 +24,14 @@ This repo is often worked on by multiple agents at the same time. Default to a w
 - If the shared checkout is dirty, create or use a separate worktree, finish there, then merge back into `main`.
 - If a push is blocked by branch protection, auth, or a higher-priority instruction, report the blocker clearly.
 
+## Verification defaults
+
+- Prefer the smallest correct verification set for the files you changed.
+- Do not run `./gradlew assembleDebug` by default for every app change; Garland builds are expensive and can bog down the machine.
+- Default to targeted tests such as `./gradlew testDebugUnitTest`, focused Gradle test targets, `./gradlew compileDebugAndroidTestKotlin`, and `cargo test` when they cover the change.
+- Escalate to `./gradlew assembleDebug` or `automation/verify_alpha_no_device.sh` only for release prep, packaging/build-system changes, manifest/resource changes that need APK validation, JNI integration changes, or bugs that reproduce only in a built app.
+- Keep thorough no-device verification for release candidates and explicit sign-off passes, not routine iteration.
+
 ## Delivery expectation
 
 - Default finish line for this repo: merged into `main` and pushed.

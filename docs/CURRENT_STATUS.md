@@ -3,16 +3,23 @@
 ## Verified in this repo
 
 - release target is `v0.0.2-alpha`
-- No-device alpha verification passes with `automation/verify_alpha_no_device.sh`
+- No-device alpha verification passes with `automation/verify_alpha_no_device.sh` on release/sign-off passes
+- No-device alpha verification passes with `automation/verify_alpha_no_device.sh` on release/sign-off passes
 - Android unit tests pass with `./gradlew testDebugUnitTest`
 - Android JVM coverage report generates with `./gradlew jacocoDebugUnitTestReport`
 - Android JVM coverage summary prints with `python3 automation/report_android_unit_coverage.py`
 - Android instrumentation sources compile with `./gradlew compileDebugAndroidTestKotlin`
-- Debug APK builds with `./gradlew assembleDebug`
+- Debug APK builds with `./gradlew assembleDebug` when we run an explicit build validation pass
 - Signed release APK builds with `./gradlew assembleRelease` when Garland release signing is configured
 - `automation/release_alpha.sh v0.0.2-alpha` now covers the signed alpha release path from a clean worktree aligned with `origin/main`
 - Android lint passes with `./gradlew lintDebug`
 - Rust core tests pass with `cargo test`
+
+## Verification default
+
+- Routine iteration should use the smallest correct verification command, not a full app build by default.
+- Prefer targeted JVM tests, focused Gradle test targets, Android test-source compile checks, and `cargo test`.
+- Reserve `./gradlew assembleDebug` and `automation/verify_alpha_no_device.sh` for release prep, packaging/build-system work, JNI integration checks, manifest/resource validation, or suspected build-only failures.
 
 ## Current product shape
 
@@ -29,15 +36,15 @@
 
 ## Open release gates
 
-1. Connected Android instrumentation has not been run on an emulator or device in this environment
-2. Provider and diagnostics flows still need real-device validation through the Android document picker and connected tests
-3. Manual alpha checks in `docs/ALPHA_RELEASE_CHECKLIST.md` are still open
+1. Local emulator/device instrumentation is intentionally not part of this VPS workflow
+2. Provider and diagnostics flows still need real-device validation through published GitHub test releases and the Android document picker
+3. Release smoke-testing and manual alpha checks in `docs/ALPHA_RELEASE_CHECKLIST.md` are still open
 
 ## Recommended execution order
 
-1. Stand up an Android target with `adb`
-2. Run `./gradlew connectedDebugAndroidTest`
-3. Run the manual picker and diagnostics checks from `docs/ALPHA_RELEASE_CHECKLIST.md`
+1. Publish a GitHub test release from the latest verified commit
+2. Install it on a real Android device and run smoke tests from `docs/ALPHA_RELEASE_CHECKLIST.md`
+3. Capture manual picker and diagnostics evidence from the published build
 4. Work through `docs/ALPHA_RELEASE_CHECKLIST.md`
 
 ## Evidence snapshot
@@ -51,4 +58,4 @@
 - `./gradlew assembleRelease` -> pass with local Garland signing material
 - `./gradlew lintDebug` -> pass
 - `cargo test` -> pass
-- `adb devices` -> command works, but no emulator or device is currently attached
+- local emulator/device testing is intentionally out of scope on this VPS; real-device validation happens from published GitHub test releases

@@ -39,17 +39,25 @@ This repo intentionally targets the smallest Android MVP that can:
 ## Verified Status
 
 - release target is `v0.0.2-alpha`
-- `automation/verify_alpha_no_device.sh` passes and freezes the repo-side alpha sign-off path
+- `automation/verify_alpha_no_device.sh` passes and freezes the repo-side alpha sign-off path for release candidates
+- `automation/verify_alpha_no_device.sh` passes and freezes the repo-side alpha sign-off path for release candidates
 - `./gradlew testDebugUnitTest` passes for the Android unit-test suite
 - `./gradlew jacocoDebugUnitTestReport` generates the Android JVM coverage report
 - `python3 automation/report_android_unit_coverage.py` prints the current Android JVM coverage summary
 - `./gradlew compileDebugAndroidTestKotlin` passes for the Android instrumentation source compile gate
-- `./gradlew assembleDebug` builds the debug APK successfully
+- `./gradlew assembleDebug` builds the debug APK successfully when we do an explicit release/build validation pass
 - `./gradlew assembleRelease` builds the signed release APK when Garland release signing is configured
 - `automation/release_alpha.sh v0.0.2-alpha` rebuilds JNI libs, verifies the repo, and publishes the signed alpha release
 - `./gradlew lintDebug` passes for the Android static quality gate
 - `cargo test` passes for the Rust core
-- connected Android instrumentation and manual device checks remain the only open alpha-release gates
+- GitHub test-release validation and manual device smoke testing after publish remain the only open alpha-release gates
+
+## Verification Policy
+
+- For routine development, prefer the smallest correct verification command instead of building the whole app.
+- Default to targeted checks like `./gradlew testDebugUnitTest`, focused Gradle test targets, `./gradlew compileDebugAndroidTestKotlin`, and `cargo test`.
+- Avoid running `./gradlew assembleDebug` on every change; Garland app builds can drag the server to a crawl.
+- Save `./gradlew assembleDebug` and `automation/verify_alpha_no_device.sh` for release prep, packaging/build-system changes, JNI integration validation, manifest/resource changes that need APK verification, or suspected build-only regressions.
 
 ## Resource-safe Gradle usage
 
@@ -59,8 +67,8 @@ This repo intentionally targets the smallest Android MVP that can:
 
 ## Alpha Release Gaps
 
-- run `./gradlew connectedDebugAndroidTest` on a connected emulator or device
-- finish the manual sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`
+- publish a GitHub test release and smoke-test it on a real Android device
+- finish the release sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`
 
 ## License
 

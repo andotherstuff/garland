@@ -270,7 +270,7 @@ object DocumentDiagnosticsScreenPresenter {
                 "Run one upload from the main screen to test Blossom delivery and relay publish end to end."
             }
             isUploadFailureStatus(record.uploadStatus) || record.uploadStatus == "relay-published-partial" || record.uploadStatus == "relay-publish-failed" -> {
-                "Refresh immediately after the failed run so the exact failing endpoint stays visible below."
+                "Retry relay publish after confirming relay connectivity and auth."
             }
             record.uploadStatus in setOf("sync-queued", "sync-running", "restore-queued", "restore-running") -> {
                 "Wait for the active worker to finish, then refresh before judging the result."

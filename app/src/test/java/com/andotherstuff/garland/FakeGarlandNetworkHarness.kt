@@ -22,6 +22,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     private val uploadAuthorizationJsons = mutableListOf<String>()
     private val relayEventIds = mutableListOf<String>()
     private val requestedDownloadPaths = mutableListOf<String>()
+    private val headRequestPaths = mutableListOf<String>()
     private var relayMode: RelayMode = RelayMode.Accept("")
     private var requireUploadAuthorization = false
     private var requiredUploadContentType: String? = null
@@ -33,6 +34,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
                 return when {
                     path == "/relay" -> relayResponse()
                     request.method == "PUT" && path == "/upload" -> handleUpload(request)
+                    request.method == "HEAD" -> handleHead(path)
                     request.method == "GET" -> handleDownload(path)
                     else -> MockResponse().setResponseCode(404)
                 }
@@ -116,6 +118,8 @@ class FakeGarlandNetworkHarness : AutoCloseable {
 
     fun downloadRequestPaths(): List<String> = requestedDownloadPaths.toList()
 
+    fun headRequestPaths(): List<String> = headRequestPaths.toList()
+
     override fun close() {
         server.shutdown()
     }
@@ -149,6 +153,12 @@ class FakeGarlandNetworkHarness : AutoCloseable {
               "sha256": "$shareIdHex"
             }
         """.trimIndent()
+    }
+
+    private fun handleHead(path: String): MockResponse {
+        headRequestPaths += path
+        val exists = downloadBodies.containsKey(path)
+        return MockResponse().setResponseCode(if (exists) 200 else 404)
     }
 
     private fun handleDownload(path: String): MockResponse {
