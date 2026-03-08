@@ -40,7 +40,6 @@ This repo intentionally targets the smallest Android MVP that can:
 
 - release target is `v0.0.2-alpha`
 - `automation/verify_alpha_no_device.sh` passes and freezes the repo-side alpha sign-off path for release candidates
-- `automation/verify_alpha_no_device.sh` passes and freezes the repo-side alpha sign-off path for release candidates
 - `./gradlew testDebugUnitTest` passes for the Android unit-test suite
 - `./gradlew jacocoDebugUnitTestReport` generates the Android JVM coverage report
 - `python3 automation/report_android_unit_coverage.py` prints the current Android JVM coverage summary
@@ -50,7 +49,7 @@ This repo intentionally targets the smallest Android MVP that can:
 - `automation/release_alpha.sh v0.0.2-alpha` rebuilds JNI libs, verifies the repo, and publishes the signed alpha release
 - `./gradlew lintDebug` passes for the Android static quality gate
 - `cargo test` passes for the Rust core
-- GitHub test-release validation and manual device smoke testing after publish remain the only open alpha-release gates
+- no-device release gates are closed for `v0.0.2-alpha`; GitHub test-release validation and manual device smoke testing remain deferred post-release follow-through
 
 ## Verification Policy
 
@@ -65,10 +64,11 @@ This repo intentionally targets the smallest Android MVP that can:
 - The wrapper forces low-priority single-worker Gradle runs with `nice`, `ionice`, `--no-daemon`, and `ActiveProcessorCount=1` so builds are less likely to stall the machine.
 - Repo automation already uses the capped wrapper for no-device verification and agent loops.
 
-## Alpha Release Gaps
+## Deferred Post-Release Validation
 
 - publish a GitHub test release and smoke-test it on a real Android device
-- finish the release sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`
+- finish the post-release sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`
+- feed results and any fallout back into `docs/RELEASE_TODO.md`
 
 ## License
 

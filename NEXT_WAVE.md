@@ -27,7 +27,7 @@ This file tracks the next integration wave after the current Garland MVP.
 - Android lint passes with `./gradlew lintDebug`
 - no-device alpha verification now has a repeatable path with `automation/verify_alpha_no_device.sh` for release/sign-off runs
 - fake Blossom/relay harness coverage now exists in JVM tests and Android test sources
-- connected instrumentation and manual device checks are still pending because they have not been run on an emulator or device
+- connected instrumentation and manual device checks are still pending and now live as deferred post-release follow-through for `v0.0.2-alpha`
 - `MainActivity` keeps a compact diagnostics summary and now opens a dedicated diagnostics screen for fuller per-document triage
 - the diagnostics screen now keeps recent per-document sync history and can copy a tester-facing report
 - manifest validation now rejects duplicate or invalid server entries and restore-side plan failures now surface structured diagnostics
@@ -35,7 +35,7 @@ This file tracks the next integration wave after the current Garland MVP.
 - configured relays and Blossom servers are now trimmed, deduplicated, and defaulted before upload or relay work starts
 - upload retry follow-through now preserves retryable network failures for the next worker pass without touching the diagnostics UI surface
 
-## Alpha Blockers
+## Deferred Post-Release Alpha Follow-Through
 
 1. End-to-end Android verification
     - publish GitHub test releases and use those artifacts for real-device smoke testing
@@ -59,7 +59,7 @@ This file tracks the next integration wave after the current Garland MVP.
 
 2. GitHub test-release verification pass
     - publish a test release from GitHub
-    - execute provider, worker, and diagnostics smoke tests from the published APK before ship sign-off
+    - execute provider, worker, and diagnostics smoke tests from the published APK after publish and feed results back into the release docs
 
 3. Diagnostics screen follow-through
     - keep the dedicated diagnostics view aligned with tester feedback
@@ -97,7 +97,7 @@ This file tracks the next integration wave after the current Garland MVP.
 - [x] Add instrumentation tests for the provider flow
 - [x] Add per-document diagnostics UI
 - [x] Prevent duplicate sync/restore jobs and classify permanent worker failures
-- [ ] Publish a GitHub test release and smoke-test it on a real Android device
+- [ ] Publish a GitHub test release and smoke-test it on a real Android device after release publish
 - [x] Add a local fake Blossom/relay harness for end-to-end verification
 - [x] Add a dedicated diagnostics screen for alpha testers
 - [x] Write an alpha release checklist
@@ -135,4 +135,4 @@ This file tracks the next integration wave after the current Garland MVP.
     - run `automation/verify_alpha_no_device.sh`
     - capture `./gradlew jacocoDebugUnitTestReport`
     - capture `python3 automation/report_android_unit_coverage.py`
-    - finish the GitHub test-release and manual sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`
+    - finish the clean no-device release run, then hand off the deferred GitHub release and manual sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`

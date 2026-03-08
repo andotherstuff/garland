@@ -24,13 +24,19 @@ Second alpha release of the Garland Android MVP.
 
 ## Release workflow
 
-- run `automation/release_alpha.sh v0.0.2-alpha` from `main` after pushing the release candidate commit
+- run `automation/release_alpha.sh v0.0.2-alpha` from a fresh clean worktree aligned with latest `origin/main`
 - the script rebuilds JNI libraries, runs the no-device alpha verification path, builds a signed release APK, verifies the APK signature, and creates or updates the GitHub prerelease with attached artifacts
 
-## Known open gates
+## Deferred validation accepted for this cut
+
+- `v0.0.2-alpha` ships on the clean no-device verification path without requiring a pre-publish `adb` target
+- connected-device instrumentation and manual picker/provider/diagnostics checks are deferred until after publish
+- post-release follow-through still needs to capture real-device evidence and feed any fallout back into `docs/RELEASE_TODO.md`
+
+## Deferred post-release follow-through
 
 - `./gradlew connectedDebugAndroidTest` still needs an emulator or device
-- manual device checks in `docs/ALPHA_RELEASE_CHECKLIST.md` are still open
+- manual device checks in `docs/ALPHA_RELEASE_CHECKLIST.md` are still open and are not pre-publish blockers for this cut
 
 ## Tag
 

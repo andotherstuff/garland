@@ -4,7 +4,6 @@
 
 - release target is `v0.0.2-alpha`
 - No-device alpha verification passes with `automation/verify_alpha_no_device.sh` on release/sign-off passes
-- No-device alpha verification passes with `automation/verify_alpha_no_device.sh` on release/sign-off passes
 - Android unit tests pass with `./gradlew testDebugUnitTest`
 - Android JVM coverage report generates with `./gradlew jacocoDebugUnitTestReport`
 - Android JVM coverage summary prints with `python3 automation/report_android_unit_coverage.py`
@@ -34,18 +33,18 @@
 - Manifest validation now rejects duplicate or invalid server entries, and restore-side plan failures now store structured diagnostics
 - Restore prefers server-returned retrieval URLs and now explains fetched-share mismatches before entering crypto recovery
 
-## Open release gates
+## Deferred post-release validation
 
-1. Local emulator/device instrumentation is intentionally not part of this VPS workflow
+1. Local emulator/device instrumentation is intentionally not part of this VPS workflow and is not a pre-publish blocker for `v0.0.2-alpha`
 2. Provider and diagnostics flows still need real-device validation through published GitHub test releases and the Android document picker
-3. Release smoke-testing and manual alpha checks in `docs/ALPHA_RELEASE_CHECKLIST.md` are still open
+3. Release smoke-testing and manual alpha checks in `docs/ALPHA_RELEASE_CHECKLIST.md` remain open follow-through work after publish
 
 ## Recommended execution order
 
-1. Publish a GitHub test release from the latest verified commit
-2. Install it on a real Android device and run smoke tests from `docs/ALPHA_RELEASE_CHECKLIST.md`
-3. Capture manual picker and diagnostics evidence from the published build
-4. Work through `docs/ALPHA_RELEASE_CHECKLIST.md`
+1. Run the final signed release from a fresh clean worktree aligned with latest `origin/main`
+2. Publish the GitHub prerelease from that verified release worktree
+3. Install the published build on a real Android device and run smoke tests from `docs/ALPHA_RELEASE_CHECKLIST.md`
+4. Capture manual picker and diagnostics evidence from the published build and feed results back into `docs/RELEASE_TODO.md`
 
 ## Evidence snapshot
 
@@ -58,4 +57,4 @@
 - `./gradlew assembleRelease` -> pass with local Garland signing material
 - `./gradlew lintDebug` -> pass
 - `cargo test` -> pass
-- local emulator/device testing is intentionally out of scope on this VPS; real-device validation happens from published GitHub test releases
+- local emulator/device testing is intentionally out of scope on this VPS; real-device validation is deferred until after publish and happens from published GitHub test releases
