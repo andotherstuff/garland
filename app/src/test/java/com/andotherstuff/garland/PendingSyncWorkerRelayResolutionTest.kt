@@ -23,4 +23,14 @@ class PendingSyncWorkerRelayResolutionTest {
 
         assertEquals(listOf("wss://queued.example"), resolved)
     }
+
+    @Test
+    fun removesDuplicateRelaysWhilePreservingOrder() {
+        val resolved = PendingSyncWorker.resolveRelayUrls(
+            queuedRelays = listOf(" wss://relay.one ", "wss://relay.one", "wss://relay.two", "wss://relay.one"),
+            sessionRelays = listOf("wss://session.example"),
+        )
+
+        assertEquals(listOf("wss://relay.one", "wss://relay.two"), resolved)
+    }
 }

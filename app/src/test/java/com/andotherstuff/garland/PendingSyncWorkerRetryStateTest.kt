@@ -1,9 +1,15 @@
 package com.andotherstuff.garland
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PendingSyncWorkerRetryStateTest {
+    @Test
+    fun dropsBlankTargetDocumentIdsBeforeRetryHandling() {
+        assertNull(PendingSyncWorker.normalizeDocumentId("   "))
+    }
+
     @Test
     fun buildsRetryMessageFromFailureText() {
         assertEquals(

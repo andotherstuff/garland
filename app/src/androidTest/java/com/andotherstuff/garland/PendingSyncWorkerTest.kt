@@ -2,9 +2,14 @@ package com.andotherstuff.garland
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.work.Configuration
 import androidx.work.ListenableWorker
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import androidx.work.workDataOf
+import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
+import androidx.work.testing.WorkManagerTestInitHelper
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -20,15 +25,48 @@ class PendingSyncWorkerTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val targetContext = instrumentation.targetContext
     private val store = LocalDocumentStore(targetContext)
+    private lateinit var workManager: WorkManager
 
     @Before
     fun setUp() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(
+            targetContext,
+            Configuration.Builder()
+                .setExecutor(SynchronousExecutor())
+                .build(),
+        )
+        workManager = WorkManager.getInstance(targetContext)
         clearWorkerState()
     }
 
     @After
     fun tearDown() {
+        workManager.cancelAllWork().result.get()
+        workManager.pruneWork()
         clearWorkerState()
+    }
+
+    @Test
+    fun keepsSingleQueuedWorkForDuplicateTargetedSyncEnqueue() {
+        store.upsertPreparedDocument(
+            documentId = "doc-duplicate-sync",
+            displayName = "sync-note.txt",
+            mimeType = "text/plain",
+            content = "hello".toByteArray(),
+            uploadPlanJson = uploadPlan(serverUrl = "http://127.0.0.1:9"),
+        )
+        val scheduler = GarlandWorkScheduler(targetContext)
+
+        scheduler.enqueuePendingSync(relayUrls = listOf("wss://relay.one"), documentId = " doc-duplicate-sync ")
+        scheduler.enqueuePendingSync(relayUrls = listOf("wss://relay.two"), documentId = "doc-duplicate-sync")
+
+        val workInfos = workManager
+            .getWorkInfosForUniqueWork(GarlandWorkScheduler.pendingSyncWorkName("doc-duplicate-sync"))
+            .get()
+
+        assertEquals(1, workInfos.size)
+        assertEquals(WorkInfo.State.ENQUEUED, workInfos.single().state)
+        assertEquals("sync-queued", store.readRecord("doc-duplicate-sync")?.uploadStatus)
     }
 
     @Test

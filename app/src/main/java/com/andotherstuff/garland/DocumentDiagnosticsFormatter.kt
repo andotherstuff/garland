@@ -234,14 +234,44 @@ object DocumentDiagnosticsFormatter {
         val trimmed = message?.trim().orEmpty()
         val parts = splitFailureMessage(trimmed)
         if (parts.size != 2) return emptyList()
-        return parts[1]
-            .split(',')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+        return splitFailureEntries(parts[1])
     }
 
     private fun splitFailureMessage(message: String): List<String> {
         return message.split("; failed:", limit = 2)
+    }
+
+    private fun splitFailureEntries(entriesText: String): List<String> {
+        val entries = mutableListOf<String>()
+        val current = StringBuilder()
+        var parenthesesDepth = 0
+
+        entriesText.forEach { char ->
+            when (char) {
+                '(' -> {
+                    parenthesesDepth += 1
+                    current.append(char)
+                }
+                ')' -> {
+                    if (parenthesesDepth > 0) {
+                        parenthesesDepth -= 1
+                    }
+                    current.append(char)
+                }
+                ',' -> {
+                    if (parenthesesDepth == 0) {
+                        current.toString().trim().takeIf { it.isNotEmpty() }?.let(entries::add)
+                        current.setLength(0)
+                    } else {
+                        current.append(char)
+                    }
+                }
+                else -> current.append(char)
+            }
+        }
+
+        current.toString().trim().takeIf { it.isNotEmpty() }?.let(entries::add)
+        return entries
     }
 
     private fun extractLegacyUploadFailure(message: String?): String? {

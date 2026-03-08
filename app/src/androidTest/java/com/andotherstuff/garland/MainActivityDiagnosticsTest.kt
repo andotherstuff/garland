@@ -184,6 +184,29 @@ class MainActivityDiagnosticsTest {
     }
 
     @Test
+    fun keepsCommaContainingLegacyRelayFailuresIntactWhenRenderedInDiagnostics() {
+        val document = store.upsertPreparedDocument(
+            documentId = "doc-legacy-comma-relay-failure",
+            displayName = "legacy-comma-note.txt",
+            mimeType = "text/plain",
+            content = "hello world".toByteArray(),
+            uploadPlanJson = sampleUploadPlanJson(documentId = "doc-legacy-comma-relay-failure"),
+        )
+        store.updateUploadStatus(
+            document.documentId,
+            "relay-publish-failed",
+            "Published to 0/2 relays; failed: wss://relay.one (auth-required: bad token, expired), wss://relay.two (timeout)",
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withId(R.id.activeDocumentText)).check(matches(withText(containsString("legacy-comma-note.txt"))))
+            onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (2 failed)")))
+            onView(withId(R.id.activeDocumentRelaysText)).check(matches(withText(containsString("relay.one (auth-required: bad token, expired)"))))
+            onView(withId(R.id.activeDocumentRelaysText)).check(matches(withText(containsString("relay.two (timeout)"))))
+        }
+    }
+
+    @Test
     fun showsLegacyUploadFailuresWhenStructuredDiagnosticsAreMissing() {
         val document = store.upsertPreparedDocument(
             documentId = "doc-legacy-upload-failure",

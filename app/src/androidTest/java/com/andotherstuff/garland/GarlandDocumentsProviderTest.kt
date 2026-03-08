@@ -507,6 +507,228 @@ class GarlandDocumentsProviderTest {
     }
 
     @Test
+    fun searchResultsPreferSummaryThenEndpointThenStatusThenMimeMatches() {
+        val rootDocumentId = queryRootDocumentId()
+
+        val summaryUri = createAndWriteDocument(rootDocumentId, "summary-note.txt", "summary body")
+        val endpointUri = createAndWriteDocument(rootDocumentId, "endpoint-note.txt", "endpoint body")
+        val statusUri = DocumentsContract.createDocument(
+            resolver,
+            documentUri(rootDocumentId),
+            "text/plain",
+            "status-note.txt"
+        )!!
+        resolver.openOutputStream(statusUri, "w")!!.use { stream ->
+            stream.write("status body".toByteArray())
+        }
+        val mimeUri = DocumentsContract.createDocument(
+            resolver,
+            documentUri(rootDocumentId),
+            "application/x-timeout-test",
+            "mime-note.bin"
+        )!!
+        resolver.openOutputStream(mimeUri, "w")!!.use { stream ->
+            stream.write("mime body".toByteArray())
+        }
+
+        val summaryDocumentId = DocumentsContract.getDocumentId(summaryUri)
+        val endpointDocumentId = DocumentsContract.getDocumentId(endpointUri)
+        val statusDocumentId = DocumentsContract.getDocumentId(statusUri)
+        val mimeDocumentId = DocumentsContract.getDocumentId(mimeUri)
+        waitForStatus(statusDocumentId, "waiting-for-identity")
+        waitForStatus(mimeDocumentId, "waiting-for-identity")
+
+        store.updateUploadDiagnostics(
+            documentId = summaryDocumentId,
+            status = "relay-published-partial",
+            message = "Timeout summary surfaced for testers",
+        )
+        store.updateUploadDiagnostics(
+            documentId = endpointDocumentId,
+            status = "relay-published-partial",
+            message = "Relay publish incomplete",
+            diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+                DocumentSyncDiagnostics(
+                    uploads = listOf(
+                        DocumentEndpointDiagnostic(
+                            "https://blossom.endpoint",
+                            "failed",
+                            "timeout while uploading share",
+                        )
+                    )
+                )
+            ),
+        )
+        store.updateUploadDiagnostics(
+            documentId = statusDocumentId,
+            status = "timeout-pending",
+            message = "Retry still queued",
+        )
+        store.updateUploadDiagnostics(
+            documentId = mimeDocumentId,
+            status = "relay-published",
+            message = "Relay accepted commit event",
+        )
+
+        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "timeout")
+        resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
+            val displayNames = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                displayNames += cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+            }
+            assertEquals(
+                listOf(
+                    "summary-note.txt [relay-published-partial]",
+                    "endpoint-note.txt [relay-published-partial]",
+                    "status-note.txt [timeout-pending]",
+                    "mime-note.bin [relay-published]",
+                ),
+                displayNames,
+            )
+        }
+    }
+
+    @Test
+    fun searchResultsPreferDisplayNameMatchesAndNewestPrefixMatchWithinSameRank() {
+        val rootDocumentId = queryRootDocumentId()
+
+        val olderPrefixUri = createAndWriteDocument(rootDocumentId, "needle-alpha.txt", "older prefix body")
+        SystemClock.sleep(20)
+        val newerPrefixUri = createAndWriteDocument(rootDocumentId, "needle-zulu.txt", "newer prefix body")
+        SystemClock.sleep(20)
+        createAndWriteDocument(rootDocumentId, "alpha-needle.txt", "contains body")
+
+        val olderPrefixDocumentId = DocumentsContract.getDocumentId(olderPrefixUri)
+        val newerPrefixDocumentId = DocumentsContract.getDocumentId(newerPrefixUri)
+        waitForStatus(olderPrefixDocumentId, "waiting-for-identity")
+        waitForStatus(newerPrefixDocumentId, "waiting-for-identity")
+
+        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "needle")
+        resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
+            val displayNames = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                displayNames += cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+            }
+            assertEquals(
+                listOf(
+                    "needle-zulu.txt [waiting-for-identity]",
+                    "needle-alpha.txt [waiting-for-identity]",
+                    "alpha-needle.txt [waiting-for-identity]",
+                ),
+                displayNames,
+            )
+        }
+    }
+
+    @Test
+    fun searchResultsUseAlphabeticalTieBreakWhenSameRankSharesTimestamp() {
+        val rootDocumentId = queryRootDocumentId()
+
+        val zuluPrefixUri = createAndWriteDocument(rootDocumentId, "needle-zulu.txt", "zulu prefix body")
+        SystemClock.sleep(20)
+        val alphaPrefixUri = createAndWriteDocument(rootDocumentId, "needle-alpha.txt", "alpha prefix body")
+
+        val zuluPrefixDocumentId = DocumentsContract.getDocumentId(zuluPrefixUri)
+        val alphaPrefixDocumentId = DocumentsContract.getDocumentId(alphaPrefixUri)
+        val sharedTimestamp = System.currentTimeMillis() - 1_000
+        overwriteUpdatedAt(zuluPrefixDocumentId, sharedTimestamp)
+        overwriteUpdatedAt(alphaPrefixDocumentId, sharedTimestamp)
+
+        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "needle")
+        resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
+            val displayNames = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                displayNames += cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+            }
+            assertEquals(
+                listOf(
+                    "needle-alpha.txt [waiting-for-identity]",
+                    "needle-zulu.txt [waiting-for-identity]",
+                ),
+                displayNames,
+            )
+        }
+    }
+
+    @Test
+    fun searchResultsPreferNewestSummaryMatchWithinSameRank() {
+        val rootDocumentId = queryRootDocumentId()
+
+        val olderSummaryUri = createAndWriteDocument(rootDocumentId, "alpha-report.txt", "older summary body")
+        SystemClock.sleep(20)
+        val newerSummaryUri = createAndWriteDocument(rootDocumentId, "zulu-report.txt", "newer summary body")
+
+        val olderSummaryDocumentId = DocumentsContract.getDocumentId(olderSummaryUri)
+        val newerSummaryDocumentId = DocumentsContract.getDocumentId(newerSummaryUri)
+        store.updateUploadDiagnostics(
+            documentId = olderSummaryDocumentId,
+            status = "relay-published-partial",
+            message = "Timeout summary for older report",
+        )
+        SystemClock.sleep(20)
+        store.updateUploadDiagnostics(
+            documentId = newerSummaryDocumentId,
+            status = "relay-published-partial",
+            message = "Timeout summary for newer report",
+        )
+
+        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "timeout")
+        resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
+            val displayNames = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                displayNames += cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+            }
+            assertEquals(
+                listOf(
+                    "zulu-report.txt [relay-published-partial]",
+                    "alpha-report.txt [relay-published-partial]",
+                ),
+                displayNames,
+            )
+        }
+    }
+
+    @Test
+    fun searchResultsUseAlphabeticalTieBreakForSameRankSummaryMatches() {
+        val rootDocumentId = queryRootDocumentId()
+
+        val zuluSummaryUri = createAndWriteDocument(rootDocumentId, "zulu-report.txt", "zulu summary body")
+        SystemClock.sleep(20)
+        val alphaSummaryUri = createAndWriteDocument(rootDocumentId, "alpha-report.txt", "alpha summary body")
+
+        val zuluSummaryDocumentId = DocumentsContract.getDocumentId(zuluSummaryUri)
+        val alphaSummaryDocumentId = DocumentsContract.getDocumentId(alphaSummaryUri)
+        store.updateUploadDiagnostics(
+            documentId = zuluSummaryDocumentId,
+            status = "relay-published-partial",
+            message = "Timeout summary shared across reports",
+        )
+        store.updateUploadDiagnostics(
+            documentId = alphaSummaryDocumentId,
+            status = "relay-published-partial",
+            message = "Timeout summary shared across reports",
+        )
+        val sharedTimestamp = System.currentTimeMillis() - 1_000
+        overwriteUpdatedAt(zuluSummaryDocumentId, sharedTimestamp)
+        overwriteUpdatedAt(alphaSummaryDocumentId, sharedTimestamp)
+
+        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "timeout")
+        resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
+            val displayNames = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                displayNames += cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+            }
+            assertEquals(
+                listOf(
+                    "alpha-report.txt [relay-published-partial]",
+                    "zulu-report.txt [relay-published-partial]",
+                ),
+                displayNames,
+            )
+        }
+    }
+
+    @Test
     fun openReadRestoresMissingLocalContentFromRemoteShare() {
         val identity = JSONObject(
             NativeBridge.deriveIdentity(
@@ -841,6 +1063,13 @@ class GarlandDocumentsProviderTest {
     }
 
     private fun documentUri(documentId: String): Uri = DocumentsContract.buildDocumentUri(AUTHORITY, documentId)
+
+    private fun overwriteUpdatedAt(documentId: String, updatedAt: Long) {
+        val metadataFile = targetContext.filesDir.resolve("garland-documents/meta/$documentId.json")
+        val metadata = JSONObject(metadataFile.readText())
+        metadata.put("updatedAt", updatedAt)
+        metadataFile.writeText(metadata.toString())
+    }
 
     private fun waitForStatus(documentId: String, expectedStatus: String) {
         repeat(20) {

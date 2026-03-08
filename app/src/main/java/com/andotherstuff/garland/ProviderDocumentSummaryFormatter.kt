@@ -2,12 +2,15 @@ package com.andotherstuff.garland
 
 object ProviderDocumentSummaryFormatter {
     fun build(record: LocalDocumentRecord): String {
-        val status = record.lastSyncMessage
+        val status = detailSummary(record) ?: record.uploadStatus
+        return "${record.mimeType} - $status"
+    }
+
+    fun detailSummary(record: LocalDocumentRecord): String? {
+        return record.lastSyncMessage
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
             ?: fallbackDiagnosticsSummary(record)
-            ?: record.uploadStatus
-        return "${record.mimeType} - $status"
     }
 
     private fun fallbackDiagnosticsSummary(record: LocalDocumentRecord): String? {

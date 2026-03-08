@@ -3,6 +3,7 @@ package com.andotherstuff.garland
 import androidx.work.OneTimeWorkRequest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GarlandWorkSchedulerTest {
@@ -30,6 +31,22 @@ class GarlandWorkSchedulerTest {
     }
 
     @Test
+    fun removesDuplicateRelaysBeforeEnqueueingTargetedSync() {
+        val backend = RecordingWorkSchedulerBackend()
+        val scheduler = GarlandWorkScheduler(backend, RecordingSyncStatusStore())
+
+        scheduler.enqueuePendingSync(
+            relayUrls = listOf(" wss://relay.one ", "wss://relay.one", "", "wss://relay.two"),
+            documentId = "doc-123",
+        )
+
+        assertEquals(
+            listOf("wss://relay.one", "wss://relay.two"),
+            backend.pendingSyncRequest.workSpec.input.getStringArray(PendingSyncWorker.KEY_RELAYS)?.toList(),
+        )
+    }
+
+    @Test
     fun usesSharedUniqueNameForFullPendingSync() {
         val backend = RecordingWorkSchedulerBackend()
         val scheduler = GarlandWorkScheduler(backend, RecordingSyncStatusStore())
@@ -39,6 +56,37 @@ class GarlandWorkSchedulerTest {
         assertEquals("garland-pending-sync:all", backend.pendingSyncName)
         assertNull(backend.pendingSyncRequest.workSpec.input.getString(PendingSyncWorker.KEY_DOCUMENT_ID))
         assertNull(backend.pendingSyncRequest.workSpec.input.getStringArray(PendingSyncWorker.KEY_RELAYS))
+    }
+
+    @Test
+    fun treatsBlankTargetDocumentIdAsFullPendingSync() {
+        val backend = RecordingWorkSchedulerBackend()
+        val statusStore = RecordingSyncStatusStore()
+        val scheduler = GarlandWorkScheduler(backend, statusStore)
+
+        scheduler.enqueuePendingSync(relayUrls = listOf("wss://relay.one"), documentId = "   ")
+
+        assertEquals("garland-pending-sync:all", backend.pendingSyncName)
+        assertNull(backend.pendingSyncRequest.workSpec.input.getString(PendingSyncWorker.KEY_DOCUMENT_ID))
+        assertEquals(
+            listOf("wss://relay.one"),
+            backend.pendingSyncRequest.workSpec.input.getStringArray(PendingSyncWorker.KEY_RELAYS)?.toList(),
+        )
+        assertTrue(statusStore.updates.isEmpty())
+    }
+
+    @Test
+    fun preservesRunningTargetedSyncStatusWhenDuplicateEnqueueArrives() {
+        val backend = RecordingWorkSchedulerBackend()
+        val statusStore = RecordingSyncStatusStore(
+            statuses = mutableMapOf("doc-123" to "sync-running"),
+        )
+        val scheduler = GarlandWorkScheduler(backend, statusStore)
+
+        scheduler.enqueuePendingSync(relayUrls = listOf("wss://relay.one"), documentId = "doc-123")
+
+        assertEquals("garland-pending-sync:doc-123", backend.pendingSyncName)
+        assertTrue(statusStore.updates.isEmpty())
     }
 
     @Test
@@ -56,6 +104,20 @@ class GarlandWorkSchedulerTest {
             listOf(StatusUpdate("doc-restore", "restore-queued", "Queued Garland restore in background")),
             statusStore.updates,
         )
+    }
+
+    @Test
+    fun preservesRunningRestoreStatusWhenDuplicateEnqueueArrives() {
+        val backend = RecordingWorkSchedulerBackend()
+        val statusStore = RecordingSyncStatusStore(
+            statuses = mutableMapOf("doc-restore" to "restore-running"),
+        )
+        val scheduler = GarlandWorkScheduler(backend, statusStore)
+
+        scheduler.enqueueRestore("doc-restore", privateKeyHex = "deadbeef")
+
+        assertEquals("garland-restore:doc-restore", backend.restoreName)
+        assertTrue(statusStore.updates.isEmpty())
     }
 }
 
@@ -76,10 +138,21 @@ private class RecordingWorkSchedulerBackend : WorkSchedulerBackend {
     }
 }
 
-private class RecordingSyncStatusStore : SyncStatusStore {
+private class RecordingSyncStatusStore(
+    private val statuses: MutableMap<String, String> = mutableMapOf(),
+) : SyncStatusStore {
     val updates = mutableListOf<StatusUpdate>()
 
+    override fun hasActiveBackgroundSync(documentId: String): Boolean {
+        return statuses[documentId] in setOf("sync-queued", "sync-running")
+    }
+
+    override fun hasActiveBackgroundRestore(documentId: String): Boolean {
+        return statuses[documentId] in setOf("restore-queued", "restore-running")
+    }
+
     override fun updateUploadStatus(documentId: String, status: String, message: String?) {
+        statuses[documentId] = status
         updates += StatusUpdate(documentId, status, message)
     }
 }

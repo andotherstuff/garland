@@ -13,7 +13,7 @@ class PendingSyncWorker(
     private val syncExecutor = GarlandSyncExecutor(appContext)
 
     override suspend fun doWork(): Result {
-        val documentId = inputData.getString(KEY_DOCUMENT_ID)
+        val documentId = normalizeDocumentId(inputData.getString(KEY_DOCUMENT_ID))
         val relayUrls = resolveRelayUrls(
             queuedRelays = inputData.getStringArray(KEY_RELAYS)?.toList(),
             sessionRelays = session.loadRelays(),
@@ -60,6 +60,10 @@ class PendingSyncWorker(
             }
         }
 
+        internal fun normalizeDocumentId(documentId: String?): String? {
+            return documentId?.trim()?.takeIf { it.isNotEmpty() }
+        }
+
         internal fun retryMessage(failureMessage: String?): String {
             val normalized = failureMessage?.trim().orEmpty().ifBlank { "Background sync failed" }
             return "Retrying background sync: $normalized"
@@ -69,6 +73,7 @@ class PendingSyncWorker(
             return relayUrls.orEmpty()
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
+                .distinct()
         }
     }
 }

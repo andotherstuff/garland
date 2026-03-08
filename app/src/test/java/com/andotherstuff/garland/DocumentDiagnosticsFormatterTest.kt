@@ -105,6 +105,32 @@ class DocumentDiagnosticsFormatterTest {
     }
 
     @Test
+    fun keepsCommaSeparatedRelayFailureDetailsIntactInLegacyMessages() {
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "relay-publish-failed",
+            lastSyncMessage = "Published to 0/2 relays; failed: wss://relay.one (auth-required: bad token, expired), wss://relay.two (timeout)",
+        )
+
+        val label = DocumentDiagnosticsFormatter.listLabel(record, summary = null, isSelected = false)
+        val details = DocumentDiagnosticsFormatter.detailText(record, summary = null)
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+
+        assertTrue(label.contains("relay fail 2/2 (relay.one: auth-required: bad token"))
+        assertTrue(details.contains("- wss://relay.one (auth-required: bad token, expired)"))
+        assertTrue(details.contains("- wss://relay.two (timeout)"))
+        assertEquals("Relays (2 failed)", sections.relaysLabel)
+        assertEquals(
+            "- relay.one (auth-required: bad token, expired)\n- relay.two (timeout)",
+            sections.relays,
+        )
+    }
+
+    @Test
     fun buildsLegacyUploadFailureSummaryWhenStructuredDiagnosticsAreMissing() {
         val record = LocalDocumentRecord(
             documentId = "doc123",

@@ -23,14 +23,20 @@ class GarlandWorkScheduler internal constructor(
     )
 
     fun enqueuePendingSync(relayUrls: List<String>, documentId: String? = null): UUID {
+        val normalizedDocumentId = PendingSyncWorker.normalizeDocumentId(documentId)
         val relaySnapshot = relayUrls
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-        documentId?.let {
-            statusStore.updateUploadStatus(it, "sync-queued", "Queued Garland sync in background")
+            .distinct()
+        normalizedDocumentId?.let {
+            if (!statusStore.hasActiveBackgroundSync(it)) {
+                statusStore.updateUploadStatus(it, "sync-queued", "Queued Garland sync in background")
+            }
         }
         val requestData = Data.Builder()
-            .putString(PendingSyncWorker.KEY_DOCUMENT_ID, documentId)
+        normalizedDocumentId?.let {
+            requestData.putString(PendingSyncWorker.KEY_DOCUMENT_ID, it)
+        }
         if (relaySnapshot.isNotEmpty()) {
             requestData.putStringArray(PendingSyncWorker.KEY_RELAYS, relaySnapshot.toTypedArray())
         }
@@ -40,12 +46,14 @@ class GarlandWorkScheduler internal constructor(
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .setInputData(requestData.build())
             .build()
-        workManager.enqueueUniquePendingSync(pendingSyncWorkName(documentId), request)
+        workManager.enqueueUniquePendingSync(pendingSyncWorkName(normalizedDocumentId), request)
         return request.id
     }
 
     fun enqueueRestore(documentId: String, privateKeyHex: String? = null): UUID {
-        statusStore.updateUploadStatus(documentId, "restore-queued", "Queued Garland restore in background")
+        if (!statusStore.hasActiveBackgroundRestore(documentId)) {
+            statusStore.updateUploadStatus(documentId, "restore-queued", "Queued Garland restore in background")
+        }
         val requestData = Data.Builder()
             .putString(RestoreDocumentWorker.KEY_DOCUMENT_ID, documentId)
         privateKeyHex
@@ -99,13 +107,28 @@ private class WorkManagerSchedulerBackend(
 }
 
 internal interface SyncStatusStore {
+    fun hasActiveBackgroundSync(documentId: String): Boolean
+    fun hasActiveBackgroundRestore(documentId: String): Boolean
     fun updateUploadStatus(documentId: String, status: String, message: String?)
 }
 
 private class LocalDocumentStatusStore(
     private val store: LocalDocumentStore,
 ) : SyncStatusStore {
+    override fun hasActiveBackgroundSync(documentId: String): Boolean {
+        return store.readRecord(documentId)?.uploadStatus in ACTIVE_BACKGROUND_SYNC_STATUSES
+    }
+
+    override fun hasActiveBackgroundRestore(documentId: String): Boolean {
+        return store.readRecord(documentId)?.uploadStatus in ACTIVE_BACKGROUND_RESTORE_STATUSES
+    }
+
     override fun updateUploadStatus(documentId: String, status: String, message: String?) {
         store.updateUploadStatus(documentId, status, message)
+    }
+
+    private companion object {
+        val ACTIVE_BACKGROUND_SYNC_STATUSES = setOf("sync-queued", "sync-running")
+        val ACTIVE_BACKGROUND_RESTORE_STATUSES = setOf("restore-queued", "restore-running")
     }
 }

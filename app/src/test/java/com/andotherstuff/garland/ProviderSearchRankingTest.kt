@@ -52,4 +52,74 @@ class ProviderSearchRankingTest {
 
         assertEquals(listOf("newer", "older"), ranked.map { it.documentId })
     }
+
+    @Test
+    fun summaryMatchesSortAheadOfUploadStatusAndMimeMatches() {
+        val summaryMatch = LocalDocumentRecord(
+            documentId = "summary",
+            displayName = "report.txt",
+            mimeType = "application/octet-stream",
+            sizeBytes = 1,
+            updatedAt = 100,
+            uploadStatus = "waiting-for-identity",
+            lastSyncMessage = "Relay timeout on wss://needle.example",
+        )
+        val statusMatch = LocalDocumentRecord(
+            documentId = "status",
+            displayName = "status.txt",
+            mimeType = "application/octet-stream",
+            sizeBytes = 1,
+            updatedAt = 300,
+            uploadStatus = "needle-pending",
+        )
+        val mimeMatch = LocalDocumentRecord(
+            documentId = "mime",
+            displayName = "mime.txt",
+            mimeType = "application/needle",
+            sizeBytes = 1,
+            updatedAt = 500,
+            uploadStatus = "waiting-for-identity",
+        )
+
+        val ranked = ProviderSearchRanking.sortMatches(listOf(mimeMatch, statusMatch, summaryMatch), "needle")
+
+        assertEquals(listOf("summary", "status", "mime"), ranked.map { it.documentId })
+    }
+
+    @Test
+    fun endpointDetailMatchesSortAheadOfUploadStatusAndMimeMatches() {
+        val endpointMatch = LocalDocumentRecord(
+            documentId = "endpoint",
+            displayName = "relay.txt",
+            mimeType = "application/octet-stream",
+            sizeBytes = 1,
+            updatedAt = 100,
+            uploadStatus = "relay-published-partial",
+            lastSyncDetailsJson = DocumentSyncDiagnosticsCodec.encode(
+                DocumentSyncDiagnostics(
+                    relays = listOf(DocumentEndpointDiagnostic("wss://relay.one", "failed", "needle timeout")),
+                ),
+            ),
+        )
+        val statusMatch = LocalDocumentRecord(
+            documentId = "status",
+            displayName = "status.txt",
+            mimeType = "application/octet-stream",
+            sizeBytes = 1,
+            updatedAt = 300,
+            uploadStatus = "needle-pending",
+        )
+        val mimeMatch = LocalDocumentRecord(
+            documentId = "mime",
+            displayName = "mime.txt",
+            mimeType = "application/needle",
+            sizeBytes = 1,
+            updatedAt = 500,
+            uploadStatus = "waiting-for-identity",
+        )
+
+        val ranked = ProviderSearchRanking.sortMatches(listOf(mimeMatch, statusMatch, endpointMatch), "needle")
+
+        assertEquals(listOf("endpoint", "status", "mime"), ranked.map { it.documentId })
+    }
 }
