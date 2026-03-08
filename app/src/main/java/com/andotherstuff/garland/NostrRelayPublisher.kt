@@ -66,7 +66,8 @@ class NostrRelayPublisher(
 
     private fun publishToRelay(relayUrl: String, event: SignedRelayEvent): RelayAttemptResult {
         repeat(maxAttempts) { attemptIndex ->
-            val result = singlePublishAttempt(relayUrl, event)
+            val result = runCatching { singlePublishAttempt(relayUrl, event) }
+                .getOrElse { RelayAttemptResult(false, relayFailureReason(it)) }
             if (result.accepted) {
                 return result
             }
@@ -116,6 +117,14 @@ class NostrRelayPublisher(
             ack.reason = "ack timeout"
         }
         return RelayAttemptResult(ack.accepted, ack.reason)
+    }
+
+    private fun relayFailureReason(error: Throwable): String {
+        if (error is IllegalArgumentException) {
+            val detail = error.message?.trim().orEmpty()
+            return if (detail.isBlank()) "Invalid relay URL" else "Invalid relay URL: $detail"
+        }
+        return error.message?.trim().takeUnless { it.isNullOrBlank() } ?: "relay publish failure"
     }
 }
 

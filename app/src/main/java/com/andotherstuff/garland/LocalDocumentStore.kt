@@ -18,7 +18,8 @@ data class LocalDocumentRecord(
 
 class LocalDocumentStore(private val context: Context) {
     private val baseDir = File(context.filesDir, "garland-documents")
-    private val impl = LocalDocumentStoreImpl(baseDir)
+    private val notifier = ProviderChangeNotifier(context.applicationContext)
+    private val impl = LocalDocumentStoreImpl(baseDir, notifier::notifyDocumentChanged)
 
     fun listDocuments(): List<LocalDocumentRecord> = impl.listDocuments()
 
@@ -58,7 +59,10 @@ class LocalDocumentStore(private val context: Context) {
     fun deleteDocument(documentId: String) = impl.deleteDocument(documentId)
 }
 
-class LocalDocumentStoreImpl(private val baseDir: File) {
+class LocalDocumentStoreImpl(
+    private val baseDir: File,
+    private val onDocumentChanged: ((String) -> Unit)? = null,
+) {
     private val blobDir = File(baseDir, "blobs")
     private val metaDir = File(baseDir, "meta")
     private val gson = Gson()
@@ -100,6 +104,7 @@ class LocalDocumentStoreImpl(private val baseDir: File) {
         )
         contentFile(documentId).writeBytes(byteArrayOf())
         writeRecord(record)
+        onDocumentChanged?.invoke(documentId)
         return record
     }
 
@@ -122,6 +127,7 @@ class LocalDocumentStoreImpl(private val baseDir: File) {
             uploadStatus = "upload-plan-ready",
         )
         writeRecord(record)
+        onDocumentChanged?.invoke(documentId)
         return record
     }
 
@@ -139,6 +145,7 @@ class LocalDocumentStoreImpl(private val baseDir: File) {
                 lastSyncDetailsJson = null,
             )
         )
+        onDocumentChanged?.invoke(documentId)
     }
 
     fun saveUploadPlan(documentId: String, json: String) {
@@ -172,16 +179,18 @@ class LocalDocumentStoreImpl(private val baseDir: File) {
             current.copy(
                 uploadStatus = status,
                 updatedAt = System.currentTimeMillis(),
-                lastSyncMessage = message,
-                lastSyncDetailsJson = diagnosticsJson,
+                lastSyncMessage = message ?: current.lastSyncMessage,
+                lastSyncDetailsJson = diagnosticsJson ?: current.lastSyncDetailsJson,
             )
         )
+        onDocumentChanged?.invoke(documentId)
     }
 
     fun deleteDocument(documentId: String) {
         contentFile(documentId).delete()
         metadataFile(documentId).delete()
         uploadPlanFile(documentId).delete()
+        onDocumentChanged?.invoke(documentId)
     }
 
     private fun writeRecord(record: LocalDocumentRecord) {

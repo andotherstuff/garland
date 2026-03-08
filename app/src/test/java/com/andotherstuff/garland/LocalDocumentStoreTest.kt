@@ -66,4 +66,36 @@ class LocalDocumentStoreTest {
 
         assertEquals(diagnosticsJson, store.readRecord(document.documentId)?.lastSyncDetailsJson)
     }
+
+    @Test
+    fun preservesStructuredDiagnosticsAcrossStatusOnlyUpdates() {
+        val tempDir = Files.createTempDirectory("garland-store-diagnostics-preserve-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                relays = listOf(DocumentEndpointDiagnostic("wss://relay.one", "failed", "timeout")),
+            )
+        )
+
+        store.updateUploadDiagnostics(document.documentId, "relay-publish-failed", "relay timeout", diagnosticsJson)
+        store.updateUploadStatus(document.documentId, "sync-queued", "Queued Garland sync in background")
+
+        assertEquals("sync-queued", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Queued Garland sync in background", store.readRecord(document.documentId)?.lastSyncMessage)
+        assertEquals(diagnosticsJson, store.readRecord(document.documentId)?.lastSyncDetailsJson)
+    }
+
+    @Test
+    fun preservesLastSyncMessageAcrossStatusOnlyUpdatesWithoutReplacementMessage() {
+        val tempDir = Files.createTempDirectory("garland-store-last-result-preserve-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+
+        store.updateUploadStatus(document.documentId, "relay-publish-failed", "relay timeout")
+        store.updateUploadStatus(document.documentId, "sync-running")
+
+        assertEquals("sync-running", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("relay timeout", store.readRecord(document.documentId)?.lastSyncMessage)
+    }
 }

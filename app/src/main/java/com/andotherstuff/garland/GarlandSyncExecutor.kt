@@ -7,6 +7,7 @@ data class SyncExecutionResult(
     val successfulDocuments: Int,
     val failedDocuments: Int,
     val message: String,
+    val failedDocumentIds: List<String> = emptyList(),
 )
 
 class GarlandSyncExecutor(
@@ -26,12 +27,14 @@ class GarlandSyncExecutor(
 
         var successfulDocuments = 0
         var failedDocuments = 0
+        val failedDocumentIds = mutableListOf<String>()
         candidates.forEach { record ->
             val result = uploadExecutor.executeDocumentUpload(record.documentId, relayUrls)
             if (result.success) {
                 successfulDocuments += 1
             } else {
                 failedDocuments += 1
+                failedDocumentIds += record.documentId
             }
         }
 
@@ -40,6 +43,7 @@ class GarlandSyncExecutor(
             successfulDocuments = successfulDocuments,
             failedDocuments = failedDocuments,
             message = "Synced $successfulDocuments/${candidates.size} pending documents",
+            failedDocumentIds = failedDocumentIds,
         )
     }
 

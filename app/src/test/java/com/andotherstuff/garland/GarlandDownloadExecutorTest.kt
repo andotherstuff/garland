@@ -4,12 +4,61 @@ import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
 import java.util.Base64
 
 class GarlandDownloadExecutorTest {
+    @Test
+    fun marksRestoreAsFailedWhenUploadPlanIsMissing() {
+        val tempDir = Files.createTempDirectory("garland-download-missing-plan-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        val executor = GarlandDownloadExecutor(store = store, recoverBlock = { error("should not recover") })
+
+        val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+        assertFalse(result.success)
+        assertEquals("download-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("No upload plan found", store.readRecord(document.documentId)?.lastSyncMessage)
+    }
+
+    @Test
+    fun reportsInvalidBlossomServerUrlWhenManifestServersAreMalformed() {
+        val tempDir = Files.createTempDirectory("garland-download-invalid-server-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123",
+                  "blocks": [
+                    {
+                      "index": 0,
+                      "share_id_hex": "share123",
+                      "servers": ["ftp://invalid-server"]
+                    }
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandDownloadExecutor(store = store, recoverBlock = { error("should not recover") })
+
+        val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+        assertFalse(result.success)
+        assertTrue(result.message.contains("Invalid Blossom server URL"))
+        assertEquals("download-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertTrue(store.readRecord(document.documentId)?.lastSyncMessage?.contains("Invalid Blossom server URL") == true)
+    }
+
     @Test
     fun restoresDocumentFromStoredManifest() {
         val tempDir = Files.createTempDirectory("garland-download-test").toFile()

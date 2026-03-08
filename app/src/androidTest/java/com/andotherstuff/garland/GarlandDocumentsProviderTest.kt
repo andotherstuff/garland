@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.os.Handler
 import android.os.Looper
 import android.provider.DocumentsContract
+import android.util.Size
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
@@ -17,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.json.JSONObject
 import java.io.Closeable
+import java.io.FileNotFoundException
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.Base64
@@ -72,6 +74,119 @@ class GarlandDocumentsProviderTest {
             val size = cursor.getLong(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE))
             assertEquals("provider-note.txt [waiting-for-identity]", displayName)
             assertEquals("provider write".toByteArray().size.toLong(), size)
+        }
+    }
+
+    @Test
+    fun imageDocumentsAdvertiseAndServeThumbnails() {
+        val rootDocumentId = queryRootDocumentId()
+        val imageUri = DocumentsContract.createDocument(
+            resolver,
+            documentUri(rootDocumentId),
+            "image/png",
+            "pixel.png"
+        )!!
+
+        resolver.openOutputStream(imageUri, "w")!!.use { stream ->
+            stream.write(PNG_1X1_BYTES)
+        }
+
+        val imageDocumentId = DocumentsContract.getDocumentId(imageUri)
+        waitForStatus(imageDocumentId, "waiting-for-identity")
+
+        resolver.query(imageUri, null, null, null, null)!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            val flags = cursor.getInt(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_FLAGS))
+            assertTrue(flags and DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL != 0)
+        }
+
+        val thumbnail = resolver.loadThumbnail(imageUri, Size(32, 32), null)
+        assertEquals(1, thumbnail.width)
+        assertEquals(1, thumbnail.height)
+
+        val textUri = createAndWriteDocument(rootDocumentId, "plain.txt", "plain body")
+        resolver.query(textUri, null, null, null, null)!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            val flags = cursor.getInt(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_FLAGS))
+            assertEquals(0, flags and DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL)
+        }
+    }
+
+    @Test
+    fun genericMimeTypeUsesDisplayNameExtensionForProviderMetadata() {
+        val rootDocumentId = queryRootDocumentId()
+        val imageUri = DocumentsContract.createDocument(
+            resolver,
+            documentUri(rootDocumentId),
+            "application/octet-stream",
+            "extension-derived.png"
+        )!!
+
+        resolver.openOutputStream(imageUri, "w")!!.use { stream ->
+            stream.write(PNG_1X1_BYTES)
+        }
+
+        val imageDocumentId = DocumentsContract.getDocumentId(imageUri)
+        waitForStatus(imageDocumentId, "waiting-for-identity")
+
+        resolver.query(imageUri, null, null, null, null)!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(
+                "image/png",
+                cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE))
+            )
+            val flags = cursor.getInt(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_FLAGS))
+            assertTrue(flags and DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL != 0)
+        }
+
+        val thumbnail = resolver.loadThumbnail(imageUri, Size(32, 32), null)
+        assertEquals(1, thumbnail.width)
+        assertEquals(1, thumbnail.height)
+    }
+
+    @Test
+    fun appendWriteModeKeepsExistingProviderContent() {
+        val rootDocumentId = queryRootDocumentId()
+        val documentUri = DocumentsContract.createDocument(
+            resolver,
+            documentUri(rootDocumentId),
+            "text/plain",
+            "append-note.txt"
+        )!!
+
+        resolver.openOutputStream(documentUri, "w")!!.use { stream ->
+            stream.write("alpha".toByteArray())
+        }
+
+        resolver.openOutputStream(documentUri, "wa")!!.use { stream ->
+            stream.write(" beta".toByteArray())
+        }
+
+        instrumentation.waitForIdleSync()
+        val documentId = DocumentsContract.getDocumentId(documentUri)
+        waitForStatus(documentId, "waiting-for-identity")
+
+        assertEquals("alpha beta", store.contentFile(documentId).readText())
+        resolver.query(documentUri, null, null, null, null)!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(
+                "alpha beta".toByteArray().size.toLong(),
+                cursor.getLong(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE))
+            )
+        }
+    }
+
+    @Test
+    fun rootFlagsAdvertiseSearchRecentsAndChildSupport() {
+        val rootsUri = DocumentsContract.buildRootsUri(AUTHORITY)
+        resolver.query(rootsUri, null, null, null, null)!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            val flags = cursor.getInt(cursor.getColumnIndexOrThrow(DocumentsContract.Root.COLUMN_FLAGS))
+
+            assertTrue(flags and DocumentsContract.Root.FLAG_SUPPORTS_CREATE != 0)
+            assertTrue(flags and DocumentsContract.Root.FLAG_SUPPORTS_RECENTS != 0)
+            assertTrue(flags and DocumentsContract.Root.FLAG_SUPPORTS_SEARCH != 0)
+            assertTrue(flags and DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD != 0)
         }
     }
 
@@ -200,6 +315,44 @@ class GarlandDocumentsProviderTest {
     }
 
     @Test
+    fun searchQueriesNotifyObserversWhenSyncStatusChanges() {
+        val rootDocumentId = queryRootDocumentId()
+        val documentUri = createAndWriteDocument(rootDocumentId, "search-refresh.txt", "refresh body")
+        val documentId = DocumentsContract.getDocumentId(documentUri)
+        val searchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, ROOT_ID, "timeout")
+
+        resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
+            assertEquals(0, cursor.count)
+        }
+
+        val searchObserver = RecordingObserver()
+        resolver.registerContentObserver(searchUri, false, searchObserver)
+        try {
+            store.updateUploadDiagnostics(
+                documentId = documentId,
+                status = "relay-published-partial",
+                message = "Relay timeout on wss://relay.search",
+            )
+
+            searchObserver.awaitChange("search refresh")
+
+            resolver.query(searchUri, null, null, null, null)!!.use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(
+                    "search-refresh.txt [relay-published-partial]",
+                    cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+                )
+                assertEquals(
+                    "text/plain - Relay timeout on wss://relay.search",
+                    cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SUMMARY))
+                )
+            }
+        } finally {
+            resolver.unregisterContentObserver(searchObserver)
+        }
+    }
+
+    @Test
     fun openReadRestoresMissingLocalContentFromRemoteShare() {
         val identity = JSONObject(
             NativeBridge.deriveIdentity(
@@ -306,12 +459,155 @@ class GarlandDocumentsProviderTest {
     }
 
     @Test
+    fun findDocumentPathReturnsRootAndChildForFlatProviderDocuments() {
+        val rootDocumentId = queryRootDocumentId()
+        val documentUri = createAndWriteDocument(rootDocumentId, "path-note.txt", "path body")
+        val treeUri = DocumentsContract.buildTreeDocumentUri(AUTHORITY, rootDocumentId)
+        val treeDocumentUri = DocumentsContract.buildDocumentUriUsingTree(
+            treeUri,
+            DocumentsContract.getDocumentId(documentUri)
+        )
+
+        val path = DocumentsContract.findDocumentPath(resolver, treeDocumentUri)
+        assertNotNull(path)
+
+        assertEquals(ROOT_ID, path!!.rootId)
+        assertEquals(
+            listOf(rootDocumentId, DocumentsContract.getDocumentId(documentUri)),
+            path.path
+        )
+    }
+
+    @Test
+    fun createDocumentRejectsDirectoryMimeType() {
+        val rootDocumentId = queryRootDocumentId()
+
+        try {
+            DocumentsContract.createDocument(
+                resolver,
+                documentUri(rootDocumentId),
+                DocumentsContract.Document.MIME_TYPE_DIR,
+                "folder"
+            )
+            throw AssertionError("Expected directory creation to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+    }
+
+    @Test
+    fun unsupportedParentRequestsFailFast() {
+        val unsupportedParentUri = documentUri("missing-parent")
+        val unsupportedChildrenUri = DocumentsContract.buildChildDocumentsUri(AUTHORITY, "missing-parent")
+
+        try {
+            resolver.query(unsupportedChildrenUri, null, null, null, null)
+            throw AssertionError("Expected child query for unsupported parent to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+
+        try {
+            DocumentsContract.createDocument(
+                resolver,
+                unsupportedParentUri,
+                "text/plain",
+                "orphan.txt"
+            )
+            throw AssertionError("Expected create for unsupported parent to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+    }
+
+    @Test
+    fun unsupportedRootQueriesFailFast() {
+        val unsupportedRecentUri = DocumentsContract.buildRecentDocumentsUri(AUTHORITY, "missing-root")
+        val unsupportedSearchUri = DocumentsContract.buildSearchDocumentsUri(AUTHORITY, "missing-root", "note")
+
+        try {
+            resolver.query(unsupportedRecentUri, null, null, null, null)
+            throw AssertionError("Expected recent query for unsupported root to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+
+        try {
+            resolver.query(unsupportedSearchUri, null, null, null, null)
+            throw AssertionError("Expected search query for unsupported root to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+    }
+
+    @Test
+    fun unsupportedDocumentQueryFailsFast() {
+        try {
+            resolver.query(documentUri("missing-document"), null, null, null, null)
+            throw AssertionError("Expected document query for missing document to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+    }
+
+    @Test
+    fun unsupportedDeleteRequestsFailFast() {
+        try {
+            DocumentsContract.deleteDocument(resolver, documentUri("missing-document"))
+            throw AssertionError("Expected delete for missing document to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+
+        try {
+            DocumentsContract.deleteDocument(resolver, documentUri("root"))
+            throw AssertionError("Expected delete for provider root to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+    }
+
+    @Test
+    fun unsupportedOpenRequestsFailFast() {
+        try {
+            resolver.openInputStream(documentUri("missing-document"))
+            throw AssertionError("Expected read open for missing document to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+
+        try {
+            resolver.openOutputStream(documentUri("missing-document"), "w")
+            throw AssertionError("Expected write open for missing document to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+
+        try {
+            resolver.openInputStream(documentUri("root"))
+            throw AssertionError("Expected read open for provider root to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+
+        try {
+            resolver.openOutputStream(documentUri("root"), "w")
+            throw AssertionError("Expected write open for provider root to fail")
+        } catch (_: FileNotFoundException) {
+            assertTrue(store.listDocuments().isEmpty())
+        }
+    }
+
+    @Test
     fun createWriteAndDeleteNotifyProviderObservers() {
         val rootDocumentId = queryRootDocumentId()
+        val rootDocumentUri = documentUri(rootDocumentId)
         val childUri = DocumentsContract.buildChildDocumentsUri(AUTHORITY, rootDocumentId)
         val recentUri = DocumentsContract.buildRecentDocumentsUri(AUTHORITY, ROOT_ID)
+        val rootObserver = RecordingObserver()
         val childObserver = RecordingObserver()
         val recentObserver = RecordingObserver()
+        resolver.registerContentObserver(rootDocumentUri, false, rootObserver)
         resolver.registerContentObserver(childUri, false, childObserver)
         resolver.registerContentObserver(recentUri, false, recentObserver)
         try {
@@ -321,6 +617,7 @@ class GarlandDocumentsProviderTest {
                 "text/plain",
                 "observer-note.txt"
             )!!
+            rootObserver.awaitChange("root create")
             childObserver.awaitChange("child create")
             recentObserver.awaitChange("recent create")
 
@@ -330,17 +627,26 @@ class GarlandDocumentsProviderTest {
                 resolver.openOutputStream(documentUri, "w")!!.use { stream ->
                     stream.write("observer body".toByteArray())
                 }
+                rootObserver.reset()
+                childObserver.reset()
+                recentObserver.reset()
                 documentObserver.awaitChange("document write")
+                rootObserver.awaitChange("root write")
+                childObserver.awaitChange("child write")
+                recentObserver.awaitChange("recent write")
 
+                rootObserver.reset()
                 childObserver.reset()
                 recentObserver.reset()
                 DocumentsContract.deleteDocument(resolver, documentUri)
+                rootObserver.awaitChange("root delete")
                 childObserver.awaitChange("child delete")
                 recentObserver.awaitChange("recent delete")
             } finally {
                 resolver.unregisterContentObserver(documentObserver)
             }
         } finally {
+            resolver.unregisterContentObserver(rootObserver)
             resolver.unregisterContentObserver(childObserver)
             resolver.unregisterContentObserver(recentObserver)
         }
@@ -402,6 +708,8 @@ class GarlandDocumentsProviderTest {
     companion object {
         private const val AUTHORITY = "com.andotherstuff.garland.documents"
         private const val ROOT_ID = "garland-root"
+        private val PNG_1X1_BYTES = Base64.getDecoder()
+            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXxoAAAAASUVORK5CYII=")
     }
 }
 

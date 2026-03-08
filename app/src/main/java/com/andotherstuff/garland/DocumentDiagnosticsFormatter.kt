@@ -14,7 +14,7 @@ object DocumentDiagnosticsFormatter {
             if (isSelected) append("* ")
             append(record.displayName)
             append(" [")
-            append(record.uploadStatus)
+            append(formatStatus(record.uploadStatus))
             append("]")
         }
         val diagnostics = mutableListOf<String>()
@@ -61,10 +61,11 @@ object DocumentDiagnosticsFormatter {
             )
         }
         val lines = mutableListOf<String>()
-        lines += "Status: ${record.uploadStatus}"
+        lines += "Status: ${formatStatus(record.uploadStatus)}"
         lines += diagnosticLines(record.lastSyncMessage)
         summary?.let {
             lines += "Blocks: ${it.blockCount}"
+            lines += "Servers: ${it.serverCount}"
         }
         val diagnostics = DocumentSyncDiagnosticsCodec.decode(record.lastSyncDetailsJson)
         diagnostics?.uploads?.takeIf { it.isNotEmpty() }?.let {
@@ -133,13 +134,17 @@ object DocumentDiagnosticsFormatter {
         return detailSections(record, summary = null).relays
     }
 
+    fun statusLabel(status: String): String {
+        return formatStatus(status)
+    }
+
     private fun normalizeServer(server: String): String {
         return "- " + server.removePrefix("https://").removePrefix("wss://")
     }
 
     private fun formatEndpointDiagnostic(diagnostic: DocumentEndpointDiagnostic): String {
         val target = diagnostic.target.removePrefix("https://").removePrefix("wss://")
-        return "- $target [${diagnostic.status}] ${diagnostic.detail}"
+        return "- $target [${formatEndpointStatus(diagnostic.status)}] ${diagnostic.detail}"
     }
 
     private fun endpointSummaryLine(label: String, diagnostics: List<DocumentEndpointDiagnostic>): String {
@@ -153,7 +158,7 @@ object DocumentDiagnosticsFormatter {
         return if (failureCount == 0) {
             "$label ($okCount/${diagnostics.size} ok)"
         } else {
-            "$label ($failureCount}/${diagnostics.size} failed)"
+            "$label ($failureCount/${diagnostics.size} failed)"
         }
     }
 
@@ -192,5 +197,25 @@ object DocumentDiagnosticsFormatter {
 
     private fun normalizeFailureEntry(entry: String): String {
         return entry.removePrefix("https://").removePrefix("wss://")
+    }
+
+    private fun formatEndpointStatus(status: String): String {
+        return formatStatus(status)
+    }
+
+    private fun formatStatus(status: String): String {
+        val tokens = status
+            .split('-')
+            .filter { it.isNotBlank() }
+            .mapIndexed { index, token ->
+                when {
+                    token.equals("ok", ignoreCase = true) -> "OK"
+                    token.equals("http", ignoreCase = true) -> "HTTP"
+                    token.all { it.isDigit() } -> token
+                    index == 0 -> token.replaceFirstChar { it.uppercase() }
+                    else -> token
+                }
+            }
+        return tokens.joinToString(" ").ifBlank { status }
     }
 }

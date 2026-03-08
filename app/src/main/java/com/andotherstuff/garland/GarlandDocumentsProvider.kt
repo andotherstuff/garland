@@ -1,7 +1,9 @@
 package com.andotherstuff.garland
 
+import android.content.res.AssetFileDescriptor
 import android.database.Cursor
 import android.database.MatrixCursor
+import android.graphics.Point
 import android.os.Handler
 import android.os.CancellationSignal
 import android.os.Looper
@@ -9,6 +11,8 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
 import android.net.Uri
+import android.webkit.MimeTypeMap
+import java.io.FileNotFoundException
 
 class GarlandDocumentsProvider : DocumentsProvider() {
     private val store by lazy { LocalDocumentStore(context!!.applicationContext) }
@@ -26,7 +30,11 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             .add(DocumentsContract.Root.COLUMN_TITLE, context?.getString(R.string.app_name))
             .add(
                 DocumentsContract.Root.COLUMN_FLAGS,
-                DocumentsContract.Root.FLAG_SUPPORTS_CREATE or DocumentsContract.Root.FLAG_LOCAL_ONLY
+                DocumentsContract.Root.FLAG_SUPPORTS_CREATE or
+                    DocumentsContract.Root.FLAG_LOCAL_ONLY or
+                    DocumentsContract.Root.FLAG_SUPPORTS_RECENTS or
+                    DocumentsContract.Root.FLAG_SUPPORTS_SEARCH or
+                    DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
             )
             .add(DocumentsContract.Root.COLUMN_ICON, R.drawable.ic_garland_mark)
         return result
@@ -43,11 +51,10 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         projection: Array<out String>?,
         sortOrder: String?
     ): Cursor {
+        requireRootParent(parentDocumentId)
         val result = MatrixCursor(resolveDocumentProjection(projection))
-        if (parentDocumentId == ROOT_DOCUMENT_ID) {
-            store.listDocuments().forEach { record ->
-                includeRecord(result, record)
-            }
+        store.listDocuments().forEach { record ->
+            includeRecord(result, record)
         }
         return result
     }
@@ -57,20 +64,25 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         mode: String,
         signal: CancellationSignal?
     ): ParcelFileDescriptor {
+        if (documentId == ROOT_DOCUMENT_ID) {
+            throw FileNotFoundException("Root document cannot be opened")
+        }
+        if (store.readRecord(documentId) == null) {
+            throw FileNotFoundException("Document not found: $documentId")
+        }
+
         val file = store.contentFile(documentId)
-        val writeMode = mode.contains("w")
+        val parsedMode = ParcelFileDescriptor.parseMode(mode)
+        val writeMode = mode.contains("w") || mode.contains("a")
 
         if (writeMode) {
             return ParcelFileDescriptor.open(
                 file,
-                ParcelFileDescriptor.MODE_READ_WRITE or
-                    ParcelFileDescriptor.MODE_CREATE or
-                    ParcelFileDescriptor.MODE_TRUNCATE,
+                parsedMode,
                 Handler(Looper.getMainLooper())
             ) {
                 store.updateFromContent(documentId)
                 buildUploadPlanAndUpload(documentId)
-                notifyDocumentChanged(documentId)
             }
         }
 
@@ -79,21 +91,52 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
-    override fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
-        val record = store.createDocument(
-            displayName = displayName ?: "Untitled",
-            mimeType = mimeType ?: "application/octet-stream"
+    override fun openDocumentThumbnail(
+        documentId: String,
+        sizeHint: Point?,
+        signal: CancellationSignal?
+    ): AssetFileDescriptor {
+        val record = store.readRecord(documentId)
+            ?: throw FileNotFoundException("Document not found: $documentId")
+        if (!supportsThumbnail(record.mimeType)) {
+            throw FileNotFoundException("Thumbnails are not supported for ${record.mimeType}")
+        }
+
+        restoreDocumentIfNeeded(documentId)
+        val descriptor = ParcelFileDescriptor.open(
+            store.contentFile(documentId),
+            ParcelFileDescriptor.MODE_READ_ONLY
         )
-        notifyDocumentChanged(record.documentId)
+        return AssetFileDescriptor(descriptor, 0, AssetFileDescriptor.UNKNOWN_LENGTH)
+    }
+
+    override fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
+        requireRootParent(parentDocumentId)
+        if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+            throw FileNotFoundException("Directories are not supported")
+        }
+
+        val resolvedDisplayName = displayName ?: "Untitled"
+        val resolvedMimeType = resolveMimeType(mimeType, resolvedDisplayName)
+        val record = store.createDocument(
+            displayName = resolvedDisplayName,
+            mimeType = resolvedMimeType
+        )
         return record.documentId
     }
 
     override fun deleteDocument(documentId: String) {
+        if (documentId == ROOT_DOCUMENT_ID) {
+            throw FileNotFoundException("Root document cannot be deleted")
+        }
+        if (store.readRecord(documentId) == null) {
+            throw FileNotFoundException("Document not found: $documentId")
+        }
         store.deleteDocument(documentId)
-        notifyDocumentChanged(documentId)
     }
 
     override fun queryRecentDocuments(rootId: String?, projection: Array<out String>?): Cursor {
+        requireKnownRootId(rootId)
         val result = MatrixCursor(resolveDocumentProjection(projection))
         store.listDocuments()
             .sortedByDescending { it.updatedAt }
@@ -107,9 +150,11 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         query: String?,
         projection: Array<out String>?
     ): Cursor {
+        requireKnownRootId(rootId)
         val result = MatrixCursor(resolveDocumentProjection(projection))
         val needle = query.orEmpty().trim().lowercase()
         if (needle.isBlank()) return result
+        GarlandProviderContract.trackSearchQuery(context!!.applicationContext, needle)
 
         store.listDocuments()
             .filter {
@@ -127,13 +172,25 @@ class GarlandDocumentsProvider : DocumentsProvider() {
     }
 
     override fun findDocumentPath(parentDocumentId: String?, childDocumentId: String?): DocumentsContract.Path {
-        return DocumentsContract.Path(ROOT_DOCUMENT_ID, listOf(ROOT_DOCUMENT_ID))
+        val childId = childDocumentId ?: throw FileNotFoundException("Document ID is required")
+        requireRootParent(parentDocumentId)
+
+        if (childId == ROOT_DOCUMENT_ID) {
+            return DocumentsContract.Path(ROOT_DOCUMENT_ID, listOf(ROOT_DOCUMENT_ID))
+        }
+
+        if (store.readRecord(childId) == null) {
+            throw FileNotFoundException("Document not found: $childId")
+        }
+
+        return DocumentsContract.Path(ROOT_DOCUMENT_ID, listOf(ROOT_DOCUMENT_ID, childId))
     }
 
     private fun includeDocument(cursor: MatrixCursor, documentId: String) {
         val isRoot = documentId == ROOT_DOCUMENT_ID
         if (!isRoot) {
-            val record = store.readRecord(documentId) ?: return
+            val record = store.readRecord(documentId)
+                ?: throw FileNotFoundException("Document not found: $documentId")
             includeRecord(cursor, record)
             return
         }
@@ -160,13 +217,19 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             .add(DocumentsContract.Document.COLUMN_MIME_TYPE, record.mimeType)
             .add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, "${record.displayName} [${record.uploadStatus}]")
             .add(DocumentsContract.Document.COLUMN_SUMMARY, buildSummary(record))
-            .add(
-                DocumentsContract.Document.COLUMN_FLAGS,
-                DocumentsContract.Document.FLAG_SUPPORTS_DELETE or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
-            )
+            .add(DocumentsContract.Document.COLUMN_FLAGS, documentFlagsFor(record))
             .add(DocumentsContract.Document.COLUMN_ICON, R.drawable.ic_garland_mark)
             .add(DocumentsContract.Document.COLUMN_SIZE, record.sizeBytes)
             .add(DocumentsContract.Document.COLUMN_LAST_MODIFIED, record.updatedAt)
+    }
+
+    private fun documentFlagsFor(record: LocalDocumentRecord): Int {
+        var flags = DocumentsContract.Document.FLAG_SUPPORTS_DELETE or
+            DocumentsContract.Document.FLAG_SUPPORTS_WRITE
+        if (supportsThumbnail(record.mimeType)) {
+            flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
+        }
+        return flags
     }
 
     private fun buildUploadPlanAndUpload(documentId: String) {
@@ -210,14 +273,33 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         return "${record.mimeType} - $status"
     }
 
-    private fun notifyDocumentChanged(documentId: String) {
-        val resolver = context?.contentResolver ?: return
-        val documentUri = DocumentsContract.buildDocumentUri(AUTHORITY, documentId)
-        val childrenUri = DocumentsContract.buildChildDocumentsUri(AUTHORITY, ROOT_DOCUMENT_ID)
-        val recentUri = DocumentsContract.buildRecentDocumentsUri(AUTHORITY, ROOT_ID)
-        val rootsUri = DocumentsContract.buildRootsUri(AUTHORITY)
-        listOf(documentUri, childrenUri, recentUri, rootsUri).forEach { uri ->
-            resolver.notifyChange(uri, null)
+    private fun supportsThumbnail(mimeType: String): Boolean = mimeType.startsWith("image/")
+
+    private fun resolveMimeType(mimeType: String?, displayName: String): String {
+        val requestedMimeType = mimeType?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+        if (requestedMimeType != "application/octet-stream") {
+            return requestedMimeType
+        }
+
+        val extension = displayName.substringAfterLast('.', missingDelimiterValue = "")
+            .lowercase()
+            .takeIf { it.isNotBlank() }
+            ?: return requestedMimeType
+
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: requestedMimeType
+    }
+
+    private fun requireRootParent(parentDocumentId: String?) {
+        val resolvedParentId = parentDocumentId ?: ROOT_DOCUMENT_ID
+        if (resolvedParentId != ROOT_DOCUMENT_ID) {
+            throw FileNotFoundException("Only the Garland root directory is supported")
+        }
+    }
+
+    private fun requireKnownRootId(rootId: String?) {
+        val resolvedRootId = rootId ?: ROOT_ID
+        if (resolvedRootId != ROOT_ID) {
+            throw FileNotFoundException("Unknown root: $resolvedRootId")
         }
     }
 
@@ -247,8 +329,8 @@ class GarlandDocumentsProvider : DocumentsProvider() {
     }
 
     companion object {
-        private const val AUTHORITY = "com.andotherstuff.garland.documents"
-        private const val ROOT_ID = "garland-root"
-        private const val ROOT_DOCUMENT_ID = "root"
+        private const val AUTHORITY = GarlandProviderContract.AUTHORITY
+        private const val ROOT_ID = GarlandProviderContract.ROOT_ID
+        private const val ROOT_DOCUMENT_ID = GarlandProviderContract.ROOT_DOCUMENT_ID
     }
 }

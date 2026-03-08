@@ -25,7 +25,7 @@ object GarlandPlanInspector {
             mimeType = manifest.mimeType,
             sizeBytes = manifest.sizeBytes,
             blockCount = manifest.blocks.size,
-            serverCount = manifest.blocks.firstOrNull()?.servers?.size ?: 0,
+            serverCount = manifest.blocks.flatMap { it.servers }.distinct().size,
             sha256Hex = manifest.sha256Hex,
             servers = manifest.blocks.flatMap { it.servers }.distinct(),
         )

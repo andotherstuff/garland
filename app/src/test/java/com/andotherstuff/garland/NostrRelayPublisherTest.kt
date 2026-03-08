@@ -59,12 +59,28 @@ class NostrRelayPublisherTest {
         closeTestResources(client, server)
     }
 
+    @Test
+    fun reportsInvalidRelayUrlWithoutThrowing() {
+        val client = OkHttpClient()
+        val publisher = NostrRelayPublisher(client = client)
+
+        val result = publisher.publish(listOf("ftp://relay.example"), sampleEvent())
+
+        assertEquals(0, result.successfulRelays)
+        assertTrue(result.message.contains("Invalid relay URL"))
+        closeClient(client)
+    }
+
     private fun closeTestResources(client: OkHttpClient, server: MockWebServer) {
+        closeClient(client)
+        runCatching { server.shutdown() }
+    }
+
+    private fun closeClient(client: OkHttpClient) {
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
         client.dispatcher.executorService.awaitTermination(1, TimeUnit.SECONDS)
         client.connectionPool.evictAll()
-        runCatching { server.shutdown() }
     }
 
     private fun sampleEvent(): SignedRelayEvent {

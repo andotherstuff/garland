@@ -31,7 +31,9 @@ open class GarlandUploadExecutor(
 
     open fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
         val raw = store.readUploadPlan(documentId)
-            ?: return UploadExecutionResult(false, 0, 0, false, "No upload plan found")
+            ?: return UploadExecutionResult(false, 0, 0, false, "No upload plan found").also {
+                store.updateUploadDiagnostics(documentId, "upload-plan-failed", it.message)
+            }
         val response = gson.fromJson(raw, WritePlanEnvelope::class.java)
         if (!response.ok || response.plan == null) {
             val message = response.error ?: "Invalid upload plan"

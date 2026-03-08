@@ -203,7 +203,11 @@ class MainActivity : AppCompatActivity() {
         binding.activeDocumentText.text = if (record == null) {
             getString(R.string.active_document_none)
         } else {
-            getString(R.string.active_document_loaded, record.displayName, record.uploadStatus)
+            getString(
+                R.string.active_document_loaded,
+                record.displayName,
+                DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus),
+            )
         }
         binding.activeDocumentDiagnosticsText.text = diagnostics.overview
         bindDiagnosticSection(binding.activeDocumentUploadsLabel, binding.activeDocumentUploadsText, diagnostics.uploadsLabel, diagnostics.uploads)
@@ -251,7 +255,11 @@ class MainActivity : AppCompatActivity() {
         loadDocumentIntoInputs(record)
         refreshDocumentList(record?.documentId)
         if (announce && record != null) {
-            binding.statusText.text = getString(R.string.document_selected, record.displayName, record.uploadStatus)
+            binding.statusText.text = getString(
+                R.string.document_selected,
+                record.displayName,
+                DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus),
+            )
         }
     }
 

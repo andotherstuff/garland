@@ -6,11 +6,67 @@ import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
 
 class GarlandUploadExecutorTest {
+    @Test
+    fun marksUploadPlanFailureWhenPlanIsMissing() {
+        val tempDir = Files.createTempDirectory("garland-upload-missing-plan-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("No upload plan found", store.readRecord(document.documentId)?.lastSyncMessage)
+    }
+
+    @Test
+    fun marksUploadPlanFailureWhenCommitEventIsMissing() {
+        val tempDir = Files.createTempDirectory("garland-upload-missing-commit-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        server.start()
+
+        val document = store.createDocument("note.txt", "text/plain")
+        val uploadUrl = server.url("").toString().removeSuffix("/")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": null
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+
+        val client = OkHttpClient()
+        val executor = GarlandUploadExecutor(store, client)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("relay-publish-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Upload plan is missing commit event", store.readRecord(document.documentId)?.lastSyncMessage)
+
+        client.dispatcher.cancelAll()
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
+        server.shutdown()
+    }
+
     @Test
     fun executesUploadPlanAndPublishesCommitEvent() {
         val tempDir = Files.createTempDirectory("garland-upload-test").toFile()
@@ -134,6 +190,55 @@ class GarlandUploadExecutorTest {
         val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
         assertEquals(2, diagnostics?.relays?.size)
         assertTrue(diagnostics?.relays?.any { it.status == "failed" } == true)
+
+        client.dispatcher.cancelAll()
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
+        server.shutdown()
+    }
+
+    @Test
+    fun marksRelayPublishFailureWhenRelayUrlIsInvalid() {
+        val tempDir = Files.createTempDirectory("garland-upload-invalid-relay-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        server.start()
+
+        val document = store.createDocument("note.txt", "text/plain")
+        val uploadUrl = server.url("").toString().removeSuffix("/")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"$uploadUrl","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+
+        val client = OkHttpClient()
+        val executor = GarlandUploadExecutor(store, client)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("ftp://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("relay-publish-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertTrue(store.readRecord(document.documentId)?.lastSyncMessage?.contains("Invalid relay URL") == true)
 
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()

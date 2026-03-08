@@ -28,7 +28,9 @@ class GarlandDownloadExecutor(
 
     fun restoreDocument(documentId: String, privateKeyHex: String): DownloadExecutionResult {
         val raw = store.readUploadPlan(documentId)
-            ?: return DownloadExecutionResult(false, 0, 0, "No upload plan found")
+            ?: return DownloadExecutionResult(false, 0, 0, "No upload plan found").also {
+                store.updateUploadStatus(documentId, "download-failed", it.message)
+            }
         val response = gson.fromJson(raw, DownloadPlanEnvelope::class.java)
         val manifest = response.plan?.manifest
             ?: return DownloadExecutionResult(false, 0, 0, "Upload plan is missing manifest").also {
@@ -43,8 +45,14 @@ class GarlandDownloadExecutor(
 
         val restoredContent = mutableListOf<Byte>()
         blocks.forEach { block ->
-            val encryptedBody = fetchEncryptedBody(block)
-                ?: return DownloadExecutionResult(false, block.servers.size, restoredContent.size, "Unable to fetch share from configured servers").also {
+            val fetchResult = fetchEncryptedBody(block)
+            val encryptedBody = fetchResult.body
+                ?: return DownloadExecutionResult(
+                    false,
+                    block.servers.size,
+                    restoredContent.size,
+                    fetchResult.error ?: "Unable to fetch share from configured servers"
+                ).also {
                     store.updateUploadStatus(documentId, "download-failed", it.message)
                 }
 
@@ -73,25 +81,45 @@ class GarlandDownloadExecutor(
         return DownloadExecutionResult(true, attemptedServers, content.size, message)
     }
 
-    private fun fetchEncryptedBody(block: ManifestBlockEnvelope): ByteArray? {
+    private fun fetchEncryptedBody(block: ManifestBlockEnvelope): FetchEncryptedBodyResult {
+        var invalidUrlMessage: String? = null
+        var attemptedValidRequest = false
         block.servers.forEach { serverUrl ->
             listOf(
                 serverUrl.trimEnd('/') + "/" + block.shareIdHex,
                 serverUrl.trimEnd('/') + "/upload/" + block.shareIdHex,
             ).forEach { url ->
-                val request = Request.Builder().url(url).get().build()
                 runCatching {
+                    val request = Request.Builder().url(url).get().build()
+                    attemptedValidRequest = true
                     client.newCall(request).execute().use { response ->
                         if (response.isSuccessful) {
-                            return response.body?.bytes()
+                            return FetchEncryptedBodyResult(body = response.body?.bytes())
                         }
+                    }
+                }.onFailure { error ->
+                    if (error is IllegalArgumentException && !attemptedValidRequest) {
+                        invalidUrlMessage = invalidBlossomServerUrlMessage(error)
                     }
                 }
             }
         }
-        return null
+        return FetchEncryptedBodyResult(
+            body = null,
+            error = if (!attemptedValidRequest) invalidUrlMessage else null,
+        )
+    }
+
+    private fun invalidBlossomServerUrlMessage(error: IllegalArgumentException): String {
+        val detail = error.message?.trim().orEmpty()
+        return if (detail.isBlank()) "Invalid Blossom server URL" else "Invalid Blossom server URL: $detail"
     }
 }
+
+private data class FetchEncryptedBodyResult(
+    val body: ByteArray?,
+    val error: String? = null,
+)
 
 private data class DownloadPlanEnvelope(
     val plan: DownloadPreparedPlan?,

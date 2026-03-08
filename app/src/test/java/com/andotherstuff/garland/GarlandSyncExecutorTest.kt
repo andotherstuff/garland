@@ -1,6 +1,7 @@
 package com.andotherstuff.garland
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -58,6 +59,23 @@ class GarlandSyncExecutorTest {
         assertEquals(1, result.attemptedDocuments)
         assertEquals(listOf(queued.documentId), uploadExecutor.uploadedIds)
     }
+
+    @Test
+    fun reportsFailedDocumentIdsForRetryClassification() {
+        val tempDir = Files.createTempDirectory("garland-sync-failure-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val failing = store.createDocument("queued.txt", "text/plain")
+        store.updateUploadStatus(failing.documentId, "sync-queued")
+
+        val uploadExecutor = FailingUploadExecutor(store)
+        val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
+
+        val result = syncExecutor.syncPendingDocuments(listOf("wss://relay.example"))
+
+        assertEquals(1, result.failedDocuments)
+        assertEquals(listOf(failing.documentId), result.failedDocumentIds)
+        assertFalse(result.message.isBlank())
+    }
 }
 
 private class RecordingUploadExecutor(store: LocalDocumentStoreImpl) : GarlandUploadExecutor(store) {
@@ -66,5 +84,11 @@ private class RecordingUploadExecutor(store: LocalDocumentStoreImpl) : GarlandUp
     override fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
         uploadedIds += documentId
         return UploadExecutionResult(true, 1, 1, true, "ok")
+    }
+}
+
+private class FailingUploadExecutor(store: LocalDocumentStoreImpl) : GarlandUploadExecutor(store) {
+    override fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
+        return UploadExecutionResult(false, 0, 0, false, "No upload plan found")
     }
 }

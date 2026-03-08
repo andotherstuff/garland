@@ -9,6 +9,7 @@ class PendingSyncWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
     private val session = GarlandSessionStore(appContext)
+    private val store = LocalDocumentStore(appContext)
     private val syncExecutor = GarlandSyncExecutor(appContext)
 
     override suspend fun doWork(): Result {
@@ -16,7 +17,11 @@ class PendingSyncWorker(
         val documentIds = inputData.getString(KEY_DOCUMENT_ID)?.let(::setOf)
         val result = runCatching { syncExecutor.syncPendingDocuments(relayUrls, documentIds) }
             .getOrElse { return Result.retry() }
-        return if (result.failedDocuments > 0) Result.retry() else Result.success()
+        if (result.failedDocuments == 0) return Result.success()
+
+        val failedRecords = result.failedDocumentIds.mapNotNull(store::readRecord)
+        if (PendingSyncWorkResultPolicy.shouldRetry(failedRecords)) return Result.retry()
+        return if (documentIds != null) Result.failure() else Result.success()
     }
 
     companion object {

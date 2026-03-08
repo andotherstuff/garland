@@ -41,7 +41,7 @@ class DocumentDiagnosticsFormatterTest {
 
         val label = DocumentDiagnosticsFormatter.listLabel(record, summary, isSelected = true)
 
-        assertTrue(label.contains("* note.txt [relay-published-partial]"))
+        assertTrue(label.contains("* note.txt [Relay published partial]"))
         assertTrue(label.contains("blocks 2 - servers 3 - upload fail 1/2 - relay fail 1/2"))
     }
 
@@ -76,7 +76,7 @@ class DocumentDiagnosticsFormatterTest {
 
         val label = DocumentDiagnosticsFormatter.listLabel(record, summary = null, isSelected = false)
 
-        assertEquals("note.txt [pending-local-write]", label)
+        assertEquals("note.txt [Pending local write]", label)
     }
 
     @Test
@@ -115,17 +115,18 @@ class DocumentDiagnosticsFormatterTest {
 
         val details = DocumentDiagnosticsFormatter.detailText(record, summary)
 
-        assertTrue(details.contains("Status: relay-published-partial"))
+        assertTrue(details.contains("Status: Relay published partial"))
         assertTrue(details.contains("Last result: Published to 1/2 relays"))
         assertTrue(details.contains("Failures:"))
         assertTrue(details.contains("- wss://relay.two (timeout)"))
         assertTrue(details.contains("Blocks: 2"))
+        assertTrue(details.contains("Servers: 2"))
         assertTrue(details.contains("Uploads: 2/2 ok"))
         assertTrue(details.contains("Relays: 1/2 ok"))
         assertTrue(details.contains("Uploads:"))
-        assertTrue(details.contains("- blossom.one [ok] Uploaded share a1"))
+        assertTrue(details.contains("- blossom.one [OK] Uploaded share a1"))
         assertTrue(details.contains("Relays:"))
-        assertTrue(details.contains("- relay.two [failed] timeout"))
+        assertTrue(details.contains("- relay.two [Failed] timeout"))
     }
 
     @Test
@@ -184,13 +185,48 @@ class DocumentDiagnosticsFormatterTest {
 
         val sections = DocumentDiagnosticsFormatter.detailSections(record, summary)
 
-        assertTrue(sections.overview.contains("Status: relay-published"))
+        assertTrue(sections.overview.contains("Status: Relay published"))
+        assertTrue(sections.overview.contains("Blocks: 1"))
+        assertTrue(sections.overview.contains("Servers: 1"))
         assertEquals("Uploads (1/1 ok)", sections.uploadsLabel)
         assertTrue(sections.overview.contains("Uploads: 1/1 ok"))
         assertEquals("Relays (1/1 ok)", sections.relaysLabel)
         assertTrue(sections.overview.contains("Relays: 1/1 ok"))
-        assertTrue(sections.uploads?.contains("- blossom.one [ok] Uploaded share a1") == true)
-        assertTrue(sections.relays?.contains("- relay.one [ok] Relay accepted commit event") == true)
+        assertTrue(sections.uploads?.contains("- blossom.one [OK] Uploaded share a1") == true)
+        assertTrue(sections.relays?.contains("- relay.one [OK] Relay accepted commit event") == true)
+    }
+
+    @Test
+    fun formatsStructuredUploadHttpStatusesForTesterFacingDiagnostics() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(
+                    DocumentEndpointDiagnostic(
+                        "https://blossom.two",
+                        "http-500",
+                        "Upload failed on https://blossom.two with HTTP 500",
+                    ),
+                ),
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "upload-http-500",
+            lastSyncMessage = "Upload failed on https://blossom.two with HTTP 500",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+
+        assertEquals("Uploads (1/1 failed)", sections.uploadsLabel)
+        assertEquals(
+            "- blossom.two [HTTP 500] Upload failed on https://blossom.two with HTTP 500",
+            sections.uploads,
+        )
     }
 
     @Test

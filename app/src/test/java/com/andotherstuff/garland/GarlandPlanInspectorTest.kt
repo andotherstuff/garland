@@ -57,7 +57,33 @@ class GarlandPlanInspectorTest {
         )
 
         requireNotNull(summary)
+        assertEquals(3, summary.serverCount)
         assertEquals(listOf("https://one", "https://two", "https://three"), summary.servers)
+    }
+
+    @Test
+    fun countsDistinctServersAcrossAllBlocks() {
+        val summary = GarlandPlanInspector.summarize(
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123",
+                  "mime_type": "text/plain",
+                  "size_bytes": 5,
+                  "sha256_hex": "abc123",
+                  "blocks": [
+                    {"servers": ["https://one"]},
+                    {"servers": ["https://one", "https://two", "https://three"]}
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        requireNotNull(summary)
+        assertEquals(3, summary.serverCount)
     }
 
     @Test
