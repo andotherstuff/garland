@@ -14,6 +14,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.andotherstuff.garland.databinding.ActivityDiagnosticsBinding
 import com.google.android.material.button.MaterialButton
 
@@ -24,8 +27,16 @@ class DiagnosticsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         binding = ActivityDiagnosticsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val v = resources.getDimensionPixelSize(R.dimen.garland_screen_padding)
+            val side = resources.getDimensionPixelSize(R.dimen.garland_home_side_padding)
+            view.setPadding(bars.left + side, bars.top + v, bars.right + side, bars.bottom + v)
+            insets
+        }
         store = LocalDocumentStore(applicationContext)
         selectedDocumentId = intent.getStringExtra(EXTRA_DOCUMENT_ID)
 
@@ -165,7 +176,7 @@ class DiagnosticsActivity : AppCompatActivity() {
         button.backgroundTintList = ColorStateList.valueOf(backgroundColor)
         button.strokeColor = ColorStateList.valueOf(strokeColor)
         button.setTextColor(textColor)
-        button.cornerRadius = resources.getDimensionPixelSize(R.dimen.garland_panel_padding) + resources.getDimensionPixelSize(R.dimen.garland_content_gap)
+        button.cornerRadius = resources.getDimensionPixelSize(R.dimen.garland_button_corner_radius)
         button.strokeWidth = if (isSelected) {
             (2 * resources.displayMetrics.density).toInt()
         } else {

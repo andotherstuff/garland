@@ -1,5 +1,8 @@
 <resources>
     <dimen name="garland_screen_padding">20dp</dimen>
+    <dimen name="garland_screen_horizontal_padding">28dp</dimen>
+    <dimen name="garland_home_side_padding">24dp</dimen>
+    <dimen name="garland_button_corner_radius">20dp</dimen>
     <dimen name="garland_card_spacing">16dp</dimen>
     <dimen name="garland_card_padding">24dp</dimen>
     <dimen name="garland_hero_card_padding">26dp</dimen>

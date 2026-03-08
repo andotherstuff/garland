@@ -16,6 +16,15 @@
             android:exported="false" />
 
         <activity
+            android:name=".ConfigActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ComposeActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_garland_window">
+
+    <!-- Scrollable content -->
+    <LinearLayout
+        android:id="@+id/contentLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/garland_section_gap"
+            android:text="@string/compose_title"
+            android:textAppearance="@style/TextAppearance.Garland.HomeTitle" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/garland_tight_gap"
+            android:text="@string/compose_subtitle"
+            android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+        <!-- File name input -->
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Garland.InputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/garland_section_gap"
+            android:hint="@string/compose_file_name_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/fileNameInput"
+                style="@style/Widget.Garland.InputEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:text="note.txt" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Content input -->
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Garland.InputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="@dimen/garland_button_gap"
+            android:hint="@string/compose_content_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/contentInput"
+                style="@style/Widget.Garland.InputEditText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="top"
+                android:inputType="textMultiLine"
+                android:scrollbars="vertical" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+    </LinearLayout>
+
+    <!-- Bottom action bar -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:paddingTop="12dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/saveButton"
+            style="@style/Widget.Garland.ActionButton.Primary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/compose_save_button" />
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

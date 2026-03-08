@@ -25,24 +25,28 @@
     </style>
 
     <style name="Widget.Garland.ActionButton" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="strokeColor">@color/garland_outline</item>
-        <item name="android:textColor">@color/garland_ink</item>
-        <item name="backgroundTint">@color/garland_surface_soft</item>
-        <item name="cornerRadius">14dp</item>
-        <item name="android:minHeight">52dp</item>
+        <item name="strokeColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
+        <item name="backgroundTint">#FFFFFF</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:minHeight">64dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:elevation">8dp</item>
     </style>
 
     <style name="Widget.Garland.ActionButton.Primary" parent="Widget.Material3.Button">
         <item name="backgroundTint">@color/garland_leaf</item>
-        <item name="android:textColor">@color/garland_bg</item>
-        <item name="cornerRadius">14dp</item>
-        <item name="android:minHeight">52dp</item>
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="cornerRadius">20dp</item>
+        <item name="android:minHeight">64dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:elevation">8dp</item>
     </style>
 
     <style name="Widget.Garland.DocumentPickerButton" parent="Widget.Material3.Button.OutlinedButton">
@@ -132,12 +136,17 @@
 
     <style name="TextAppearance.Garland.DiagnosticsBody" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/garland_muted</item>
-        <item name="android:fontFamily">monospace</item>
+        <item name="android:fontFamily">sans-serif</item>
         <item name="android:lineSpacingExtra">4dp</item>
     </style>
 
     <style name="TextAppearance.Garland.BodyStrong" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/garland_ink</item>
+    </style>
+
+    <style name="TextAppearance.Garland.HomeTitle" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <style name="TextAppearance.Garland.DebugTitle" parent="TextAppearance.Material3.TitleLarge">

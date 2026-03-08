@@ -1,8 +1,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.Garland" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="android:statusBarColor">@color/garland_bg</item>
-        <item name="android:navigationBarColor">@color/garland_bg</item>
-        <item name="android:windowBackground">@color/garland_bg</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@android:color/black</item>
         <item name="colorPrimary">@color/garland_leaf</item>
         <item name="colorOnPrimary">@color/garland_bg</item>
         <item name="colorSecondary">@color/garland_gold</item>

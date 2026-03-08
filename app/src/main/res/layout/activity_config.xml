@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_garland_window">
+
+    <!-- Scrollable content -->
+    <LinearLayout
+        android:id="@+id/contentLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/garland_section_gap"
+            android:text="@string/config_title"
+            android:textAppearance="@style/TextAppearance.Garland.HomeTitle" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/garland_tight_gap"
+            android:text="@string/config_subtitle"
+            android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="@dimen/garland_section_gap"
+            android:clipToPadding="false">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Identity section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/identity_section_label"
+                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_content_gap"
+                    android:hint="@string/mnemonic_label">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/mnemonicInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textMultiLine"
+                        android:lines="3"
+                        android:maxLines="3" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_button_gap"
+                    android:hint="@string/passphrase_label">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/passphraseInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/loadIdentityButton"
+                    style="@style/Widget.Garland.ActionButton.Primary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_content_gap"
+                    android:text="@string/derive_button" />
+
+                <TextView
+                    android:id="@+id/identityStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_content_gap"
+                    android:textAppearance="@style/TextAppearance.Garland.BodySupport"
+                    android:visibility="gone" />
+
+                <!-- Relays section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_section_gap"
+                    android:text="@string/relay_defaults_label"
+                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_content_gap"
+                    android:hint="Relay 1">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/relayOneInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_button_gap"
+                    android:hint="Relay 2">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/relayTwoInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_button_gap"
+                    android:hint="Relay 3">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/relayThreeInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Blossom section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_section_gap"
+                    android:text="@string/blossom_defaults_label"
+                    android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_content_gap"
+                    android:hint="Blossom server 1">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/serverOneInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_button_gap"
+                    android:hint="Blossom server 2">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/serverTwoInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Garland.InputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_button_gap"
+                    android:hint="Blossom server 3">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/serverThreeInput"
+                        style="@style/Widget.Garland.InputEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Bottom spacer so content clears the floating buttons -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp" />
+
+            </LinearLayout>
+        </ScrollView>
+
+    </LinearLayout>
+
+    <!-- Bottom action bar -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:paddingTop="12dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/cancelButton"
+            style="@style/Widget.Garland.ActionButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/compose_cancel_button" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/deriveButton"
+            style="@style/Widget.Garland.ActionButton.Primary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/garland_button_gap"
+            android:layout_weight="1"
+            android:text="@string/config_save_button" />
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

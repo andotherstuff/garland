@@ -1,5 +1,6 @@
 package com.andotherstuff.garland
 
+import android.app.Activity
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.Gravity
@@ -7,129 +8,72 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.andotherstuff.garland.databinding.ActivityMainBinding
 import com.google.android.material.button.MaterialButton
-import org.json.JSONObject
+
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var session: GarlandSessionStore
     private lateinit var store: LocalDocumentStore
     private lateinit var workScheduler: GarlandWorkScheduler
-    private var privateKeyHex: String? = null
-    private var preparedDocumentId: String? = null
+    private var selectedDocumentId: String? = null
+
+    private val composeLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            refreshSelectedDocumentState(store.latestDocument()?.documentId)
+        }
+    }
+
+    private val configLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        bindDefaults()
+        updateActiveDocument(selectedDocumentId?.let { store.readRecord(it) } ?: store.latestDocument())
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
         session = GarlandSessionStore(applicationContext)
         store = LocalDocumentStore(applicationContext)
         workScheduler = GarlandWorkScheduler(applicationContext)
 
         bindDefaults()
         binding.statusText.text = getString(R.string.app_boot_status)
-        privateKeyHex = session.loadPrivateKeyHex()
-        binding.passphraseInput.setText(session.loadPassphrase())
-        bindLatestDocument()
-
-        binding.deriveButton.setOnClickListener {
-            val response = JSONObject(
-                NativeBridge.deriveIdentity(
-                    binding.mnemonicInput.text?.toString().orEmpty(),
-                    binding.passphraseInput.text?.toString().orEmpty(),
-                )
-            )
-
-            binding.statusText.text = if (response.optBoolean("ok")) {
-                val derivedPrivateKey = GarlandSessionStore.normalizePrivateKeyHex(response.optString("private_key_hex"))
-                if (derivedPrivateKey == null) {
-                    privateKeyHex = null
-                    session.clearPrivateKeyHex()
-                    session.clearPassphrase()
-                    getString(R.string.identity_error, "missing private key")
-                } else {
-                    privateKeyHex = derivedPrivateKey
-                    session.savePrivateKeyHex(derivedPrivateKey)
-                    session.savePassphrase(binding.passphraseInput.text?.toString().orEmpty())
-                    getString(R.string.identity_loaded, response.optString("nsec"))
-                }
-            } else {
-                privateKeyHex = null
-                session.clearPrivateKeyHex()
-                session.clearPassphrase()
-                getString(R.string.identity_error, response.optString("error"))
-            }
+        binding.createFileButton.setOnClickListener {
+            composeLauncher.launch(ComposeActivity.createIntent(this))
         }
 
-        binding.prepareUploadButton.setOnClickListener {
-            val privateKey = privateKeyHex
-            if (privateKey.isNullOrBlank()) {
-                binding.statusText.text = getString(R.string.prepare_requires_identity)
-                return@setOnClickListener
-            }
-
-            session.saveRelays(currentRelays())
-
-            val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
-                privateKeyHex = privateKey,
-                content = binding.contentInput.text?.toString().orEmpty().toByteArray(),
-                blossomServers = currentBlossomServers(),
-                createdAt = System.currentTimeMillis() / 1000,
-            )
-            session.saveBlossomServers(currentBlossomServers())
-
-            val response = JSONObject(NativeBridge.prepareSingleBlockWrite(requestJson))
-            binding.statusText.text = if (response.optBoolean("ok")) {
-                val plan = response.getJSONObject("plan")
-                val documentId = plan.getString("document_id")
-                store.upsertPreparedDocument(
-                    documentId = documentId,
-                    displayName = binding.fileNameInput.text?.toString().orEmpty().ifBlank { "note.txt" },
-                    mimeType = binding.mimeTypeInput.text?.toString().orEmpty().ifBlank { "text/plain" },
-                    content = binding.contentInput.text?.toString().orEmpty().toByteArray(),
-                    uploadPlanJson = response.toString(),
-                )
-                selectDocument(store.readRecord(documentId), false)
-                getString(
-                    R.string.upload_prepared,
-                    documentId,
-                    plan.getJSONArray("uploads").length()
-                )
-            } else {
-                getString(R.string.upload_prepare_error, response.optString("error"))
-            }
-        }
-
-        binding.executeUploadButton.setOnClickListener {
-            val documentId = preparedDocumentId
-            if (documentId.isNullOrBlank()) {
-                binding.statusText.text = getString(R.string.upload_requires_prepared_document)
-                return@setOnClickListener
-            }
-
-            executeUpload(documentId, getString(R.string.upload_running, documentId))
-        }
-
-        binding.refreshDocumentsButton.setOnClickListener {
-            refreshDocumentList(preparedDocumentId)
-        }
-
-        binding.openDiagnosticsButton.setOnClickListener {
-            startActivity(DiagnosticsActivity.createIntent(this, preparedDocumentId))
+        binding.configButton.setOnClickListener {
+            configLauncher.launch(ConfigActivity.createIntent(this))
         }
 
         binding.syncDocumentsButton.setOnClickListener {
             val relays = currentRelays()
             session.saveRelays(relays)
             workScheduler.enqueuePendingSync(relays)
-            refreshDocumentList(preparedDocumentId)
+            refreshDocumentList(selectedDocumentId)
             binding.statusText.text = getString(R.string.sync_documents_queued)
         }
 
+        binding.openDiagnosticsButton.setOnClickListener {
+            startActivity(DiagnosticsActivity.createIntent(this, selectedDocumentId ?: store.latestDocument()?.documentId))
+        }
+
+        binding.refreshDocumentsButton.setOnClickListener {
+            refreshDocumentList(selectedDocumentId)
+            updateActiveDocument(selectedDocumentId?.let { store.readRecord(it) } ?: store.latestDocument())
+        }
+
         binding.retryUploadButton.setOnClickListener {
-            val documentId = preparedDocumentId
+            val documentId = selectedDocumentId
             if (documentId.isNullOrBlank()) {
                 binding.statusText.text = getString(R.string.upload_requires_prepared_document)
                 return@setOnClickListener
@@ -138,28 +82,16 @@ class MainActivity : AppCompatActivity() {
             executeUpload(documentId, getString(R.string.upload_retry_running, documentId))
         }
 
-        binding.deleteDocumentButton.setOnClickListener {
-            val document = preparedDocumentId?.let { store.readRecord(it) }
-            if (document == null) {
-                binding.statusText.text = getString(R.string.document_delete_requires_selection)
-                return@setOnClickListener
-            }
-
-            store.deleteDocument(document.documentId)
-            clearDocumentInputs()
-            selectDocument(store.latestDocument(), false)
-            binding.statusText.text = getString(R.string.document_deleted, document.displayName)
-        }
-
         binding.restoreDocumentButton.setOnClickListener {
-            val documentId = preparedDocumentId
+            val documentId = selectedDocumentId
             if (documentId.isNullOrBlank()) {
                 binding.statusText.text = getString(R.string.document_delete_requires_selection)
                 return@setOnClickListener
             }
-            val privateKey = privateKeyHex
+            val privateKey = session.loadPrivateKeyHex()
             if (privateKey.isNullOrBlank()) {
                 binding.statusText.text = getString(R.string.restore_requires_identity)
+                configLauncher.launch(ConfigActivity.createIntent(this))
                 return@setOnClickListener
             }
 
@@ -167,11 +99,23 @@ class MainActivity : AppCompatActivity() {
             selectDocument(store.readRecord(documentId), false)
             binding.statusText.text = getString(R.string.restore_queued, documentId)
         }
+
+        binding.deleteDocumentButton.setOnClickListener {
+            val document = selectedDocumentId?.let { store.readRecord(it) }
+            if (document == null) {
+                binding.statusText.text = getString(R.string.document_delete_requires_selection)
+                return@setOnClickListener
+            }
+
+            store.deleteDocument(document.documentId)
+            selectDocument(store.latestDocument(), false)
+            binding.statusText.text = getString(R.string.document_deleted, document.displayName)
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        selectDocument(preparedDocumentId?.let { store.readRecord(it) } ?: store.latestDocument(), false)
+        selectDocument(selectedDocumentId?.let { store.readRecord(it) } ?: store.latestDocument(), false)
     }
 
     private fun executeUpload(documentId: String, runningText: String) {
@@ -183,9 +127,9 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = getString(R.string.upload_queued, documentId)
     }
 
-    private fun refreshSelectedDocumentState(documentId: String) {
-        val record = store.readRecord(documentId)
-        preparedDocumentId = record?.documentId
+    private fun refreshSelectedDocumentState(documentId: String?) {
+        val record = documentId?.let { store.readRecord(it) } ?: store.latestDocument()
+        selectedDocumentId = record?.documentId
         updateActiveDocument(record)
         refreshDocumentList(record?.documentId)
     }
@@ -223,15 +167,12 @@ class MainActivity : AppCompatActivity() {
         binding.serverThreeInput.setText(blossomServers[2])
     }
 
-    private fun bindLatestDocument() {
-        selectDocument(store.latestDocument(), false)
-    }
-
     private fun updateActiveDocument(record: LocalDocumentRecord?) {
         bindMainStatus(record)
         val planDecode = record?.let { GarlandPlanInspector.decodeResult(store.readUploadPlan(it.documentId)) }
         val summary = planDecode?.summary
         val diagnostics = DocumentDiagnosticsFormatter.detailSections(record, summary, planMalformed = planDecode?.malformed == true)
+
         binding.activeDocumentText.text = if (record == null) {
             getString(R.string.active_document_none)
         } else {
@@ -241,21 +182,7 @@ class MainActivity : AppCompatActivity() {
                 DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus),
             )
         }
-        binding.activeDocumentDiagnosticsText.text = diagnostics.overview
-        renderProgressSection(binding.activeDocumentProgressLabel, binding.activeDocumentProgressContainer, diagnostics.progressLabel, diagnostics.progressSteps)
-        bindDiagnosticSection(binding.activeDocumentUploadsLabel, binding.activeDocumentUploadsText, diagnostics.uploadsLabel, diagnostics.uploads)
-        bindDiagnosticSection(binding.activeDocumentRelaysLabel, binding.activeDocumentRelaysText, diagnostics.relaysLabel, diagnostics.relays)
-        binding.preparedSnapshotText.text = if (record == null || summary == null) {
-            getString(R.string.prepared_snapshot_none)
-        } else {
-            getString(
-                R.string.prepared_snapshot_ready,
-                record.displayName,
-                summary.sizeBytes,
-                summary.blockCount,
-                summary.shareCount,
-            )
-        }
+
         binding.activeDocumentDetailText.text = if (record == null) {
             getString(R.string.active_document_details_none)
         } else {
@@ -279,8 +206,8 @@ class MainActivity : AppCompatActivity() {
                 localBytes,
                 if (summary == null) "missing" else "ready",
             )
-            val serverText = summary?.servers
-                ?.takeIf { it.isNotEmpty() }
+            val serverText = currentBlossomServers()
+                .takeIf { it.isNotEmpty() }
                 ?.joinToString(", ") { it.removePrefix("https://").removePrefix("wss://") }
                 ?.let { getString(R.string.active_document_servers, it) }
                 .orEmpty()
@@ -291,6 +218,16 @@ class MainActivity : AppCompatActivity() {
                 .filter { it.isNotBlank() }
                 .joinToString("\n")
         }
+
+        binding.activeDocumentDiagnosticsText.text = diagnostics.overview
+        renderProgressSection(
+            binding.activeDocumentProgressLabel,
+            binding.activeDocumentProgressContainer,
+            diagnostics.progressLabel,
+            diagnostics.progressSteps,
+        )
+        bindDiagnosticSection(binding.activeDocumentUploadsLabel, binding.activeDocumentUploadsText, diagnostics.uploadsLabel, diagnostics.uploads)
+        bindDiagnosticSection(binding.activeDocumentRelaysLabel, binding.activeDocumentRelaysText, diagnostics.relaysLabel, diagnostics.relays)
     }
 
     private fun bindMainStatus(record: LocalDocumentRecord?) {
@@ -324,9 +261,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectDocument(record: LocalDocumentRecord?, announce: Boolean) {
-        preparedDocumentId = record?.documentId
+        selectedDocumentId = record?.documentId
         updateActiveDocument(record)
-        loadDocumentIntoInputs(record)
         refreshDocumentList(record?.documentId)
         if (announce && record != null) {
             binding.statusText.text = getString(
@@ -335,25 +271,6 @@ class MainActivity : AppCompatActivity() {
                 DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus),
             )
         }
-    }
-
-    private fun loadDocumentIntoInputs(record: LocalDocumentRecord?) {
-        if (record == null) {
-            clearDocumentInputs()
-            return
-        }
-
-        binding.fileNameInput.setText(record.displayName)
-        binding.mimeTypeInput.setText(record.mimeType)
-        val content = runCatching { store.contentFile(record.documentId).readBytes().toString(Charsets.UTF_8) }
-            .getOrElse { "" }
-        binding.contentInput.setText(content)
-    }
-
-    private fun clearDocumentInputs() {
-        binding.fileNameInput.setText("")
-        binding.mimeTypeInput.setText("")
-        binding.contentInput.setText("")
     }
 
     private fun bindDiagnosticSection(labelView: TextView, textView: TextView, label: String?, content: String?) {
@@ -480,8 +397,8 @@ class MainActivity : AppCompatActivity() {
                     params.bottomMargin = resources.getDimensionPixelSize(R.dimen.garland_list_item_gap)
                 }
                 isAllCaps = false
-                textAlignment = android.view.View.TEXT_ALIGNMENT_VIEW_START
-                gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
                 setPaddingRelative(
                     resources.getDimensionPixelSize(R.dimen.garland_card_padding),
                     resources.getDimensionPixelSize(R.dimen.garland_content_gap),
@@ -509,7 +426,7 @@ class MainActivity : AppCompatActivity() {
         button.backgroundTintList = ColorStateList.valueOf(backgroundColor)
         button.strokeColor = ColorStateList.valueOf(strokeColor)
         button.setTextColor(textColor)
-        button.cornerRadius = resources.getDimensionPixelSize(R.dimen.garland_panel_padding) + resources.getDimensionPixelSize(R.dimen.garland_content_gap)
+        button.cornerRadius = resources.getDimensionPixelSize(R.dimen.garland_button_corner_radius)
         button.strokeWidth = if (isSelected) {
             (2 * resources.displayMetrics.density).toInt()
         } else {
