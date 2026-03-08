@@ -34,6 +34,32 @@ class GarlandConfigTest {
     }
 
     @Test
+    fun prepareWriteJsonSanitizesConfiguredBlossomServers() {
+        val json = GarlandConfig.buildPrepareWriteRequestJson(
+            privateKeyHex = "deadbeef",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            content = "hello".toByteArray(),
+            blossomServers = listOf(" https://one.example ", "", "https://one.example", "https://two.example "),
+            createdAt = 123L,
+        )
+
+        val payload = JsonParser.parseString(json).asJsonObject
+        val servers = payload.getAsJsonArray("servers").map { it.asString }
+        assertEquals(listOf("https://one.example", "https://two.example"), servers)
+    }
+
+    @Test
+    fun normalizeConfiguredEndpointsFallsBackWhenConfiguredValuesAreBlank() {
+        val normalized = GarlandConfig.normalizeConfiguredEndpoints(
+            configured = listOf("", "   "),
+            fallback = listOf("wss://relay.one", "wss://relay.two"),
+        )
+
+        assertEquals(listOf("wss://relay.one", "wss://relay.two"), normalized)
+    }
+
+    @Test
     fun prepareWriteJsonEscapesControlCharactersByProducingValidJson() {
         val json = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = "deadbeef",

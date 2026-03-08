@@ -248,7 +248,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
             displayName = record.displayName,
             mimeType = record.mimeType,
             content = content,
-            blossomServers = session.loadBlossomServers(),
+            blossomServers = session.resolvedBlossomServers(),
             createdAt = System.currentTimeMillis() / 1000,
         )
         val responseJson = NativeBridge.prepareSingleBlockWrite(requestJson)
@@ -258,7 +258,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         store.updateUploadStatus(documentId, status, message)
         if (status != "upload-plan-ready") return
 
-        workScheduler.enqueuePendingSync(session.loadRelays(), documentId)
+        workScheduler.enqueuePendingSync(session.resolvedRelays(), documentId)
     }
 
     private fun restoreDocumentIfNeeded(documentId: String) {

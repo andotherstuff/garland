@@ -71,6 +71,29 @@ class NostrRelayPublisherTest {
         closeClient(client)
     }
 
+    @Test
+    fun deduplicatesRelayUrlsBeforePublishing() {
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                }
+            })
+        )
+        server.start()
+
+        val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
+        val client = OkHttpClient()
+        val publisher = NostrRelayPublisher(client = client)
+
+        val result = publisher.publish(listOf(" $relayUrl ", relayUrl), sampleEvent())
+
+        assertEquals(1, result.attemptedRelays)
+        assertEquals(1, result.successfulRelays)
+        closeTestResources(client, server)
+    }
+
     private fun closeTestResources(client: OkHttpClient, server: MockWebServer) {
         closeClient(client)
         runCatching { server.shutdown() }

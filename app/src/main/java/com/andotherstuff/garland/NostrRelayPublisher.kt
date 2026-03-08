@@ -37,7 +37,7 @@ class NostrRelayPublisher(
     private val maxAttempts: Int = 2,
 ) {
     fun publish(relayUrls: List<String>, event: SignedRelayEvent): RelayPublishResult {
-        val normalizedRelays = relayUrls.map { it.trim() }.filter { it.isNotEmpty() }
+        val normalizedRelays = GarlandConfig.normalizeConfiguredEndpoints(relayUrls)
         if (normalizedRelays.isEmpty()) {
             return RelayPublishResult(0, 0, emptyList(), emptyList(), "No relays configured")
         }

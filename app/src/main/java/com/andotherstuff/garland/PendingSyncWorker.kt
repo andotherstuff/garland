@@ -16,7 +16,7 @@ class PendingSyncWorker(
         val documentId = normalizeDocumentId(inputData.getString(KEY_DOCUMENT_ID))
         val relayUrls = resolveRelayUrls(
             queuedRelays = inputData.getStringArray(KEY_RELAYS)?.toList(),
-            sessionRelays = session.loadRelays(),
+            sessionRelays = session.resolvedRelays(),
         )
         val documentIds = documentId?.let(::setOf)
         val result = runCatching { syncExecutor.syncPendingDocuments(relayUrls, documentIds) }

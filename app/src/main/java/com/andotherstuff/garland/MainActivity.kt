@@ -171,19 +171,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun currentBlossomServers(): List<String> {
-        return listOf(
-                    binding.serverOneInput.text?.toString().orEmpty(),
-                    binding.serverTwoInput.text?.toString().orEmpty(),
-                    binding.serverThreeInput.text?.toString().orEmpty(),
-                )
+        return GarlandConfig.normalizeConfiguredEndpoints(
+            configured = listOf(
+                binding.serverOneInput.text?.toString().orEmpty(),
+                binding.serverTwoInput.text?.toString().orEmpty(),
+                binding.serverThreeInput.text?.toString().orEmpty(),
+            ),
+            fallback = GarlandConfig.defaults.blossomServers,
+        )
     }
 
     private fun currentRelays(): List<String> {
-        return listOf(
-                    binding.relayOneInput.text?.toString().orEmpty(),
-                    binding.relayTwoInput.text?.toString().orEmpty(),
-                    binding.relayThreeInput.text?.toString().orEmpty(),
-                )
+        return GarlandConfig.normalizeConfiguredEndpoints(
+            configured = listOf(
+                binding.relayOneInput.text?.toString().orEmpty(),
+                binding.relayTwoInput.text?.toString().orEmpty(),
+                binding.relayThreeInput.text?.toString().orEmpty(),
+            ),
+            fallback = GarlandConfig.defaults.relays,
+        )
     }
 
     private fun bindDefaults() {

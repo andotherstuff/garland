@@ -35,6 +35,7 @@ object GarlandConfig {
         blossomServers: List<String>,
         createdAt: Long,
     ): String {
+        val normalizedServers = normalizeConfiguredEndpoints(blossomServers, defaults.blossomServers)
         val payload = JsonObject().apply {
             addProperty("private_key_hex", privateKeyHex)
             addProperty("display_name", displayName)
@@ -42,10 +43,18 @@ object GarlandConfig {
             addProperty("created_at", createdAt)
             addProperty("content_b64", Base64.getEncoder().encodeToString(content))
             add("servers", JsonArray().apply {
-                blossomServers.forEach(::add)
+                normalizedServers.forEach(::add)
             })
         }
         return gson.toJson(payload)
+    }
+
+    fun normalizeConfiguredEndpoints(configured: List<String>, fallback: List<String> = emptyList()): List<String> {
+        val normalized = configured
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        return if (normalized.isNotEmpty()) normalized else fallback.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
     }
 
     fun buildRecoverReadRequestJson(

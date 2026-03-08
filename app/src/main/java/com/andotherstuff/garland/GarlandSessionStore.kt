@@ -13,17 +13,17 @@ class GarlandSessionStore(context: Context) {
 
     fun saveBlossomServers(servers: List<String>) {
         prefs.edit()
-            .putString(KEY_SERVER_ONE, servers.getOrNull(0))
-            .putString(KEY_SERVER_TWO, servers.getOrNull(1))
-            .putString(KEY_SERVER_THREE, servers.getOrNull(2))
+            .putString(KEY_SERVER_ONE, servers.getOrNull(0)?.trim())
+            .putString(KEY_SERVER_TWO, servers.getOrNull(1)?.trim())
+            .putString(KEY_SERVER_THREE, servers.getOrNull(2)?.trim())
             .apply()
     }
 
     fun saveRelays(relays: List<String>) {
         prefs.edit()
-            .putString(KEY_RELAY_ONE, relays.getOrNull(0))
-            .putString(KEY_RELAY_TWO, relays.getOrNull(1))
-            .putString(KEY_RELAY_THREE, relays.getOrNull(2))
+            .putString(KEY_RELAY_ONE, relays.getOrNull(0)?.trim())
+            .putString(KEY_RELAY_TWO, relays.getOrNull(1)?.trim())
+            .putString(KEY_RELAY_THREE, relays.getOrNull(2)?.trim())
             .apply()
     }
 
@@ -43,6 +43,14 @@ class GarlandSessionStore(context: Context) {
             prefs.getString(KEY_RELAY_TWO, fallback[1]).orEmpty(),
             prefs.getString(KEY_RELAY_THREE, fallback[2]).orEmpty(),
         )
+    }
+
+    fun resolvedBlossomServers(): List<String> {
+        return GarlandConfig.normalizeConfiguredEndpoints(loadBlossomServers(), GarlandConfig.defaults.blossomServers)
+    }
+
+    fun resolvedRelays(): List<String> {
+        return GarlandConfig.normalizeConfiguredEndpoints(loadRelays(), GarlandConfig.defaults.relays)
     }
 
     companion object {
