@@ -2,6 +2,7 @@ package com.andotherstuff.garland
 
 import androidx.work.OneTimeWorkRequest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -104,6 +105,33 @@ class GarlandWorkSchedulerTest {
             listOf(StatusUpdate("doc-restore", "restore-queued", "Queued Garland restore in background")),
             statusStore.updates,
         )
+    }
+
+    @Test
+    fun normalizesRestoreDocumentIdAndPrivateKeyBeforeEnqueue() {
+        val backend = RecordingWorkSchedulerBackend()
+        val statusStore = RecordingSyncStatusStore()
+        val scheduler = GarlandWorkScheduler(backend, statusStore)
+
+        scheduler.enqueueRestore(" doc-restore ", privateKeyHex = "  deadbeef  ")
+
+        assertEquals("garland-restore:doc-restore", backend.restoreName)
+        assertEquals("doc-restore", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_DOCUMENT_ID))
+        assertEquals("deadbeef", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX))
+        assertEquals(
+            listOf(StatusUpdate("doc-restore", "restore-queued", "Queued Garland restore in background")),
+            statusStore.updates,
+        )
+    }
+
+    @Test
+    fun dropsBlankRestorePrivateKeyPayload() {
+        val backend = RecordingWorkSchedulerBackend()
+        val scheduler = GarlandWorkScheduler(backend, RecordingSyncStatusStore())
+
+        scheduler.enqueueRestore("doc-restore", privateKeyHex = "   ")
+
+        assertNull(backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX))
     }
 
     @Test

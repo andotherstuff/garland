@@ -13,10 +13,9 @@ class RestoreDocumentWorker(
     private val downloadExecutor = GarlandDownloadExecutor(appContext)
 
     override suspend fun doWork(): Result {
-        val documentId = inputData.getString(KEY_DOCUMENT_ID)
+        val documentId = normalizeDocumentId(inputData.getString(KEY_DOCUMENT_ID))
             ?: return Result.failure()
-        val privateKeyHex = inputData.getString(KEY_PRIVATE_KEY_HEX)
-            ?.takeIf { it.isNotBlank() }
+        val privateKeyHex = normalizePrivateKeyHex(inputData.getString(KEY_PRIVATE_KEY_HEX))
             ?: session.loadPrivateKeyHex()
             ?: return Result.failure().also {
                 store.updateUploadStatus(documentId, "restore-failed", "Load identity before background restore")
@@ -34,6 +33,14 @@ class RestoreDocumentWorker(
     companion object {
         const val KEY_DOCUMENT_ID = "document_id"
         const val KEY_PRIVATE_KEY_HEX = "private_key_hex"
+
+        internal fun normalizeDocumentId(documentId: String?): String? {
+            return documentId?.trim()?.takeIf { it.isNotEmpty() }
+        }
+
+        internal fun normalizePrivateKeyHex(privateKeyHex: String?): String? {
+            return privateKeyHex?.trim()?.takeIf { it.isNotEmpty() }
+        }
     }
 
     private fun resolveFailure(documentId: String, message: String?): Result {

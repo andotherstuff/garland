@@ -2,6 +2,7 @@ package com.andotherstuff.garland
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.nio.file.Files
 
@@ -84,6 +85,25 @@ class LocalDocumentStoreTest {
         assertEquals("sync-queued", store.readRecord(document.documentId)?.uploadStatus)
         assertEquals("Queued Garland sync in background", store.readRecord(document.documentId)?.lastSyncMessage)
         assertEquals(diagnosticsJson, store.readRecord(document.documentId)?.lastSyncDetailsJson)
+    }
+
+    @Test
+    fun clearsStructuredDiagnosticsWhenRequested() {
+        val tempDir = Files.createTempDirectory("garland-store-diagnostics-clear-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                relays = listOf(DocumentEndpointDiagnostic("wss://relay.one", "failed", "timeout")),
+            )
+        )
+
+        store.updateUploadDiagnostics(document.documentId, "relay-publish-failed", "relay timeout", diagnosticsJson)
+        store.updateUploadDiagnostics(document.documentId, "upload-plan-failed", "Unreadable upload plan metadata", clearDiagnostics = true)
+
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Unreadable upload plan metadata", store.readRecord(document.documentId)?.lastSyncMessage)
+        assertNull(store.readRecord(document.documentId)?.lastSyncDetailsJson)
     }
 
     @Test

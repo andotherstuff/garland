@@ -469,6 +469,51 @@ class GarlandDocumentsProviderTest {
     }
 
     @Test
+    fun childAndRecentQueriesShowNewestUpdatedDocumentFirst() {
+        val rootDocumentId = queryRootDocumentId()
+        val olderUri = createAndWriteDocument(rootDocumentId, "older-note.txt", "older body")
+        SystemClock.sleep(20)
+        val newerUri = createAndWriteDocument(rootDocumentId, "newer-note.txt", "newer body")
+
+        val olderDocumentId = DocumentsContract.getDocumentId(olderUri)
+        val newerDocumentId = DocumentsContract.getDocumentId(newerUri)
+
+        store.updateUploadDiagnostics(
+            documentId = olderDocumentId,
+            status = "download-restored",
+            message = "Older document became the most recently updated",
+        )
+
+        val childUri = DocumentsContract.buildChildDocumentsUri(AUTHORITY, rootDocumentId)
+        resolver.query(childUri, null, null, null, null)!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(
+                "older-note.txt [download-restored]",
+                cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+            )
+            assertTrue(cursor.moveToNext())
+            assertEquals(
+                "newer-note.txt [waiting-for-identity]",
+                cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME))
+            )
+        }
+
+        val recentUri = DocumentsContract.buildRecentDocumentsUri(AUTHORITY, ROOT_ID)
+        resolver.query(recentUri, null, null, null, null)!!.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(
+                olderDocumentId,
+                cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID))
+            )
+            assertTrue(cursor.moveToNext())
+            assertEquals(
+                newerDocumentId,
+                cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID))
+            )
+        }
+    }
+
+    @Test
     fun searchQueriesNotifyObserversWhenSyncStatusChanges() {
         val rootDocumentId = queryRootDocumentId()
         val documentUri = createAndWriteDocument(rootDocumentId, "search-refresh.txt", "refresh body")
@@ -852,6 +897,18 @@ class GarlandDocumentsProviderTest {
             listOf(rootDocumentId, DocumentsContract.getDocumentId(documentUri)),
             path.path
         )
+    }
+
+    @Test
+    fun isChildDocumentMatchesFlatProviderHierarchy() {
+        val rootDocumentId = queryRootDocumentId()
+        val rootUri = documentUri(rootDocumentId)
+        val documentUri = createAndWriteDocument(rootDocumentId, "child-note.txt", "child body")
+
+        assertTrue(DocumentsContract.isChildDocument(resolver, rootUri, documentUri))
+        assertTrue(!DocumentsContract.isChildDocument(resolver, rootUri, rootUri))
+        assertTrue(!DocumentsContract.isChildDocument(resolver, rootUri, documentUri("missing-document")))
+        assertTrue(!DocumentsContract.isChildDocument(resolver, documentUri("missing-parent"), documentUri))
     }
 
     @Test

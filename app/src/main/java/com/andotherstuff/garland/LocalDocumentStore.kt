@@ -54,7 +54,8 @@ class LocalDocumentStore(private val context: Context) {
         status: String,
         message: String? = null,
         diagnosticsJson: String? = null,
-    ) = impl.updateUploadDiagnostics(documentId, status, message, diagnosticsJson)
+        clearDiagnostics: Boolean = false,
+    ) = impl.updateUploadDiagnostics(documentId, status, message, diagnosticsJson, clearDiagnostics)
 
     fun deleteDocument(documentId: String) = impl.deleteDocument(documentId)
 }
@@ -173,6 +174,7 @@ class LocalDocumentStoreImpl(
         status: String,
         message: String? = null,
         diagnosticsJson: String? = null,
+        clearDiagnostics: Boolean = false,
     ) {
         val current = readRecord(documentId) ?: return
         writeRecord(
@@ -180,7 +182,11 @@ class LocalDocumentStoreImpl(
                 uploadStatus = status,
                 updatedAt = System.currentTimeMillis(),
                 lastSyncMessage = message ?: current.lastSyncMessage,
-                lastSyncDetailsJson = diagnosticsJson ?: current.lastSyncDetailsJson,
+                lastSyncDetailsJson = when {
+                    diagnosticsJson != null -> diagnosticsJson
+                    clearDiagnostics -> null
+                    else -> current.lastSyncDetailsJson
+                },
             )
         )
         onDocumentChanged?.invoke(documentId)

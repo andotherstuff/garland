@@ -52,7 +52,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
     ): Cursor {
         requireRootParent(parentDocumentId)
         val result = MatrixCursor(resolveDocumentProjection(projection))
-        store.listDocuments().forEach { record ->
+        ProviderVisibleDocumentOrdering.sortRecentFirst(store.listDocuments()).forEach { record ->
             includeRecord(result, record)
         }
         return result
@@ -143,8 +143,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
     override fun queryRecentDocuments(rootId: String?, projection: Array<out String>?): Cursor {
         requireKnownRootId(rootId)
         val result = MatrixCursor(resolveDocumentProjection(projection))
-        store.listDocuments()
-            .sortedByDescending { it.updatedAt }
+        ProviderVisibleDocumentOrdering.sortRecentFirst(store.listDocuments())
             .take(5)
             .forEach { includeRecord(result, it) }
         return result

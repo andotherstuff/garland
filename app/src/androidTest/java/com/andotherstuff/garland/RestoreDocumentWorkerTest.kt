@@ -46,6 +46,50 @@ class RestoreDocumentWorkerTest {
     }
 
     @Test
+    fun trimsRestoreInputsBeforeExecution() = runBlocking {
+        session.savePrivateKeyHex("unused-session-key")
+        val document = store.createDocument("restore-note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "plan": {
+                "manifest": {
+                  "document_id": "${document.documentId}",
+                  "blocks": [
+                    {
+                      "index": 0,
+                      "share_id_hex": "share123",
+                      "servers": ["http://127.0.0.1:9"]
+                    }
+                  ]
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+        val worker = buildWorker(" ${document.documentId} ", privateKeyHex = "  deadbeef  ")
+
+        val result = worker.doWork()
+
+        assertTrue(result is ListenableWorker.Result.Retry)
+        assertEquals("restore-queued", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals(
+            "Retrying background restore: Unable to fetch share from configured servers",
+            store.readRecord(document.documentId)?.lastSyncMessage,
+        )
+    }
+
+    @Test
+    fun failsPermanentlyWhenRestoreDocumentIdIsBlank() = runBlocking {
+        val worker = buildWorker("   ")
+
+        val result = worker.doWork()
+
+        assertTrue(result is ListenableWorker.Result.Failure)
+    }
+
+    @Test
     fun retriesTransientFetchFailureAtWorkerBoundary() = runBlocking {
         session.savePrivateKeyHex("deadbeef")
         val document = store.createDocument("restore-note.txt", "text/plain")

@@ -13,6 +13,55 @@ import java.nio.file.Files
 
 class GarlandUploadExecutorTest {
     @Test
+    fun marksUploadPlanFailureWhenPlanJsonIsMalformed() {
+        val tempDir = Files.createTempDirectory("garland-upload-malformed-plan-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(document.documentId, "{not-json")
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Unreadable upload plan metadata", store.readRecord(document.documentId)?.lastSyncMessage)
+    }
+
+    @Test
+    fun marksUploadPlanFailureWhenUploadsFieldIsMissing() {
+        val tempDir = Files.createTempDirectory("garland-upload-missing-uploads-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Unreadable upload plan metadata", store.readRecord(document.documentId)?.lastSyncMessage)
+    }
+
+    @Test
     fun marksUploadPlanFailureWhenPlanIsMissing() {
         val tempDir = Files.createTempDirectory("garland-upload-missing-plan-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
@@ -24,6 +73,175 @@ class GarlandUploadExecutorTest {
         assertFalse(result.success)
         assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
         assertEquals("No upload plan found", store.readRecord(document.documentId)?.lastSyncMessage)
+        val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+        assertEquals("upload plan", diagnostics?.plan?.first()?.field)
+        assertEquals("missing", diagnostics?.plan?.first()?.status)
+    }
+
+    @Test
+    fun marksUploadPlanFailureWhenEntryServerUrlIsInvalid() {
+        val tempDir = Files.createTempDirectory("garland-upload-invalid-server-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"ftp://server.example","share_id_hex":"a1","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertTrue(store.readRecord(document.documentId)?.lastSyncMessage?.contains("invalid Blossom server URL") == true)
+    }
+
+    @Test
+    fun marksUploadPlanFailureWhenEntryShareIdHexIsInvalid() {
+        val tempDir = Files.createTempDirectory("garland-upload-invalid-share-id-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"https://server.example","share_id_hex":"share-1","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Upload plan entry 1 has invalid share ID hex", store.readRecord(document.documentId)?.lastSyncMessage)
+        val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+        assertEquals("plan.uploads[1].share_id_hex", diagnostics?.plan?.first()?.field)
+        assertEquals("invalid", diagnostics?.plan?.first()?.status)
+    }
+
+    @Test
+    fun clearsStaleDiagnosticsWhenUploadPlanValidationFails() {
+        val tempDir = Files.createTempDirectory("garland-upload-clear-stale-diagnostics-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.updateUploadDiagnostics(
+            document.documentId,
+            "relay-publish-failed",
+            "relay timeout",
+            DocumentSyncDiagnosticsCodec.encode(
+                DocumentSyncDiagnostics(
+                    uploads = listOf(DocumentEndpointDiagnostic("https://server.example", "ok", "Uploaded share deadbeef")),
+                    relays = listOf(DocumentEndpointDiagnostic("wss://relay.example", "failed", "timeout")),
+                )
+            )
+        )
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"https://server.example","share_id_hex":"share-1","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Upload plan entry 1 has invalid share ID hex", store.readRecord(document.documentId)?.lastSyncMessage)
+        val diagnostics = DocumentSyncDiagnosticsCodec.decode(store.readRecord(document.documentId)?.lastSyncDetailsJson)
+        assertEquals(1, diagnostics?.plan?.size)
+        assertTrue(diagnostics?.uploads?.isEmpty() == true)
+        assertTrue(diagnostics?.relays?.isEmpty() == true)
+    }
+
+    @Test
+    fun marksUploadPlanFailureWhenEntryBodyIsInvalidBase64() {
+        val tempDir = Files.createTempDirectory("garland-upload-invalid-body-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("note.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"https://server.example","share_id_hex":"a1","body_b64":"%%%not-base64%%%"}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent()
+        )
+        val executor = GarlandUploadExecutor(store)
+
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-plan-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals("Upload plan entry 1 has invalid base64 share body", store.readRecord(document.documentId)?.lastSyncMessage)
     }
 
     @Test

@@ -51,13 +51,14 @@ class GarlandWorkScheduler internal constructor(
     }
 
     fun enqueueRestore(documentId: String, privateKeyHex: String? = null): UUID {
-        if (!statusStore.hasActiveBackgroundRestore(documentId)) {
-            statusStore.updateUploadStatus(documentId, "restore-queued", "Queued Garland restore in background")
+        val normalizedDocumentId = RestoreDocumentWorker.normalizeDocumentId(documentId)
+            ?: throw IllegalArgumentException("Document id is required for background restore")
+        if (!statusStore.hasActiveBackgroundRestore(normalizedDocumentId)) {
+            statusStore.updateUploadStatus(normalizedDocumentId, "restore-queued", "Queued Garland restore in background")
         }
         val requestData = Data.Builder()
-            .putString(RestoreDocumentWorker.KEY_DOCUMENT_ID, documentId)
-        privateKeyHex
-            ?.takeIf { it.isNotBlank() }
+            .putString(RestoreDocumentWorker.KEY_DOCUMENT_ID, normalizedDocumentId)
+        RestoreDocumentWorker.normalizePrivateKeyHex(privateKeyHex)
             ?.let { requestData.putString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX, it) }
         val request = OneTimeWorkRequestBuilder<RestoreDocumentWorker>()
             .setConstraints(networkConstraints())
@@ -65,7 +66,7 @@ class GarlandWorkScheduler internal constructor(
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .setInputData(requestData.build())
             .build()
-        workManager.enqueueUniqueRestore(restoreWorkName(documentId), request)
+        workManager.enqueueUniqueRestore(restoreWorkName(normalizedDocumentId), request)
         return request.id
     }
 
