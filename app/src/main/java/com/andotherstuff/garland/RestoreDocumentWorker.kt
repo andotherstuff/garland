@@ -15,22 +15,34 @@ class RestoreDocumentWorker(
     override suspend fun doWork(): Result {
         val documentId = inputData.getString(KEY_DOCUMENT_ID)
             ?: return Result.failure()
-        val privateKeyHex = session.loadPrivateKeyHex()
+        val privateKeyHex = inputData.getString(KEY_PRIVATE_KEY_HEX)
+            ?.takeIf { it.isNotBlank() }
+            ?: session.loadPrivateKeyHex()
             ?: return Result.failure().also {
                 store.updateUploadStatus(documentId, "restore-failed", "Load identity before background restore")
-        }
+            }
         store.updateUploadStatus(documentId, "restore-running", "Restoring Garland document in background")
         val result = runCatching { downloadExecutor.restoreDocument(documentId, privateKeyHex) }
             .getOrElse {
                 val message = it.message ?: "Background restore failed"
-                store.updateUploadStatus(documentId, "restore-failed", message)
-                return if (RestoreWorkResultPolicy.shouldRetry(message)) Result.retry() else Result.failure()
+                return resolveFailure(documentId, message)
             }
         if (result.success) return Result.success()
-        return if (RestoreWorkResultPolicy.shouldRetry(result.message)) Result.retry() else Result.failure()
+        return resolveFailure(documentId, result.message)
     }
 
     companion object {
         const val KEY_DOCUMENT_ID = "document_id"
+        const val KEY_PRIVATE_KEY_HEX = "private_key_hex"
+    }
+
+    private fun resolveFailure(documentId: String, message: String?): Result {
+        val normalizedMessage = message?.trim().orEmpty().ifBlank { "Background restore failed" }
+        if (RestoreWorkResultPolicy.shouldRetry(normalizedMessage)) {
+            store.updateUploadStatus(documentId, "restore-queued", "Retrying background restore: $normalizedMessage")
+            return Result.retry()
+        }
+        store.updateUploadStatus(documentId, "restore-failed", normalizedMessage)
+        return Result.failure()
     }
 }

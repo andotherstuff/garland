@@ -1,7 +1,8 @@
 package com.andotherstuff.garland
 
-import com.google.gson.Gson
-import com.google.gson.annotations.SerializedName
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 
 data class GarlandPlanSummary(
     val documentId: String,
@@ -14,40 +15,93 @@ data class GarlandPlanSummary(
 )
 
 object GarlandPlanInspector {
-    private val gson = Gson()
+    private data class ObjectField(
+        val value: JsonObject?,
+        val malformed: Boolean,
+    )
 
-    fun summarize(uploadPlanJson: String?): GarlandPlanSummary? {
-        if (uploadPlanJson.isNullOrBlank()) return null
-        val envelope = runCatching { gson.fromJson(uploadPlanJson, PlanEnvelope::class.java) }.getOrNull() ?: return null
-        val manifest = envelope.plan?.manifest ?: return null
-        return GarlandPlanSummary(
-            documentId = manifest.documentId,
-            mimeType = manifest.mimeType,
-            sizeBytes = manifest.sizeBytes,
-            blockCount = manifest.blocks.size,
-            serverCount = manifest.blocks.flatMap { it.servers }.distinct().size,
-            sha256Hex = manifest.sha256Hex,
-            servers = manifest.blocks.flatMap { it.servers }.distinct(),
+    data class DecodeResult(
+        val summary: GarlandPlanSummary?,
+        val malformed: Boolean,
+    )
+
+    fun decodeResult(uploadPlanJson: String?): DecodeResult {
+        if (uploadPlanJson.isNullOrBlank()) return DecodeResult(summary = null, malformed = false)
+        val root = runCatching { JsonParser.parseString(uploadPlanJson) }
+            .getOrElse { return DecodeResult(summary = null, malformed = true) }
+        val envelope = root.takeIf { it.isJsonObject }?.asJsonObject
+            ?: return DecodeResult(summary = null, malformed = true)
+        val planField = envelope.objectField("plan")
+        if (planField.malformed) return DecodeResult(summary = null, malformed = true)
+        val plan = planField.value ?: return DecodeResult(summary = null, malformed = false)
+        val manifestField = plan.objectField("manifest")
+        if (manifestField.malformed) return DecodeResult(summary = null, malformed = true)
+        val manifest = manifestField.value ?: return DecodeResult(summary = null, malformed = false)
+        val summary = decodeSummary(manifest) ?: return DecodeResult(summary = null, malformed = true)
+        return DecodeResult(
+            summary = summary,
+            malformed = false,
         )
     }
+
+    fun summarize(uploadPlanJson: String?): GarlandPlanSummary? {
+        return decodeResult(uploadPlanJson).summary
+    }
+
+    private fun decodeSummary(manifest: JsonObject): GarlandPlanSummary? {
+        val documentId = manifest.requiredString("document_id")?.takeIf { it.isNotBlank() } ?: return null
+        val mimeType = manifest.requiredString("mime_type")?.takeIf { it.isNotBlank() } ?: return null
+        val sizeBytes = manifest.requiredLong("size_bytes")?.takeIf { it >= 0L } ?: return null
+        val sha256Hex = manifest.requiredString("sha256_hex")?.takeIf { it.isNotBlank() } ?: return null
+        val blocks = manifest.requiredArray("blocks") ?: return null
+        val servers = decodeServers(blocks) ?: return null
+        return GarlandPlanSummary(
+            documentId = documentId,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            blockCount = blocks.size(),
+            serverCount = servers.size,
+            sha256Hex = sha256Hex,
+            servers = servers,
+        )
+    }
+
+    private fun decodeServers(blocks: JsonArray): List<String>? {
+        return buildList {
+            for (block in blocks) {
+                val payload = block.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+                val rawServers = payload.requiredArray("servers") ?: return null
+                for (server in rawServers) {
+                    val value = server.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
+                        ?.takeIf { it.isNotBlank() }
+                        ?: return null
+                    if (!contains(value)) add(value)
+                }
+            }
+        }
+    }
+
+    private fun JsonObject.objectField(fieldName: String): ObjectField {
+        if (!has(fieldName)) return ObjectField(value = null, malformed = false)
+        val value = get(fieldName) ?: return ObjectField(value = null, malformed = true)
+        return ObjectField(
+            value = value.takeIf { it.isJsonObject }?.asJsonObject,
+            malformed = !value.isJsonObject,
+        )
+    }
+
+    private fun JsonObject.requiredArray(fieldName: String): JsonArray? {
+        val value = get(fieldName) ?: return null
+        return value.takeIf { it.isJsonArray }?.asJsonArray
+    }
+
+    private fun JsonObject.requiredLong(fieldName: String): Long? {
+        val value = get(fieldName) ?: return null
+        return value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asLong
+    }
+
+    private fun JsonObject.requiredString(fieldName: String): String? {
+        val value = get(fieldName) ?: return null
+        return value.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
+    }
 }
-
-private data class PlanEnvelope(
-    val plan: PlanBody?,
-)
-
-private data class PlanBody(
-    val manifest: PlanManifest?,
-)
-
-private data class PlanManifest(
-    @SerializedName("document_id") val documentId: String,
-    @SerializedName("mime_type") val mimeType: String,
-    @SerializedName("size_bytes") val sizeBytes: Long,
-    @SerializedName("sha256_hex") val sha256Hex: String,
-    val blocks: List<PlanBlock>,
-)
-
-private data class PlanBlock(
-    val servers: List<String>,
-)

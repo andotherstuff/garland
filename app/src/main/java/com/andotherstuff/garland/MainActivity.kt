@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            workScheduler.enqueueRestore(documentId)
+            workScheduler.enqueueRestore(documentId, privateKey)
             selectDocument(store.readRecord(documentId), false)
             binding.statusText.text = getString(R.string.restore_queued, documentId)
         }
@@ -198,8 +198,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActiveDocument(record: LocalDocumentRecord?) {
-        val summary = record?.let { GarlandPlanInspector.summarize(store.readUploadPlan(it.documentId)) }
-        val diagnostics = DocumentDiagnosticsFormatter.detailSections(record, summary)
+        val planDecode = record?.let { GarlandPlanInspector.decodeResult(store.readUploadPlan(it.documentId)) }
+        val summary = planDecode?.summary
+        val diagnostics = DocumentDiagnosticsFormatter.detailSections(record, summary, planMalformed = planDecode?.malformed == true)
         binding.activeDocumentText.text = if (record == null) {
             getString(R.string.active_document_none)
         } else {
@@ -304,6 +305,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         records.forEach { record ->
+            val planDecode = GarlandPlanInspector.decodeResult(store.readUploadPlan(record.documentId))
             val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -315,8 +317,9 @@ class MainActivity : AppCompatActivity() {
                 textAlignment = android.view.View.TEXT_ALIGNMENT_VIEW_START
                 text = DocumentDiagnosticsFormatter.listLabel(
                     record = record,
-                    summary = GarlandPlanInspector.summarize(store.readUploadPlan(record.documentId)),
+                    summary = planDecode.summary,
                     isSelected = record.documentId == selectedDocumentId,
+                    planMalformed = planDecode.malformed,
                 )
                 setOnClickListener { selectDocument(record, true) }
             }

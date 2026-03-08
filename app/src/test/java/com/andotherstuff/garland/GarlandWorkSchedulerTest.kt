@@ -18,7 +18,10 @@ class GarlandWorkSchedulerTest {
         )
 
         assertEquals("garland-pending-sync:doc-123", backend.pendingSyncName)
-        assertNull(backend.pendingSyncRequest.workSpec.input.getStringArray(PendingSyncWorker.KEY_RELAYS))
+        assertEquals(
+            listOf("wss://relay.one", "wss://relay.two"),
+            backend.pendingSyncRequest.workSpec.input.getStringArray(PendingSyncWorker.KEY_RELAYS)?.toList(),
+        )
         assertEquals("doc-123", backend.pendingSyncRequest.workSpec.input.getString(PendingSyncWorker.KEY_DOCUMENT_ID))
         assertEquals(
             listOf(StatusUpdate("doc-123", "sync-queued", "Queued Garland sync in background")),
@@ -35,6 +38,7 @@ class GarlandWorkSchedulerTest {
 
         assertEquals("garland-pending-sync:all", backend.pendingSyncName)
         assertNull(backend.pendingSyncRequest.workSpec.input.getString(PendingSyncWorker.KEY_DOCUMENT_ID))
+        assertNull(backend.pendingSyncRequest.workSpec.input.getStringArray(PendingSyncWorker.KEY_RELAYS))
     }
 
     @Test
@@ -43,10 +47,11 @@ class GarlandWorkSchedulerTest {
         val statusStore = RecordingSyncStatusStore()
         val scheduler = GarlandWorkScheduler(backend, statusStore)
 
-        scheduler.enqueueRestore("doc-restore")
+        scheduler.enqueueRestore("doc-restore", privateKeyHex = "deadbeef")
 
         assertEquals("garland-restore:doc-restore", backend.restoreName)
         assertEquals("doc-restore", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_DOCUMENT_ID))
+        assertEquals("deadbeef", backend.restoreRequest.workSpec.input.getString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX))
         assertEquals(
             listOf(StatusUpdate("doc-restore", "restore-queued", "Queued Garland restore in background")),
             statusStore.updates,

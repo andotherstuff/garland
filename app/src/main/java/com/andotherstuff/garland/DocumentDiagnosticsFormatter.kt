@@ -1,6 +1,9 @@
 package com.andotherstuff.garland
 
 object DocumentDiagnosticsFormatter {
+    private const val MALFORMED_DIAGNOSTICS_LABEL = "Stored diagnostics: Unreadable sync details"
+    private const val MALFORMED_UPLOAD_PLAN_LABEL = "Stored upload plan: Unreadable plan metadata"
+
     data class DetailSections(
         val overview: String,
         val uploadsLabel: String?,
@@ -9,7 +12,7 @@ object DocumentDiagnosticsFormatter {
         val relays: String?,
     )
 
-    fun listLabel(record: LocalDocumentRecord, summary: GarlandPlanSummary?, isSelected: Boolean): String {
+    fun listLabel(record: LocalDocumentRecord, summary: GarlandPlanSummary?, isSelected: Boolean, planMalformed: Boolean = false): String {
         val header = buildString {
             if (isSelected) append("* ")
             append(record.displayName)
@@ -22,7 +25,8 @@ object DocumentDiagnosticsFormatter {
             diagnostics += "blocks ${it.blockCount}"
             diagnostics += "servers ${it.serverCount}"
         }
-        val details = DocumentSyncDiagnosticsCodec.decode(record.lastSyncDetailsJson)
+        val decodeResult = DocumentSyncDiagnosticsCodec.decodeResult(record.lastSyncDetailsJson)
+        val details = decodeResult.diagnostics
         val uploadFailures = details?.uploads?.count { it.status != "ok" } ?: 0
         val relayFailures = details?.relays?.count { it.status != "ok" } ?: 0
         if (!details?.uploads.isNullOrEmpty()) {
@@ -39,6 +43,12 @@ object DocumentDiagnosticsFormatter {
                 "relay fail $relayFailures/${details!!.relays.size}"
             }
         }
+        if (decodeResult.malformed) {
+            diagnostics += "diagnostics unreadable"
+        }
+        if (planMalformed) {
+            diagnostics += "plan unreadable"
+        }
         if (details == null) {
             record.lastSyncMessage
                 ?.trim()
@@ -50,7 +60,7 @@ object DocumentDiagnosticsFormatter {
             .joinToString("\n")
     }
 
-    fun detailSections(record: LocalDocumentRecord?, summary: GarlandPlanSummary?): DetailSections {
+    fun detailSections(record: LocalDocumentRecord?, summary: GarlandPlanSummary?, planMalformed: Boolean = false): DetailSections {
         if (record == null) {
             return DetailSections(
                 overview = "Select a document to inspect diagnostics.",
@@ -67,12 +77,19 @@ object DocumentDiagnosticsFormatter {
             lines += "Blocks: ${it.blockCount}"
             lines += "Servers: ${it.serverCount}"
         }
-        val diagnostics = DocumentSyncDiagnosticsCodec.decode(record.lastSyncDetailsJson)
+        val decodeResult = DocumentSyncDiagnosticsCodec.decodeResult(record.lastSyncDetailsJson)
+        val diagnostics = decodeResult.diagnostics
         diagnostics?.uploads?.takeIf { it.isNotEmpty() }?.let {
             lines += endpointSummaryLine("Uploads", it)
         }
         diagnostics?.relays?.takeIf { it.isNotEmpty() }?.let {
             lines += endpointSummaryLine("Relays", it)
+        }
+        if (decodeResult.malformed) {
+            lines += MALFORMED_DIAGNOSTICS_LABEL
+        }
+        if (planMalformed) {
+            lines += MALFORMED_UPLOAD_PLAN_LABEL
         }
         val uploadDiagnostics = diagnostics?.uploads?.takeIf { it.isNotEmpty() }
         val legacyUploadFailure = extractLegacyUploadFailure(record.lastSyncMessage)
@@ -109,8 +126,8 @@ object DocumentDiagnosticsFormatter {
         )
     }
 
-    fun detailText(record: LocalDocumentRecord?, summary: GarlandPlanSummary?): String {
-        val sections = detailSections(record, summary)
+    fun detailText(record: LocalDocumentRecord?, summary: GarlandPlanSummary?, planMalformed: Boolean = false): String {
+        val sections = detailSections(record, summary, planMalformed)
         return listOf(
             sections.overview,
             sections.uploads?.let { "${sections.uploadsLabel}:\n$it" },
@@ -118,20 +135,20 @@ object DocumentDiagnosticsFormatter {
         ).filterNotNull().joinToString("\n")
     }
 
-    fun hasUploadDiagnostics(record: LocalDocumentRecord?, summary: GarlandPlanSummary?): Boolean {
-        return !detailSections(record, summary).uploads.isNullOrBlank()
+    fun hasUploadDiagnostics(record: LocalDocumentRecord?, summary: GarlandPlanSummary?, planMalformed: Boolean = false): Boolean {
+        return !detailSections(record, summary, planMalformed).uploads.isNullOrBlank()
     }
 
-    fun hasRelayDiagnostics(record: LocalDocumentRecord?): Boolean {
-        return !detailSections(record, summary = null).relays.isNullOrBlank()
+    fun hasRelayDiagnostics(record: LocalDocumentRecord?, planMalformed: Boolean = false): Boolean {
+        return !detailSections(record, summary = null, planMalformed = planMalformed).relays.isNullOrBlank()
     }
 
-    fun uploadSectionText(record: LocalDocumentRecord?, summary: GarlandPlanSummary?): String? {
-        return detailSections(record, summary).uploads
+    fun uploadSectionText(record: LocalDocumentRecord?, summary: GarlandPlanSummary?, planMalformed: Boolean = false): String? {
+        return detailSections(record, summary, planMalformed).uploads
     }
 
-    fun relaySectionText(record: LocalDocumentRecord?): String? {
-        return detailSections(record, summary = null).relays
+    fun relaySectionText(record: LocalDocumentRecord?, planMalformed: Boolean = false): String? {
+        return detailSections(record, summary = null, planMalformed = planMalformed).relays
     }
 
     fun statusLabel(status: String): String {

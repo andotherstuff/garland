@@ -157,12 +157,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         GarlandProviderContract.trackSearchQuery(context!!.applicationContext, needle)
 
         store.listDocuments()
-            .filter {
-                it.displayName.lowercase().contains(needle) ||
-                    it.uploadStatus.lowercase().contains(needle) ||
-                    it.mimeType.lowercase().contains(needle) ||
-                    it.lastSyncMessage.orEmpty().lowercase().contains(needle)
-            }
+            .filter { ProviderSearchMatcher.matches(it, needle) }
             .forEach { includeRecord(result, it) }
         return result
     }
@@ -269,14 +264,17 @@ class GarlandDocumentsProvider : DocumentsProvider() {
     }
 
     private fun buildSummary(record: LocalDocumentRecord): String {
-        val status = record.lastSyncMessage?.takeIf { it.isNotBlank() } ?: record.uploadStatus
-        return "${record.mimeType} - $status"
+        return ProviderDocumentSummaryFormatter.build(record)
     }
 
-    private fun supportsThumbnail(mimeType: String): Boolean = mimeType.startsWith("image/")
+    private fun supportsThumbnail(mimeType: String): Boolean = mimeType.startsWith("image/", ignoreCase = true)
 
     private fun resolveMimeType(mimeType: String?, displayName: String): String {
-        val requestedMimeType = mimeType?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+        val requestedMimeType = mimeType
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?.lowercase()
+            ?: "application/octet-stream"
         if (requestedMimeType != "application/octet-stream") {
             return requestedMimeType
         }

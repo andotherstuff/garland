@@ -23,34 +23,39 @@ class GarlandWorkScheduler internal constructor(
     )
 
     fun enqueuePendingSync(relayUrls: List<String>, documentId: String? = null): UUID {
+        val relaySnapshot = relayUrls
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
         documentId?.let {
             statusStore.updateUploadStatus(it, "sync-queued", "Queued Garland sync in background")
+        }
+        val requestData = Data.Builder()
+            .putString(PendingSyncWorker.KEY_DOCUMENT_ID, documentId)
+        if (relaySnapshot.isNotEmpty()) {
+            requestData.putStringArray(PendingSyncWorker.KEY_RELAYS, relaySnapshot.toTypedArray())
         }
         val request = OneTimeWorkRequestBuilder<PendingSyncWorker>()
             .setConstraints(networkConstraints())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .setInputData(
-                Data.Builder()
-                    .putString(PendingSyncWorker.KEY_DOCUMENT_ID, documentId)
-                    .build()
-            )
+            .setInputData(requestData.build())
             .build()
         workManager.enqueueUniquePendingSync(pendingSyncWorkName(documentId), request)
         return request.id
     }
 
-    fun enqueueRestore(documentId: String): UUID {
+    fun enqueueRestore(documentId: String, privateKeyHex: String? = null): UUID {
         statusStore.updateUploadStatus(documentId, "restore-queued", "Queued Garland restore in background")
+        val requestData = Data.Builder()
+            .putString(RestoreDocumentWorker.KEY_DOCUMENT_ID, documentId)
+        privateKeyHex
+            ?.takeIf { it.isNotBlank() }
+            ?.let { requestData.putString(RestoreDocumentWorker.KEY_PRIVATE_KEY_HEX, it) }
         val request = OneTimeWorkRequestBuilder<RestoreDocumentWorker>()
             .setConstraints(networkConstraints())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .setInputData(
-                Data.Builder()
-                    .putString(RestoreDocumentWorker.KEY_DOCUMENT_ID, documentId)
-                    .build()
-            )
+            .setInputData(requestData.build())
             .build()
         workManager.enqueueUniqueRestore(restoreWorkName(documentId), request)
         return request.id
