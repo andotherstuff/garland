@@ -41,9 +41,9 @@ Current target: `v0.0.2-alpha`
 
 ## What is still blocking the release
 
-1. The release docs and handoff need to say clearly that connected-device and manual device validation are deferred until after publish.
-2. The final release must run from a fresh clean worktree aligned with `origin/main`.
-3. After publish, someone still needs to do production or real-device validation and report back any fallout quickly.
+1. The final release must run from a fresh clean worktree aligned with `origin/main`.
+2. The release owner still needs to capture the final APK path, SHA-256 file path, and GitHub prerelease URL.
+3. A named owner still needs to handle post-release connected and manual device validation and report back any fallout quickly.
 
 ## Non-negotiable workflow rules
 
@@ -141,7 +141,7 @@ Goal: make the release docs reflect reality before and after publish.
 The release is ready only when all of the following are true:
 
 - [x] Deferred device-validation risk is documented in the release docs
-- [ ] Release docs match reality
+- [x] Release docs match reality
 - [ ] Final release run happens from a clean worktree aligned with latest `origin/main`
 - [ ] `automation/release_alpha.sh v0.0.2-alpha` completes successfully
 - [ ] Signed APK, SHA-256, and GitHub prerelease are all captured

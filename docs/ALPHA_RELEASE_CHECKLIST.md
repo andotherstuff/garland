@@ -62,4 +62,4 @@ Evidence to capture:
 - [ ] `automation/release_alpha.sh v0.0.2-alpha` runs from a fresh clean worktree aligned with `origin/main`
 - [ ] Signed APK path, SHA-256 path, and GitHub prerelease URL are captured
 - [ ] A named owner is assigned for post-release connected and manual validation
-- [ ] `README.md`, `docs/CURRENT_STATUS.md`, and `NEXT_WAVE.md` match the release state
+- [x] `README.md`, `docs/CURRENT_STATUS.md`, and `NEXT_WAVE.md` match the release state
