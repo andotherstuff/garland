@@ -1,5 +1,33 @@
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoReport
+import java.util.Properties
+
+val releaseSigningPropertiesPath =
+    System.getenv("GARLAND_RELEASE_PROPERTIES")
+        ?: "${System.getProperty("user.home")}/.config/garland/release/signing.properties"
+val releaseSigningProperties = Properties()
+val releaseSigningFile = file(releaseSigningPropertiesPath)
+if (releaseSigningFile.exists()) {
+    releaseSigningFile.inputStream().use(releaseSigningProperties::load)
+}
+
+val hasReleaseSigning = listOf(
+    "storeFile",
+    "storePassword",
+    "keyAlias",
+    "keyPassword",
+).all { !releaseSigningProperties.getProperty(it).isNullOrBlank() }
+
+val releaseTaskRequested = gradle.startParameter.taskNames.any {
+    it.contains("Release", ignoreCase = true)
+}
+
+if (releaseTaskRequested && !hasReleaseSigning) {
+    throw GradleException(
+        "Missing Garland release signing properties at $releaseSigningPropertiesPath. " +
+            "Run automation/release_alpha.sh or set GARLAND_RELEASE_PROPERTIES."
+    )
+}
 
 plugins {
     id("com.android.application")
@@ -19,15 +47,29 @@ android {
         applicationId = "com.andotherstuff.garland"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.0.1-alpha"
+        versionCode = 2
+        versionName = "0.0.2-alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseSigningProperties.getProperty("storeFile"))
+                storePassword = releaseSigningProperties.getProperty("storePassword")
+                keyAlias = releaseSigningProperties.getProperty("keyAlias")
+                keyPassword = releaseSigningProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

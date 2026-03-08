@@ -2,13 +2,15 @@
 
 ## Verified in this repo
 
-- release target is `v0.0.1-alpha`
+- release target is `v0.0.2-alpha`
 - No-device alpha verification passes with `automation/verify_alpha_no_device.sh`
 - Android unit tests pass with `./gradlew testDebugUnitTest`
 - Android JVM coverage report generates with `./gradlew jacocoDebugUnitTestReport`
 - Android JVM coverage summary prints with `python3 automation/report_android_unit_coverage.py`
 - Android instrumentation sources compile with `./gradlew compileDebugAndroidTestKotlin`
 - Debug APK builds with `./gradlew assembleDebug`
+- Signed release APK builds with `./gradlew assembleRelease` when Garland release signing is configured
+- `automation/release_alpha.sh v0.0.2-alpha` now covers the signed alpha release path from a clean worktree aligned with `origin/main`
 - Android lint passes with `./gradlew lintDebug`
 - Rust core tests pass with `cargo test`
 
@@ -46,6 +48,7 @@
 - `python3 automation/report_android_unit_coverage.py` -> 59% instruction, 50% branch, 57.2% line coverage
 - `./gradlew compileDebugAndroidTestKotlin` -> pass
 - `./gradlew assembleDebug` -> pass
+- `./gradlew assembleRelease` -> pass with local Garland signing material
 - `./gradlew lintDebug` -> pass
 - `cargo test` -> pass
 - `adb devices` -> command works, but no emulator or device is currently attached
