@@ -1,5 +1,6 @@
 package com.andotherstuff.garland
 
+import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
@@ -14,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.CoreMatchers.containsString
 import org.junit.After
 import org.junit.Before
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -75,16 +77,67 @@ class MainActivityDiagnosticsTest {
     }
 
     @Test
-    fun showsFirstFailingEndpointsInDocumentListSummary() {
+    fun rendersFailingStructuredEndpointsBeforeSuccessfulOnes() {
         val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
             DocumentSyncDiagnostics(
                 uploads = listOf(
                     DocumentEndpointDiagnostic("https://blossom.one", "ok", "Uploaded share a1"),
                     DocumentEndpointDiagnostic("https://blossom.two", "failed", "HTTP 500"),
+                    DocumentEndpointDiagnostic("https://blossom.three", "ok", "Uploaded share a3"),
                 ),
                 relays = listOf(
                     DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event"),
                     DocumentEndpointDiagnostic("wss://relay.two", "failed", "timeout"),
+                    DocumentEndpointDiagnostic("wss://relay.three", "ok", "Relay accepted mirror event"),
+                ),
+            )
+        )
+        val document = store.upsertPreparedDocument(
+            documentId = "doc-failure-first-order",
+            displayName = "failure-first-order.txt",
+            mimeType = "text/plain",
+            content = "hello world".toByteArray(),
+            uploadPlanJson = sampleUploadPlanJson(documentId = "doc-failure-first-order"),
+        )
+        store.updateUploadDiagnostics(
+            documentId = document.documentId,
+            status = "relay-published-partial",
+            message = "Published to 2/3 relays; failed: wss://relay.two (timeout)",
+            diagnosticsJson = diagnosticsJson,
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Uploads (1/3 failed)")))
+            onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (1/3 failed)")))
+
+            scenario.onActivity { activity ->
+                assertLineOrder(
+                    textView = activity.findViewById(R.id.activeDocumentUploadsText),
+                    first = "- blossom.two [Failed] HTTP 500",
+                    second = "- blossom.one [OK] Uploaded share a1",
+                )
+                assertLineOrder(
+                    textView = activity.findViewById(R.id.activeDocumentRelaysText),
+                    first = "- relay.two [Failed] timeout",
+                    second = "- relay.one [OK] Relay accepted commit event",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun showsRemainingFailureCountsInDocumentListSummary() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(
+                    DocumentEndpointDiagnostic("https://blossom.one", "failed", "HTTP 500"),
+                    DocumentEndpointDiagnostic("https://blossom.two", "failed", "timeout"),
+                    DocumentEndpointDiagnostic("https://blossom.three", "ok", "Uploaded share a3"),
+                ),
+                relays = listOf(
+                    DocumentEndpointDiagnostic("wss://relay.one", "failed", "timeout"),
+                    DocumentEndpointDiagnostic("wss://relay.two", "failed", "auth required"),
+                    DocumentEndpointDiagnostic("wss://relay.three", "ok", "Relay accepted commit event"),
                 ),
             )
         )
@@ -98,13 +151,13 @@ class MainActivityDiagnosticsTest {
         store.updateUploadDiagnostics(
             documentId = document.documentId,
             status = "relay-published-partial",
-            message = "Published to 1/2 relays; failed: wss://relay.two (timeout)",
+            message = "Published to 1/3 relays; failed: wss://relay.one (timeout), wss://relay.two (auth required)",
             diagnosticsJson = diagnosticsJson,
         )
 
         ActivityScenario.launch(MainActivity::class.java).use {
-            onView(withText(containsString("upload fail 1/2 (blossom.two: HTTP 500)"))).check(matches(isDisplayed()))
-            onView(withText(containsString("relay fail 1/2 (relay.two: timeout)"))).check(matches(isDisplayed()))
+            onView(withText(containsString("upload fail 2/3 (blossom.one: HTTP 500, +1 more)"))).check(matches(isDisplayed()))
+            onView(withText(containsString("relay fail 2/3 (relay.one: timeout, +1 more)"))).check(matches(isDisplayed()))
         }
     }
 
@@ -138,6 +191,41 @@ class MainActivityDiagnosticsTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Uploads (1/1 failed)")))
             onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("blossom.two [HTTP 500] Upload failed on https://blossom.two with HTTP 500"))))
+        }
+    }
+
+    @Test
+    fun showsStructuredPlanFailuresInDiagnostics() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                plan = listOf(
+                    DocumentPlanDiagnostic(
+                        field = "plan.uploads[1].share_id_hex",
+                        status = "invalid",
+                        detail = "Upload plan entry 1 has invalid share ID hex",
+                    )
+                )
+            )
+        )
+        val document = store.upsertPreparedDocument(
+            documentId = "doc-structured-plan-failure",
+            displayName = "structured-plan-failure.txt",
+            mimeType = "text/plain",
+            content = "hello world".toByteArray(),
+            uploadPlanJson = sampleUploadPlanJson(documentId = "doc-structured-plan-failure"),
+        )
+        store.updateUploadDiagnostics(
+            documentId = document.documentId,
+            status = "upload-plan-failed",
+            message = "Upload plan entry 1 has invalid share ID hex",
+            diagnosticsJson = diagnosticsJson,
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Plan checks: 0/1 ok"))))
+            onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Plan checks (1/1 failed)")))
+            onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("uploads[1].share_id_hex [Invalid] Upload plan entry 1 has invalid share ID hex"))))
+            onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withEffectiveVisibility(GONE)))
         }
     }
 
@@ -309,7 +397,8 @@ class MainActivityDiagnosticsTest {
             scenario.recreate()
 
             onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Status: Sync queued"))))
-            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Last result: Queued Garland sync in background"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Current state: Queued Garland sync in background"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Endpoint details below are from the last completed background attempt"))))
             onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Uploads (1/2 failed)")))
             onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("blossom.two [Failed] HTTP 500"))))
             onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (1/2 failed)")))
@@ -356,7 +445,7 @@ class MainActivityDiagnosticsTest {
             scenario.recreate()
 
             onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Status: Sync running"))))
-            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Last result: Running Garland sync in background"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Current state: Running Garland sync in background"))))
             onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Uploads (1/2 failed)")))
             onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("blossom.two [Failed] HTTP 500"))))
             onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (1/2 failed)")))
@@ -442,7 +531,7 @@ class MainActivityDiagnosticsTest {
             scenario.recreate()
 
             onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Status: Restore queued"))))
-            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Last result: Queued Garland restore in background"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Current state: Queued Garland restore in background"))))
             onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Uploads (1/2 failed)")))
             onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("blossom.two [Failed] HTTP 500"))))
             onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (1/2 failed)")))
@@ -452,7 +541,7 @@ class MainActivityDiagnosticsTest {
             scenario.recreate()
 
             onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Status: Restore running"))))
-            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Last result: Restoring Garland document in background"))))
+            onView(withId(R.id.activeDocumentDiagnosticsText)).check(matches(withText(containsString("Current state: Restoring Garland document in background"))))
             onView(withId(R.id.activeDocumentUploadsLabel)).check(matches(withText("Uploads (1/2 failed)")))
             onView(withId(R.id.activeDocumentUploadsText)).check(matches(withText(containsString("blossom.two [Failed] HTTP 500"))))
             onView(withId(R.id.activeDocumentRelaysLabel)).check(matches(withText("Relays (1/2 failed)")))
@@ -631,5 +720,18 @@ $blocksJson
     private fun clearAppState() {
         targetContext.deleteSharedPreferences("garland-session")
         targetContext.filesDir.resolve("garland-documents").deleteRecursively()
+    }
+
+    private fun assertLineOrder(textView: TextView, first: String, second: String) {
+        val rendered = textView.text.toString()
+        val firstIndex = rendered.indexOf(first)
+        val secondIndex = rendered.indexOf(second)
+
+        assertTrue("Missing '$first' in:\n$rendered", firstIndex >= 0)
+        assertTrue("Missing '$second' in:\n$rendered", secondIndex >= 0)
+        assertTrue(
+            "Expected '$first' before '$second' in:\n$rendered",
+            firstIndex < secondIndex,
+        )
     }
 }

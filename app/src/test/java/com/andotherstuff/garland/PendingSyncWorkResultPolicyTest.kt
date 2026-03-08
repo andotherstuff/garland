@@ -7,6 +7,9 @@ import org.junit.Test
 class PendingSyncWorkResultPolicyTest {
     @Test
     fun doesNotRetryPermanentSyncFailures() {
+        assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", "Unreadable upload plan metadata"))))
+        assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", "Upload plan entry 1 is missing Blossom server URL"))))
+        assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", null))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", "No upload plan found"))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("upload-plan-failed", "Invalid upload plan"))))
         assertFalse(PendingSyncWorkResultPolicy.shouldRetry(listOf(record("relay-publish-failed", "Upload plan is missing commit event"))))
@@ -27,7 +30,7 @@ class PendingSyncWorkResultPolicyTest {
         assertTrue(PendingSyncWorkResultPolicy.shouldRetry(emptyList()))
     }
 
-    private fun record(status: String, message: String): LocalDocumentRecord {
+    private fun record(status: String, message: String?): LocalDocumentRecord {
         return LocalDocumentRecord(
             documentId = "doc123",
             displayName = "note.txt",

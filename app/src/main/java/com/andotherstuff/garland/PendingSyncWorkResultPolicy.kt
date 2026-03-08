@@ -21,6 +21,7 @@ internal object PendingSyncWorkResultPolicy {
 
     private fun shouldRetry(record: LocalDocumentRecord): Boolean {
         val normalized = record.lastSyncMessage?.trim().orEmpty()
+        if (record.uploadStatus == "upload-plan-failed") return false
         if (normalized.isBlank()) return true
         if (normalized in permanentFailures) return false
         if (record.uploadStatus == "relay-publish-failed" && isPermanentRelayFailure(normalized)) return false

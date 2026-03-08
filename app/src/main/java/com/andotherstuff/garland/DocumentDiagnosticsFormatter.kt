@@ -3,8 +3,11 @@ package com.andotherstuff.garland
 object DocumentDiagnosticsFormatter {
     private const val MALFORMED_DIAGNOSTICS_LABEL = "Stored diagnostics: Unreadable sync details"
     private const val MALFORMED_UPLOAD_PLAN_LABEL = "Stored upload plan: Unreadable plan metadata"
+    private const val PRESERVED_DIAGNOSTICS_LABEL = "Endpoint details below are from the last completed background attempt"
+    private const val PLAN_CHECKS_LABEL = "Plan checks"
     private val relayProgressPattern = Regex("Published to \\d+/(\\d+) relays")
     private val urlSchemePattern = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
+    private val activeBackgroundStatuses = setOf("sync-queued", "sync-running", "restore-queued", "restore-running")
 
     data class DetailSections(
         val overview: String,
@@ -29,8 +32,16 @@ object DocumentDiagnosticsFormatter {
         }
         val decodeResult = DocumentSyncDiagnosticsCodec.decodeResult(record.lastSyncDetailsJson)
         val details = decodeResult.diagnostics
+        val planFailures = details?.plan?.count { it.status == "ok" }?.let { details.plan.size - it } ?: 0
         val uploadFailures = details?.uploads?.count { it.status != "ok" } ?: 0
         val relayFailures = details?.relays?.count { it.status != "ok" } ?: 0
+        if (!details?.plan.isNullOrEmpty()) {
+            diagnostics += if (planFailures == 0) {
+                "plan ok"
+            } else {
+                listPlanFailureSummary(planFailures, details!!.plan)
+            }
+        }
         if (!details?.uploads.isNullOrEmpty()) {
             diagnostics += if (uploadFailures == 0) {
                 "uploads ok"
@@ -76,13 +87,19 @@ object DocumentDiagnosticsFormatter {
         }
         val lines = mutableListOf<String>()
         lines += "Status: ${formatStatus(record.uploadStatus)}"
-        lines += diagnosticLines(record.lastSyncMessage)
+        lines += diagnosticLines(record.uploadStatus, record.lastSyncMessage)
         summary?.let {
             lines += "Blocks: ${it.blockCount}"
             lines += "Servers: ${it.serverCount}"
         }
         val decodeResult = DocumentSyncDiagnosticsCodec.decodeResult(record.lastSyncDetailsJson)
         val diagnostics = decodeResult.diagnostics
+        val planDiagnostics = diagnostics?.plan
+            ?.takeIf { it.isNotEmpty() }
+            ?.let(::prioritizeFailingPlanDiagnostics)
+        planDiagnostics?.let {
+            lines += planSummaryLine(PLAN_CHECKS_LABEL, it)
+        }
         diagnostics?.uploads?.takeIf { it.isNotEmpty() }?.let {
             lines += endpointSummaryLine("Uploads", it)
         }
@@ -95,21 +112,27 @@ object DocumentDiagnosticsFormatter {
         if (planMalformed) {
             lines += MALFORMED_UPLOAD_PLAN_LABEL
         }
-        val uploadDiagnostics = diagnostics?.uploads?.takeIf { it.isNotEmpty() }
+        val uploadDiagnostics = diagnostics?.uploads
+            ?.takeIf { it.isNotEmpty() }
+            ?.let(::prioritizeFailingEndpoints)
         val legacyUploadFailure = extractLegacyUploadFailure(record.lastSyncMessage)
         val uploads = when {
+            !planDiagnostics.isNullOrEmpty() -> planDiagnostics.joinToString("\n", transform = ::formatPlanDiagnostic)
             !uploadDiagnostics.isNullOrEmpty() -> uploadDiagnostics.joinToString("\n", transform = ::formatEndpointDiagnostic)
             legacyUploadFailure != null -> formatLegacyUploadFailureLine(legacyUploadFailure)
             !summary?.servers.isNullOrEmpty() -> summary.servers.joinToString("\n", transform = ::normalizeServer)
             else -> null
         }
         val uploadsLabel = when {
+            !planDiagnostics.isNullOrEmpty() -> planSectionLabel(PLAN_CHECKS_LABEL, planDiagnostics)
             !uploadDiagnostics.isNullOrEmpty() -> endpointSectionLabel("Uploads", uploadDiagnostics)
             legacyUploadFailure != null -> "Uploads (1 failed)"
             !summary?.servers.isNullOrEmpty() -> "Planned servers"
             else -> null
         }
-        val relayDiagnostics = diagnostics?.relays?.takeIf { it.isNotEmpty() }
+        val relayDiagnostics = diagnostics?.relays
+            ?.takeIf { it.isNotEmpty() }
+            ?.let(::prioritizeFailingEndpoints)
         val legacyRelayFailures = extractFailureEntries(record.lastSyncMessage)
         val relays = when {
             !relayDiagnostics.isNullOrEmpty() -> relayDiagnostics.joinToString("\n", transform = ::formatEndpointDiagnostic)
@@ -120,6 +143,9 @@ object DocumentDiagnosticsFormatter {
             !relayDiagnostics.isNullOrEmpty() -> endpointSectionLabel("Relays", relayDiagnostics)
             legacyRelayFailures.isNotEmpty() -> "Relays (${legacyRelayFailures.size} failed)"
             else -> null
+        }
+        if (shouldShowPreservedDiagnosticsHint(record.uploadStatus, uploads, relays)) {
+            lines += PRESERVED_DIAGNOSTICS_LABEL
         }
         return DetailSections(
             overview = lines.joinToString("\n"),
@@ -163,9 +189,40 @@ object DocumentDiagnosticsFormatter {
         return "- ${normalizeEndpointTarget(server)}"
     }
 
+    private fun shouldShowPreservedDiagnosticsHint(status: String, uploads: String?, relays: String?): Boolean {
+        return status in activeBackgroundStatuses && (!uploads.isNullOrBlank() || !relays.isNullOrBlank())
+    }
+
     private fun formatEndpointDiagnostic(diagnostic: DocumentEndpointDiagnostic): String {
         val target = normalizeEndpointTarget(diagnostic.target)
         return "- $target [${formatEndpointStatus(diagnostic.status)}] ${diagnostic.detail}"
+    }
+
+    private fun formatPlanDiagnostic(diagnostic: DocumentPlanDiagnostic): String {
+        return "- ${normalizePlanField(diagnostic.field)} [${formatPlanStatus(diagnostic.status)}] ${diagnostic.detail}"
+    }
+
+    private fun prioritizeFailingPlanDiagnostics(diagnostics: List<DocumentPlanDiagnostic>): List<DocumentPlanDiagnostic> {
+        return diagnostics.sortedBy { if (it.status == "ok") 1 else 0 }
+    }
+
+    private fun planSummaryLine(label: String, diagnostics: List<DocumentPlanDiagnostic>): String {
+        val okCount = diagnostics.count { it.status == "ok" }
+        return "$label: $okCount/${diagnostics.size} ok"
+    }
+
+    private fun planSectionLabel(label: String, diagnostics: List<DocumentPlanDiagnostic>): String {
+        val okCount = diagnostics.count { it.status == "ok" }
+        val failureCount = diagnostics.size - okCount
+        return if (failureCount == 0) {
+            "$label ($okCount/${diagnostics.size} ok)"
+        } else {
+            "$label ($failureCount/${diagnostics.size} failed)"
+        }
+    }
+
+    private fun prioritizeFailingEndpoints(diagnostics: List<DocumentEndpointDiagnostic>): List<DocumentEndpointDiagnostic> {
+        return diagnostics.sortedBy { if (it.status == "ok") 1 else 0 }
     }
 
     private fun endpointSummaryLine(label: String, diagnostics: List<DocumentEndpointDiagnostic>): String {
@@ -192,7 +249,24 @@ object DocumentDiagnosticsFormatter {
         val target = normalizeFailureEntry(firstFailure.target)
         val detail = summarizeFailureDetail(firstFailure.detail, formatEndpointStatus(firstFailure.status))
             ?: formatEndpointStatus(firstFailure.status)
-        return "$prefix fail $failureCount/${diagnostics.size} ($target: $detail)"
+        return "$prefix fail $failureCount/${diagnostics.size} ($target: $detail${remainingFailureSuffix(failureCount)})"
+    }
+
+    private fun listPlanFailureSummary(failureCount: Int, diagnostics: List<DocumentPlanDiagnostic>): String {
+        val firstFailure = diagnostics.firstOrNull { it.status != "ok" }
+        if (firstFailure == null) {
+            return "plan fail $failureCount/${diagnostics.size}"
+        }
+
+        val field = normalizePlanField(firstFailure.field)
+        val detail = summarizeFailureDetail(firstFailure.detail, formatPlanStatus(firstFailure.status))
+            ?: formatPlanStatus(firstFailure.status)
+        return "plan fail $failureCount/${diagnostics.size} ($field: $detail${remainingFailureSuffix(failureCount)})"
+    }
+
+    private fun remainingFailureSuffix(failureCount: Int): String {
+        val remainingFailures = failureCount - 1
+        return if (remainingFailures > 0) ", +$remainingFailures more" else ""
     }
 
     private fun legacyListSummary(message: String?): String? {
@@ -217,17 +291,26 @@ object DocumentDiagnosticsFormatter {
         }
     }
 
-    private fun diagnosticLines(message: String?): List<String> {
+    private fun diagnosticLines(status: String, message: String?): List<String> {
         val trimmed = message?.trim().orEmpty()
         if (trimmed.isEmpty()) return listOf("Last result: No sync result yet")
 
         val parts = splitFailureMessage(trimmed)
-        val lines = mutableListOf("Last result: ${parts[0].trim()}")
+        val resultLabel = if (shouldDescribeCurrentState(status, trimmed)) {
+            "Current state"
+        } else {
+            "Last result"
+        }
+        val lines = mutableListOf("$resultLabel: ${parts[0].trim()}")
         if (parts.size == 2) {
             lines += "Failures:"
             lines += extractFailureEntries(trimmed).map { "- $it" }
         }
         return lines
+    }
+
+    private fun shouldDescribeCurrentState(status: String, message: String): Boolean {
+        return status in activeBackgroundStatuses && message.contains("background", ignoreCase = true)
     }
 
     private fun extractFailureEntries(message: String?): List<String> {
@@ -319,6 +402,10 @@ object DocumentDiagnosticsFormatter {
         return normalizeEndpointTarget(entry)
     }
 
+    private fun normalizePlanField(field: String): String {
+        return field.trim().removePrefix("plan.").ifBlank { "plan" }
+    }
+
     private fun normalizeEndpointTarget(target: String): String {
         return target.trim().replace(urlSchemePattern, "")
     }
@@ -333,6 +420,10 @@ object DocumentDiagnosticsFormatter {
     }
 
     private fun formatEndpointStatus(status: String): String {
+        return formatStatus(status)
+    }
+
+    private fun formatPlanStatus(status: String): String {
         return formatStatus(status)
     }
 

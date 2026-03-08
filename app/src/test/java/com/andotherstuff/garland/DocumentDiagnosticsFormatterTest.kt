@@ -148,6 +148,104 @@ class DocumentDiagnosticsFormatterTest {
     }
 
     @Test
+    fun surfacesStructuredPlanFailuresInListAndDetailSections() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                plan = listOf(
+                    DocumentPlanDiagnostic(
+                        field = "plan.uploads[1].share_id_hex",
+                        status = "invalid",
+                        detail = "Upload plan entry 1 has invalid share ID hex",
+                    )
+                )
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "upload-plan-failed",
+            lastSyncMessage = "Upload plan entry 1 has invalid share ID hex",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+
+        val label = DocumentDiagnosticsFormatter.listLabel(record, summary = null, isSelected = false)
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+
+        assertTrue(label.contains("plan fail 1/1 (uploads[1].share_id_hex:"))
+        assertTrue(sections.overview.contains("Plan checks: 0/1 ok"))
+        assertEquals("Plan checks (1/1 failed)", sections.uploadsLabel)
+        assertEquals(
+            "- uploads[1].share_id_hex [Invalid] Upload plan entry 1 has invalid share ID hex",
+            sections.uploads,
+        )
+        assertEquals(null, sections.relaysLabel)
+    }
+
+    @Test
+    fun addsRemainingFailureCountsToStructuredListSummaries() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(
+                    DocumentEndpointDiagnostic("https://blossom.one", "failed", "HTTP 500"),
+                    DocumentEndpointDiagnostic("https://blossom.two", "failed", "timeout"),
+                    DocumentEndpointDiagnostic("https://blossom.three", "ok", "Uploaded share a3"),
+                ),
+                relays = listOf(
+                    DocumentEndpointDiagnostic("wss://relay.one", "failed", "timeout"),
+                    DocumentEndpointDiagnostic("wss://relay.two", "failed", "auth required"),
+                    DocumentEndpointDiagnostic("wss://relay.three", "ok", "Relay accepted commit event"),
+                ),
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "relay-published-partial",
+            lastSyncMessage = "Published to 1/3 relays; failed: wss://relay.one (timeout), wss://relay.two (auth required)",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+
+        val label = DocumentDiagnosticsFormatter.listLabel(record, summary = null, isSelected = false)
+
+        assertTrue(label.contains("upload fail 2/3 (blossom.one: HTTP 500, +1 more)"))
+        assertTrue(label.contains("relay fail 2/3 (relay.one: timeout, +1 more)"))
+    }
+
+    @Test
+    fun addsRemainingFailureCountsToPlanListSummaries() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                plan = listOf(
+                    DocumentPlanDiagnostic("plan.uploads[0].share_id_hex", "invalid", "Upload plan entry 0 has invalid share ID hex"),
+                    DocumentPlanDiagnostic("plan.manifest.blocks", "missing", "Manifest blocks are missing"),
+                    DocumentPlanDiagnostic("plan.commit_event", "ok", "Commit event present"),
+                )
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "upload-plan-failed",
+            lastSyncMessage = "Upload plan validation failed",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+
+        val label = DocumentDiagnosticsFormatter.listLabel(record, summary = null, isSelected = false)
+
+        assertTrue(label.contains("plan fail 2/3 (uploads[0].share_id_hex:"))
+        assertTrue(label.contains(", +1 more)"))
+    }
+
+    @Test
     fun fallsBackToHeaderWhenNoDiagnosticsExist() {
         val record = LocalDocumentRecord(
             documentId = "doc123",
@@ -347,6 +445,106 @@ class DocumentDiagnosticsFormatterTest {
         assertTrue(sections.relaysLabel?.contains("Relays") == true)
         assertTrue(sections.relaysLabel?.contains("(") == true)
         assertTrue(sections.relaysLabel?.contains("failed") == true)
+    }
+
+    @Test
+    fun prioritizesFailingEndpointsAtTopOfStructuredDiagnosticsSections() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(
+                    DocumentEndpointDiagnostic("https://blossom.one", "ok", "Uploaded share a1"),
+                    DocumentEndpointDiagnostic("https://blossom.two", "failed", "HTTP 500"),
+                    DocumentEndpointDiagnostic("https://blossom.three", "ok", "Uploaded share a3"),
+                ),
+                relays = listOf(
+                    DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event"),
+                    DocumentEndpointDiagnostic("wss://relay.two", "failed", "timeout"),
+                    DocumentEndpointDiagnostic("wss://relay.three", "ok", "Relay accepted commit event"),
+                ),
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "relay-published-partial",
+            lastSyncMessage = "Published to 2/3 relays; failed: wss://relay.two (timeout)",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+
+        assertEquals(
+            "- blossom.two [Failed] HTTP 500\n- blossom.one [OK] Uploaded share a1\n- blossom.three [OK] Uploaded share a3",
+            sections.uploads,
+        )
+        assertEquals(
+            "- relay.two [Failed] timeout\n- relay.one [OK] Relay accepted commit event\n- relay.three [OK] Relay accepted commit event",
+            sections.relays,
+        )
+    }
+
+    @Test
+    fun marksPreservedEndpointDetailsDuringBackgroundRetryStatuses() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                uploads = listOf(
+                    DocumentEndpointDiagnostic("https://blossom.one", "ok", "Uploaded share a1"),
+                    DocumentEndpointDiagnostic("https://blossom.two", "failed", "HTTP 500"),
+                ),
+                relays = listOf(
+                    DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event"),
+                    DocumentEndpointDiagnostic("wss://relay.two", "failed", "timeout"),
+                ),
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "sync-queued",
+            lastSyncMessage = "Queued Garland sync in background",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+
+        assertTrue(sections.overview.contains("Status: Sync queued"))
+        assertTrue(sections.overview.contains("Current state: Queued Garland sync in background"))
+        assertTrue(sections.overview.contains("Endpoint details below are from the last completed background attempt"))
+        assertEquals("Uploads (1/2 failed)", sections.uploadsLabel)
+        assertEquals("Relays (1/2 failed)", sections.relaysLabel)
+    }
+
+    @Test
+    fun keepsLastResultLabelWhenBackgroundStatusPreservesPriorOutcomeMessage() {
+        val diagnosticsJson = DocumentSyncDiagnosticsCodec.encode(
+            DocumentSyncDiagnostics(
+                relays = listOf(
+                    DocumentEndpointDiagnostic("wss://relay.one", "ok", "Relay accepted commit event"),
+                    DocumentEndpointDiagnostic("wss://relay.two", "failed", "timeout"),
+                ),
+            )
+        )
+        val record = LocalDocumentRecord(
+            documentId = "doc123",
+            displayName = "note.txt",
+            mimeType = "text/plain",
+            sizeBytes = 42,
+            updatedAt = 123,
+            uploadStatus = "sync-running",
+            lastSyncMessage = "Published to 1/2 relays; failed: wss://relay.two (timeout)",
+            lastSyncDetailsJson = diagnosticsJson,
+        )
+
+        val sections = DocumentDiagnosticsFormatter.detailSections(record, summary = null)
+
+        assertTrue(sections.overview.contains("Status: Sync running"))
+        assertTrue(sections.overview.contains("Last result: Published to 1/2 relays"))
     }
 
     @Test
