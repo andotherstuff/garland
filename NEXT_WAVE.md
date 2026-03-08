@@ -18,6 +18,7 @@ This file tracks the next integration wave after the current Garland MVP.
 
 - Android unit tests pass with `./gradlew testDebugUnitTest`
 - Android JVM coverage report generates with `./gradlew jacocoDebugUnitTestReport`
+- Android JVM coverage summary prints with `python3 automation/report_android_unit_coverage.py`
 - Rust core tests pass with `cargo test`
 - Android instrumentation sources compile with `./gradlew compileDebugAndroidTestKotlin`
 - debug build passes with `./gradlew assembleDebug`
@@ -106,4 +107,5 @@ This file tracks the next integration wave after the current Garland MVP.
 4. Work the alpha release checklist
     - run `automation/verify_alpha_no_device.sh`
     - capture `./gradlew jacocoDebugUnitTestReport`
+    - capture `python3 automation/report_android_unit_coverage.py`
     - finish the connected-device and manual sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`

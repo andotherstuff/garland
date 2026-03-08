@@ -5,6 +5,7 @@
 - No-device alpha verification passes with `automation/verify_alpha_no_device.sh`
 - Android unit tests pass with `./gradlew testDebugUnitTest`
 - Android JVM coverage report generates with `./gradlew jacocoDebugUnitTestReport`
+- Android JVM coverage summary prints with `python3 automation/report_android_unit_coverage.py`
 - Android instrumentation sources compile with `./gradlew compileDebugAndroidTestKotlin`
 - Debug APK builds with `./gradlew assembleDebug`
 - Android lint passes with `./gradlew lintDebug`
@@ -36,6 +37,7 @@
 - `automation/verify_alpha_no_device.sh` -> pass
 - `./gradlew testDebugUnitTest` -> pass
 - `./gradlew jacocoDebugUnitTestReport` -> pass
+- `python3 automation/report_android_unit_coverage.py` -> 59% instruction, 50% branch, 56.6% line coverage
 - `./gradlew compileDebugAndroidTestKotlin` -> pass
 - `./gradlew assembleDebug` -> pass
 - `./gradlew lintDebug` -> pass

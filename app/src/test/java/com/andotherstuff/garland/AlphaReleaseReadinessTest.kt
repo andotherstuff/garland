@@ -10,6 +10,7 @@ class AlphaReleaseReadinessTest {
         val script = repoFile("automation/verify_alpha_no_device.sh").readText()
 
         assertTrue(script.contains("jacocoDebugUnitTestReport"))
+        assertTrue(script.contains("report_android_unit_coverage.py"))
         assertTrue(script.contains("lintDebug"))
     }
 
