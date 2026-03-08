@@ -24,6 +24,8 @@ sha256 %6$s</string>
     <string name="diagnostics_refresh_button">Refresh diagnostics</string>
     <string name="diagnostics_copy_button">Copy report</string>
     <string name="diagnostics_copy_document_id_button">Copy ID</string>
+    <string name="diagnostics_priority_label">Priority</string>
+    <string name="diagnostics_signal_label">Signal trace</string>
     <string name="diagnostics_documents_label">Document diagnostics</string>
     <string name="diagnostics_history_label">Recent history</string>
     <string name="diagnostics_troubleshooting_label">Troubleshooting</string>

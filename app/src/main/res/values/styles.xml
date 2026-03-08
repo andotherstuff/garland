@@ -1,10 +1,18 @@
 <resources>
-    <style name="Widget.Garland.Card" parent="Widget.Material3.CardView.Elevated">
+    <style name="Widget.Garland.PanelCard" parent="Widget.Material3.CardView.Elevated">
         <item name="cardBackgroundColor">@color/garland_surface</item>
         <item name="strokeColor">@color/garland_outline</item>
         <item name="strokeWidth">1dp</item>
-        <item name="cardCornerRadius">24dp</item>
+        <item name="cardCornerRadius">28dp</item>
         <item name="cardElevation">0dp</item>
+    </style>
+
+    <style name="Widget.Garland.Card" parent="Widget.Garland.PanelCard" />
+
+    <style name="Widget.Garland.HeroCard" parent="Widget.Garland.PanelCard">
+        <item name="cardBackgroundColor">@color/garland_surface_high</item>
+        <item name="strokeColor">@color/garland_info</item>
+        <item name="strokeWidth">2dp</item>
     </style>
 
     <style name="Widget.Garland.ActionButton" parent="Widget.Material3.Button.OutlinedButton">
@@ -18,6 +26,28 @@
         <item name="android:textColor">@color/garland_bg</item>
     </style>
 
+    <style name="Widget.Garland.StatusChip" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:background">@drawable/bg_status_chip</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/garland_bg</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.08</item>
+    </style>
+
+    <style name="Widget.Garland.StatusChip.Success" parent="Widget.Garland.StatusChip" />
+
+    <style name="Widget.Garland.StatusChip.Warning" parent="Widget.Garland.StatusChip" />
+
+    <style name="Widget.Garland.StatusChip.Error" parent="Widget.Garland.StatusChip" />
+
+    <style name="Widget.Garland.StatusChip.Info" parent="Widget.Garland.StatusChip" />
+
+    <style name="Widget.Garland.StatusChip.Neutral" parent="Widget.Garland.StatusChip" />
+
     <style name="TextAppearance.Garland.SectionEyebrow" parent="TextAppearance.Material3.LabelMedium">
         <item name="android:textAllCaps">true</item>
         <item name="android:textColor">@color/garland_gold</item>
@@ -30,6 +60,20 @@
     </style>
 
     <style name="TextAppearance.Garland.BodyMuted" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/garland_muted</item>
+    </style>
+
+    <style name="TextAppearance.Garland.HeroTitle" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Garland.HeroBody" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">@color/garland_muted</item>
+    </style>
+
+    <style name="TextAppearance.Garland.DetailMono" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:fontFamily">monospace</item>
         <item name="android:textColor">@color/garland_muted</item>
     </style>
 </resources>

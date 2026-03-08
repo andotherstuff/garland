@@ -1,12 +1,14 @@
 <resources>
-    <color name="garland_bg">#09110F</color>
-    <color name="garland_surface">#101B18</color>
-    <color name="garland_surface_alt">#162522</color>
-    <color name="garland_ink">#E6F2ED</color>
-    <color name="garland_muted">#A1B8AF</color>
-    <color name="garland_leaf">#62C08B</color>
-    <color name="garland_gold">#D6B36D</color>
-    <color name="garland_outline">#28433D</color>
-    <color name="garland_warning">#FFB86B</color>
-    <color name="garland_error">#FF8A80</color>
+    <color name="garland_bg">#070B10</color>
+    <color name="garland_surface">#0F1720</color>
+    <color name="garland_surface_alt">#15212C</color>
+    <color name="garland_surface_high">#1C2B38</color>
+    <color name="garland_ink">#EDF4F7</color>
+    <color name="garland_muted">#97A9B8</color>
+    <color name="garland_leaf">#7CD5A1</color>
+    <color name="garland_gold">#F0C36A</color>
+    <color name="garland_info">#7AB8FF</color>
+    <color name="garland_outline">#293947</color>
+    <color name="garland_warning">#F7B955</color>
+    <color name="garland_error">#FF8F85</color>
 </resources>

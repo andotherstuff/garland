@@ -31,6 +31,30 @@ class UiThemeContractTest {
         assertTrue(mainLayout.contains("@string/troubleshooting_actions_label"))
     }
 
+    @Test
+    fun diagnosticsScreenUsesMissionControlHeroAndSectionPanels() {
+        val diagnosticsLayout = projectFile("app", "src", "main", "res", "layout", "activity_diagnostics.xml")
+
+        assertTrue(diagnosticsLayout.contains("diagnosticsHeroCard"))
+        assertTrue(diagnosticsLayout.contains("diagnosticsHeadlineToneText"))
+        assertTrue(diagnosticsLayout.contains("diagnosticsHeadlineText"))
+        assertTrue(diagnosticsLayout.contains("diagnosticsSummaryText"))
+        assertTrue(diagnosticsLayout.contains("@style/Widget.Garland.PanelCard"))
+    }
+
+    @Test
+    fun styleAndColorTokensExposeSemanticDiagnosticStates() {
+        val stylesXml = projectFile("app", "src", "main", "res", "values", "styles.xml")
+        val colorsXml = projectFile("app", "src", "main", "res", "values", "colors.xml")
+
+        assertTrue(stylesXml.contains("Widget.Garland.HeroCard"))
+        assertTrue(stylesXml.contains("Widget.Garland.StatusChip.Success"))
+        assertTrue(stylesXml.contains("Widget.Garland.StatusChip.Warning"))
+        assertTrue(stylesXml.contains("Widget.Garland.StatusChip.Error"))
+        assertTrue(colorsXml.contains("garland_info"))
+        assertTrue(colorsXml.contains("garland_surface_high"))
+    }
+
     private fun projectFile(vararg segments: String): String {
         val cwd = Path.of(System.getProperty("user.dir"))
         val repoRoot = if (cwd.resolve("app").toFile().exists()) cwd else cwd.parent
