@@ -1,13 +1,13 @@
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::commit_crypto::{encode_commit_content, encrypt_commit_payload};
-use crate::crypto::{decrypt_block, prepare_replication_upload, BlossomServer};
+use crate::crypto::{BlossomServer, decrypt_block, prepare_replication_upload};
 use crate::key_hierarchy::{derive_file_key as derive_file_key_from_master, derive_master_key};
-use crate::nostr_event::{sign_custom_event, SignedEvent, UnsignedEvent};
+use crate::nostr_event::{SignedEvent, UnsignedEvent, sign_custom_event};
 use crate::packaging::CONTENT_CAPACITY;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

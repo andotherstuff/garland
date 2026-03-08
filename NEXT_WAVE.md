@@ -104,7 +104,7 @@ This file tracks the next integration wave after the current Garland MVP.
 - [x] Harden upload/download retry handling and operator diagnostics without UI churn
 - [x] Align Garland block framing, random padding, and commit/file key primitives closer to v0.1
 - [x] Align storage identity derivation and master-key hierarchy closer to v0.1
-- [ ] Align metadata encryption and per-blob auth helpers with the v0.1 key hierarchy
+- [x] Align metadata encryption and per-blob auth helpers with the v0.1 key hierarchy
 - [ ] Replace the MVP manifest/share model with spec-style share descriptors and erasure metadata
 
 ## Clean Next Steps

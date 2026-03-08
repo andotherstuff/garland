@@ -106,6 +106,8 @@
         <item name="android:lineSpacingExtra">2dp</item>
     </style>
 
+    <style name="TextAppearance.Garland.HomeTitle" parent="TextAppearance.Garland.DisplayTitle" />
+
     <style name="TextAppearance.Garland.HeroTitle" parent="TextAppearance.Material3.HeadlineSmall">
         <item name="android:textColor">@color/garland_ink</item>
         <item name="android:textStyle">bold</item>

@@ -229,6 +229,7 @@ open class GarlandUploadExecutor(
             )
         }
 
+        store.saveLastCommitEventId(documentId, commitEvent.id)
         val relayStatus = if (relayResult.successfulRelays == relayResult.attemptedRelays) {
             "relay-published"
         } else {
@@ -410,13 +411,6 @@ open class GarlandUploadExecutor(
         }
         val authJson = gson.toJson(signedEvent.toRelayEventPayload())
         return "Nostr ${Base64.getUrlEncoder().withoutPadding().encodeToString(authJson.toByteArray(Charsets.UTF_8))}"
-    }
-
-    private fun resolveUploadContentType(documentId: String, manifestMimeType: String?): String {
-        val manifestType = manifestMimeType?.trim()?.takeIf { it.isNotEmpty() }
-        if (manifestType != null) return manifestType
-        val recordType = store.readRecord(documentId)?.mimeType?.trim()?.takeIf { it.isNotEmpty() }
-        return recordType ?: "application/octet-stream"
     }
 
     private fun resolveUploadContentType(documentId: String, manifestMimeType: String?): String {

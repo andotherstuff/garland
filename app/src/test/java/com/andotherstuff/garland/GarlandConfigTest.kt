@@ -74,8 +74,6 @@ class GarlandConfigTest {
     fun prepareWriteJsonIncludesPreviousEventIdWhenProvided() {
         val json = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = "deadbeef",
-            displayName = "note.txt",
-            mimeType = "text/plain",
             content = "hello".toByteArray(),
             blossomServers = GarlandConfig.defaults.blossomServers,
             createdAt = 123L,
@@ -90,8 +88,6 @@ class GarlandConfigTest {
     fun prepareWriteJsonIncludesDocumentIdWhenProvided() {
         val json = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = "deadbeef",
-            displayName = "note.txt",
-            mimeType = "text/plain",
             content = "hello".toByteArray(),
             blossomServers = GarlandConfig.defaults.blossomServers,
             createdAt = 123L,
@@ -106,8 +102,6 @@ class GarlandConfigTest {
     fun prepareWriteJsonOmitsPreviousEventIdWhenNull() {
         val json = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = "deadbeef",
-            displayName = "note.txt",
-            mimeType = "text/plain",
             content = "hello".toByteArray(),
             blossomServers = GarlandConfig.defaults.blossomServers,
             createdAt = 123L,

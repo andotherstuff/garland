@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chacha20::cipher::{KeyIvInit, StreamCipher};
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
@@ -123,7 +123,8 @@ fn derive_commit_keys(private_key: &[u8; 32]) -> Result<([u8; 32], [u8; 32]), Co
     let commit_key =
         derive_commit_key(&master_key).map_err(|_| CommitCryptoError::HkdfExpansionFailed)?;
 
-    let commit_hk = Hkdf::<Sha256>::new(None, &commit_key);
+    let commit_hk = Hkdf::<Sha256>::from_prk(&commit_key)
+        .map_err(|_| CommitCryptoError::HkdfExpansionFailed)?;
     let mut enc_key = [0_u8; 32];
     let mut mac_key = [0_u8; 32];
     commit_hk

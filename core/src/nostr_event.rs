@@ -1,9 +1,9 @@
-use hkdf::Hkdf;
 use nostr::event::{Kind, Tag, UnsignedEvent as NostrUnsignedEvent};
 use nostr::{Keys, SecretKey, Timestamp};
 use serde::Serialize;
-use sha2::Sha256;
 use thiserror::Error;
+
+use crate::key_hierarchy::{derive_blob_auth_private_key, derive_master_key};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct UnsignedEvent {
@@ -100,29 +100,20 @@ fn derive_blob_auth_private_key_hex(
     private_key_hex: &str,
     share_id_hex: &str,
 ) -> Result<String, NostrEventError> {
-    let seed_bytes =
+    let private_key_bytes =
         hex::decode(private_key_hex).map_err(|_| NostrEventError::InvalidPrivateKey)?;
-    let seed_bytes: [u8; 32] = seed_bytes
+    let private_key_bytes: [u8; 32] = private_key_bytes
         .try_into()
         .map_err(|_| NostrEventError::InvalidPrivateKey)?;
     let share_id = hex::decode(share_id_hex).map_err(|_| NostrEventError::InvalidShareId)?;
-    if share_id.len() != 32 {
-        return Err(NostrEventError::InvalidShareId);
-    }
+    let share_id: [u8; 32] = share_id
+        .try_into()
+        .map_err(|_| NostrEventError::InvalidShareId)?;
+    let master_key =
+        derive_master_key(&private_key_bytes).map_err(|_| NostrEventError::SigningFailed)?;
+    let blob_auth_private_key = derive_blob_auth_private_key(&master_key, &share_id)
+        .map_err(|_| NostrEventError::SigningFailed)?;
 
-    let hk = Hkdf::<Sha256>::from_prk(&seed_bytes).map_err(|_| NostrEventError::SigningFailed)?;
-    let mut counter = 0_u32;
-    loop {
-        let mut candidate = [0_u8; 32];
-        let mut info = Vec::with_capacity(b"garland-v1:auth:".len() + share_id.len() + 4);
-        info.extend_from_slice(b"garland-v1:auth:");
-        info.extend_from_slice(&share_id);
-        info.extend_from_slice(&counter.to_be_bytes());
-        hk.expand(&info, &mut candidate)
-            .map_err(|_| NostrEventError::SigningFailed)?;
-        if SecretKey::from_slice(&candidate).is_ok() {
-            return Ok(hex::encode(candidate));
-        }
-        counter = counter.wrapping_add(1);
-    }
+    SecretKey::from_slice(&blob_auth_private_key).map_err(|_| NostrEventError::SigningFailed)?;
+    Ok(hex::encode(blob_auth_private_key))
 }
