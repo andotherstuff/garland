@@ -74,14 +74,14 @@ class LocalDocumentStoreImpl(
     }
 
     fun listDocuments(): List<LocalDocumentRecord> {
-        return metaDir.listFiles { file -> file.extension == "json" }
+        return metaDir.listFiles { file -> isRecordMetadataFile(file) }
             ?.mapNotNull { readRecord(it.nameWithoutExtension) }
             ?.sortedBy { it.displayName.lowercase() }
             ?: emptyList()
     }
 
     fun latestDocument(): LocalDocumentRecord? {
-        return metaDir.listFiles { file -> file.extension == "json" }
+        return metaDir.listFiles { file -> isRecordMetadataFile(file) }
             ?.mapNotNull { readRecord(it.nameWithoutExtension) }
             ?.maxByOrNull { it.updatedAt }
     }
@@ -201,6 +201,10 @@ class LocalDocumentStoreImpl(
 
     private fun writeRecord(record: LocalDocumentRecord) {
         metadataFile(record.documentId).writeText(gson.toJson(record))
+    }
+
+    private fun isRecordMetadataFile(file: File): Boolean {
+        return file.extension == "json" && !file.name.endsWith(".upload.json")
     }
 
     private fun metadataFile(documentId: String): File = File(metaDir, "$documentId.json")
