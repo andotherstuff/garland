@@ -1,10 +1,12 @@
 package com.andotherstuff.garland
 
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 
 class GarlandSyncExecutorTest {
     @Test
@@ -12,25 +14,46 @@ class GarlandSyncExecutorTest {
         val tempDir = Files.createTempDirectory("garland-sync-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val pending = store.createDocument("pending.txt", "text/plain")
-        store.updateUploadStatus(pending.documentId, "upload-plan-ready")
         val complete = store.createDocument("complete.txt", "text/plain")
         store.updateUploadStatus(complete.documentId, "relay-published")
+        val harness = FakeGarlandNetworkHarness()
 
-        val uploadExecutor = RecordingUploadExecutor(store)
-        val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
+        try {
+            harness.enqueueUploadSuccess()
+            harness.acceptRelayEvents()
+            store.saveUploadPlan(pending.documentId, uploadPlanJson(harness.blossomBaseUrl(), pending.documentId, "a1", "aGVsbG8="))
+            store.updateUploadStatus(pending.documentId, "upload-plan-ready")
+            val client = OkHttpClient()
 
-        val result = syncExecutor.syncPendingDocuments(listOf("wss://relay.example"))
+            try {
+                val uploadExecutor = GarlandUploadExecutor(
+                    store = store,
+                    client = client,
+                    relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+                )
+                val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
 
-        assertEquals(1, result.attemptedDocuments)
-        assertEquals(1, result.successfulDocuments)
-        assertEquals(listOf(pending.documentId), uploadExecutor.uploadedIds)
+                val result = syncExecutor.syncPendingDocuments(listOf(harness.relayWebSocketUrl()))
+
+                assertEquals(1, result.attemptedDocuments)
+                assertEquals(1, result.successfulDocuments)
+                assertEquals(listOf("a1"), harness.uploadedShareIds())
+                assertEquals("hello", harness.uploadedBodies().single().toString(Charsets.UTF_8))
+                assertEquals("relay-published", store.readRecord(pending.documentId)?.uploadStatus)
+                assertEquals("relay-published", store.readRecord(complete.documentId)?.uploadStatus)
+            } finally {
+                closeClient(client)
+            }
+        } finally {
+            harness.close()
+        }
     }
 
     @Test
     fun reportsWhenNoPendingDocumentsExist() {
         val tempDir = Files.createTempDirectory("garland-sync-empty-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
-        val uploadExecutor = RecordingUploadExecutor(store)
+        val uploadExecutor = GarlandUploadExecutor(store)
         val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
 
         val result = syncExecutor.syncPendingDocuments(listOf("wss://relay.example"))
@@ -46,18 +69,40 @@ class GarlandSyncExecutorTest {
         val queued = store.createDocument("queued.txt", "text/plain")
         store.updateUploadStatus(queued.documentId, "sync-queued")
         val other = store.createDocument("other.txt", "text/plain")
-        store.updateUploadStatus(other.documentId, "upload-plan-ready")
+        val harness = FakeGarlandNetworkHarness()
 
-        val uploadExecutor = RecordingUploadExecutor(store)
-        val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
+        try {
+            harness.enqueueUploadSuccess(times = 1)
+            harness.acceptRelayEvents()
+            store.saveUploadPlan(queued.documentId, uploadPlanJson(harness.blossomBaseUrl(), queued.documentId, "a1", "cXVldWVk"))
+            store.saveUploadPlan(other.documentId, uploadPlanJson(harness.blossomBaseUrl(), other.documentId, "b2", "b3RoZXI="))
+            store.updateUploadStatus(other.documentId, "upload-plan-ready")
+            val client = OkHttpClient()
 
-        val result = syncExecutor.syncPendingDocuments(
-            relayUrls = listOf("wss://relay.example"),
-            documentIds = setOf(queued.documentId),
-        )
+            try {
+                val uploadExecutor = GarlandUploadExecutor(
+                    store = store,
+                    client = client,
+                    relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+                )
+                val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
 
-        assertEquals(1, result.attemptedDocuments)
-        assertEquals(listOf(queued.documentId), uploadExecutor.uploadedIds)
+                val result = syncExecutor.syncPendingDocuments(
+                    relayUrls = listOf(harness.relayWebSocketUrl()),
+                    documentIds = setOf(queued.documentId),
+                )
+
+                assertEquals(1, result.attemptedDocuments)
+                assertEquals(1, result.successfulDocuments)
+                assertEquals(listOf("a1"), harness.uploadedShareIds())
+                assertEquals("relay-published", store.readRecord(queued.documentId)?.uploadStatus)
+                assertEquals("upload-plan-ready", store.readRecord(other.documentId)?.uploadStatus)
+            } finally {
+                closeClient(client)
+            }
+        } finally {
+            harness.close()
+        }
     }
 
     @Test
@@ -67,7 +112,7 @@ class GarlandSyncExecutorTest {
         val failing = store.createDocument("queued.txt", "text/plain")
         store.updateUploadStatus(failing.documentId, "sync-queued")
 
-        val uploadExecutor = FailingUploadExecutor(store)
+        val uploadExecutor = GarlandUploadExecutor(store)
         val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
 
         val result = syncExecutor.syncPendingDocuments(listOf("wss://relay.example"))
@@ -84,27 +129,62 @@ class GarlandSyncExecutorTest {
         val pending = store.createDocument("pending.txt", "text/plain")
         store.updateUploadStatus(pending.documentId, "upload-network-failed")
 
-        val uploadExecutor = RecordingUploadExecutor(store)
+        store.saveUploadPlan(
+            pending.documentId,
+            uploadPlanJson("http://127.0.0.1:1", pending.documentId, "a1", "aGVsbG8="),
+        )
+        val uploadExecutor = GarlandUploadExecutor(store)
         val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
 
         val result = syncExecutor.syncPendingDocuments(listOf("wss://relay.example"))
 
         assertEquals(1, result.attemptedDocuments)
-        assertEquals(listOf(pending.documentId), uploadExecutor.uploadedIds)
+        assertEquals(1, result.failedDocuments)
+        assertEquals(listOf(pending.documentId), result.failedDocumentIds)
+        assertEquals("upload-network-failed", store.readRecord(pending.documentId)?.uploadStatus)
+        assertTrue(store.readRecord(pending.documentId)?.lastSyncMessage?.contains("after 3 attempts") == true)
     }
-}
 
-private class RecordingUploadExecutor(store: LocalDocumentStoreImpl) : GarlandUploadExecutor(store) {
-    val uploadedIds = mutableListOf<String>()
-
-    override fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
-        uploadedIds += documentId
-        return UploadExecutionResult(true, 1, 1, true, "ok")
+    private fun uploadPlanJson(serverUrl: String, documentId: String, shareIdHex: String, bodyBase64: String): String {
+        return """
+            {
+              "ok": true,
+              "plan": {
+                "manifest": {
+                  "document_id": "$documentId",
+                  "mime_type": "text/plain",
+                  "size_bytes": 5,
+                  "sha256_hex": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+                  "blocks": [
+                    {
+                      "index": 0,
+                      "share_id_hex": "$shareIdHex",
+                      "servers": ["$serverUrl"]
+                    }
+                  ]
+                },
+                "uploads": [
+                  {"server_url":"$serverUrl","share_id_hex":"$shareIdHex","body_b64":"$bodyBase64"}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+        """.trimIndent()
     }
-}
 
-private class FailingUploadExecutor(store: LocalDocumentStoreImpl) : GarlandUploadExecutor(store) {
-    override fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
-        return UploadExecutionResult(false, 0, 0, false, "No upload plan found")
+    private fun closeClient(client: OkHttpClient) {
+        client.dispatcher.cancelAll()
+        client.dispatcher.executorService.shutdown()
+        client.dispatcher.executorService.awaitTermination(1, TimeUnit.SECONDS)
+        client.connectionPool.evictAll()
     }
 }

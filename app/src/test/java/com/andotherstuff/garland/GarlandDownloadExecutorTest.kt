@@ -622,6 +622,66 @@ class GarlandDownloadExecutorTest {
         }
     }
 
+    @Test
+    fun restoresDocumentFromStoredRetrievalUrlBeforeFallbackPaths() {
+        val tempDir = Files.createTempDirectory("garland-download-retrieval-url-success-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val harness = FakeGarlandNetworkHarness()
+
+        try {
+            val document = store.createDocument("note.txt", "text/plain")
+            val encryptedShare = encryptedShare(fillByte = 14)
+            val shareIdHex = sha256Hex(encryptedShare)
+            harness.enqueueDownloadPath("/blob/$shareIdHex", encryptedShare)
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "plan": {
+                    "manifest": {
+                      "document_id": "${document.documentId}",
+                      "blocks": [
+                        {
+                          "index": 0,
+                          "share_id_hex": "$shareIdHex",
+                          "servers": ["${harness.blossomBaseUrl()}"]
+                        }
+                      ]
+                    },
+                    "uploads": [
+                      {
+                        "server_url": "${harness.blossomBaseUrl()}",
+                        "share_id_hex": "$shareIdHex",
+                        "retrieval_url": "${harness.blossomBaseUrl()}/blob/$shareIdHex"
+                      }
+                    ]
+                  }
+                }
+                """.trimIndent(),
+            )
+            val client = OkHttpClient()
+            val executor = GarlandDownloadExecutor(
+                store = store,
+                client = client,
+                recoverBlock = {
+                    "{\"ok\":true,\"content_b64\":\"${Base64.getEncoder().encodeToString("hello".toByteArray())}\",\"error\":null}"
+                },
+            )
+
+            val result = executor.restoreDocument(document.documentId, "deadbeef")
+
+            assertTrue(result.success)
+            assertEquals("hello", store.contentFile(document.documentId).readText())
+            assertEquals(listOf("/blob/$shareIdHex"), harness.downloadRequestPaths())
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            harness.close()
+        }
+    }
+
     private fun encryptedShare(fillByte: Int): ByteArray = ByteArray(262_144) { fillByte.toByte() }
 
     private fun sha256Hex(body: ByteArray): String {

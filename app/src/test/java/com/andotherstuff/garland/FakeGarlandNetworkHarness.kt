@@ -16,6 +16,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     private val downloadBodies = mutableMapOf<String, ByteArray>()
     private val uploadResponseBodies = mutableMapOf<String, String>()
     private val uploadedShareIds = mutableListOf<String>()
+    private val uploadedBodies = mutableListOf<ByteArray>()
     private val uploadAuthorizationJsons = mutableListOf<String>()
     private val relayEventIds = mutableListOf<String>()
     private val requestedDownloadPaths = mutableListOf<String>()
@@ -96,6 +97,8 @@ class FakeGarlandNetworkHarness : AutoCloseable {
 
     fun uploadedShareIds(): List<String> = uploadedShareIds.toList()
 
+    fun uploadedBodies(): List<ByteArray> = uploadedBodies.map(ByteArray::clone)
+
     fun uploadAuthorizationJsons(): List<String> = uploadAuthorizationJsons.toList()
 
     fun receivedRelayEventIds(): List<String> = relayEventIds.toList()
@@ -109,6 +112,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     private fun handleUpload(request: RecordedRequest): MockResponse {
         val shareId = request.getHeader("X-SHA-256")
         shareId?.let(uploadedShareIds::add)
+        uploadedBodies += request.body.readByteArray()
         val authPayload = parseAuthorizationJson(request.getHeader("Authorization"))
         authPayload?.let(uploadAuthorizationJsons::add)
         if (requireUploadAuthorization && authPayload == null) {
