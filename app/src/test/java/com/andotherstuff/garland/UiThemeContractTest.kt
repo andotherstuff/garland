@@ -29,6 +29,10 @@ class UiThemeContractTest {
 
         assertTrue(mainLayout.contains("com.google.android.material.card.MaterialCardView"))
         assertTrue(mainLayout.contains("@string/troubleshooting_actions_label"))
+        assertTrue(mainLayout.contains("@+id/mainStatusChip"))
+        assertTrue(mainLayout.contains("@+id/mainStatusHeadlineText"))
+        assertTrue(mainLayout.contains("@+id/mainStatusSummaryText"))
+        assertTrue(mainLayout.contains("@+id/mainNextStepsText"))
     }
 
     @Test

@@ -210,6 +210,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActiveDocument(record: LocalDocumentRecord?) {
+        bindMainStatus(record)
         val planDecode = record?.let { GarlandPlanInspector.decodeResult(store.readUploadPlan(it.documentId)) }
         val summary = planDecode?.summary
         val diagnostics = DocumentDiagnosticsFormatter.detailSections(record, summary, planMalformed = planDecode?.malformed == true)
@@ -259,6 +260,36 @@ class MainActivity : AppCompatActivity() {
             listOf(detailText, storageText, serverText, diagnosticText)
                 .filter { it.isNotBlank() }
                 .joinToString("\n")
+        }
+    }
+
+    private fun bindMainStatus(record: LocalDocumentRecord?) {
+        val state = MainScreenStatusPresenter.build(record)
+        binding.mainStatusChip.text = state.label
+        binding.mainStatusHeadlineText.text = state.headline
+        binding.mainStatusSummaryText.text = state.summary
+        binding.mainNextStepsText.text = state.nextSteps.joinToString("\n") { "- $it" }
+
+        val backgroundColor = ContextCompat.getColor(this, mainStatusBackgroundColor(state.tone))
+        val textColor = ContextCompat.getColor(this, mainStatusTextColor(state.tone))
+        binding.mainStatusChip.backgroundTintList = ColorStateList.valueOf(backgroundColor)
+        binding.mainStatusChip.setTextColor(textColor)
+    }
+
+    private fun mainStatusBackgroundColor(tone: String): Int {
+        return when (tone) {
+            "success" -> R.color.garland_leaf
+            "warning" -> R.color.garland_gold
+            "danger" -> R.color.garland_error
+            "active" -> R.color.garland_surface_alt
+            else -> R.color.garland_surface_alt
+        }
+    }
+
+    private fun mainStatusTextColor(tone: String): Int {
+        return when (tone) {
+            "success", "warning", "danger" -> R.color.garland_bg
+            else -> R.color.garland_ink
         }
     }
 
