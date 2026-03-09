@@ -623,6 +623,198 @@ class GarlandUploadExecutorTest {
     }
 
     @Test
+    fun honorsRetryAfterSecondsHeaderForRetryableUploadResponses() {
+        val tempDir = Files.createTempDirectory("garland-upload-retry-after-seconds-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.start()
+        val uploadUrl = server.url("").toString().removeSuffix("/")
+        server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "7"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
+        server.enqueue(
+            MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                    webSocket.close(1000, null)
+                }
+            })
+        )
+
+        try {
+            val document = store.createDocument("retry-after.txt", "text/plain")
+            val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val delays = mutableListOf<Long>()
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(store, client, retrySleep = delays::add)
+            val result = executor.executeDocumentUpload(document.documentId, listOf(relayUrl))
+
+            assertTrue(result.success)
+            assertEquals(listOf(7000L), delays)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun honorsRetryAfterHttpDateForRetryableUploadResponses() {
+        val tempDir = Files.createTempDirectory("garland-upload-retry-after-date-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.start()
+        val uploadUrl = server.url("").toString().removeSuffix("/")
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(503)
+                .setHeader("Retry-After", "Thu, 07 Dec 2023 12:00:05 GMT")
+        )
+        server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
+        server.enqueue(
+            MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                    webSocket.close(1000, null)
+                }
+            })
+        )
+
+        try {
+            val document = store.createDocument("retry-after-date.txt", "text/plain")
+            val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val delays = mutableListOf<Long>()
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(
+                store,
+                client,
+                retrySleep = delays::add,
+                clock = { 1_701_950_400L },
+            )
+            val result = executor.executeDocumentUpload(document.documentId, listOf(relayUrl))
+
+            assertTrue(result.success)
+            assertEquals(listOf(5000L), delays)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun fallsBackToExponentialBackoffWhenRetryAfterHeaderIsInvalid() {
+        val tempDir = Files.createTempDirectory("garland-upload-retry-after-invalid-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.start()
+        val uploadUrl = server.url("").toString().removeSuffix("/")
+        server.enqueue(MockResponse().setResponseCode(429).setHeader("Retry-After", "soon"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
+        server.enqueue(
+            MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    webSocket.send("[\"OK\",\"event123\",true,\"\"]")
+                    webSocket.close(1000, null)
+                }
+            })
+        )
+
+        try {
+            val document = store.createDocument("retry-after-invalid.txt", "text/plain")
+            val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val delays = mutableListOf<Long>()
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(store, client, retrySleep = delays::add)
+            val result = executor.executeDocumentUpload(document.documentId, listOf(relayUrl))
+
+            assertTrue(result.success)
+            assertEquals(listOf(500L), delays)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun publishesCommitWhenAtLeastOneReplicaUploadSucceeds() {
         val tempDir = Files.createTempDirectory("garland-upload-partial-replica-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)

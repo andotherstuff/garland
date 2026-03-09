@@ -7,6 +7,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 data class UploadExecutionResult(
     val success: Boolean,
@@ -238,7 +240,7 @@ open class GarlandUploadExecutor(
                             responseBodyText = responseBody.body?.string(),
                         )
                         if (shouldRetryUploadResponse(responseBody.code) && attempt < MAX_UPLOAD_ATTEMPTS) {
-                            retryDelay(attempt)
+                            retryDelay(attempt, responseBody.header("Retry-After"))
                             return@use
                         }
                         val message = uploadAttemptSummary(baseMessage, attempt)
@@ -274,7 +276,7 @@ open class GarlandUploadExecutor(
                 }
             } catch (error: IOException) {
                 if (attempt < MAX_UPLOAD_ATTEMPTS) {
-                    retryDelay(attempt)
+                    retryDelay(attempt, null)
                     continue
                 }
                 val baseMessage = uploadNetworkFailureMessage(upload.serverUrl, error)
@@ -346,9 +348,23 @@ open class GarlandUploadExecutor(
         return statusCode == 408 || statusCode == 425 || statusCode == 429 || statusCode in 500..599
     }
 
-    private fun retryDelay(attempt: Int) {
-        val delayMs = INITIAL_RETRY_DELAY_MS * (1L shl (attempt - 1).coerceAtMost(4))
+    private fun retryDelay(attempt: Int, retryAfterHeader: String?) {
+        val delayMs = parseRetryAfterMillis(retryAfterHeader)
+            ?: INITIAL_RETRY_DELAY_MS * (1L shl (attempt - 1).coerceAtMost(4))
         retrySleep(delayMs)
+    }
+
+    private fun parseRetryAfterMillis(retryAfterHeader: String?): Long? {
+        val header = retryAfterHeader?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        header.toLongOrNull()
+            ?.takeIf { it > 0L }
+            ?.let { return it * 1000L }
+
+        val retryAtEpochSeconds = runCatching {
+            ZonedDateTime.parse(header, DateTimeFormatter.RFC_1123_DATE_TIME).toEpochSecond()
+        }.getOrNull() ?: return null
+        val delaySeconds = (retryAtEpochSeconds - clock()).coerceAtLeast(1L)
+        return delaySeconds * 1000L
     }
 
     private fun storeUploadPlanFailure(documentId: String, diagnostic: DocumentPlanDiagnostic, message: String) {
