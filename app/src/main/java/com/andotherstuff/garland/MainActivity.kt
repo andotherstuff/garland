@@ -32,7 +32,6 @@ class MainActivity : AppCompatActivity() {
     private val configLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        bindDefaults()
         updateActiveDocument(selectedDocumentId?.let { store.readRecord(it) } ?: store.latestDocument())
     }
 
@@ -45,7 +44,6 @@ class MainActivity : AppCompatActivity() {
         store = LocalDocumentStore(applicationContext)
         workScheduler = GarlandWorkScheduler(applicationContext)
 
-        bindDefaults()
         binding.statusText.text = getString(R.string.app_boot_status)
         binding.createFileButton.setOnClickListener {
             composeLauncher.launch(ComposeActivity.createIntent(this))
@@ -134,37 +132,8 @@ class MainActivity : AppCompatActivity() {
         refreshDocumentList(record?.documentId)
     }
 
-    private fun currentBlossomServers(): List<String> {
-        return GarlandConfig.normalizeConfiguredEndpoints(
-            configured = listOf(
-                binding.serverOneInput.text?.toString().orEmpty(),
-                binding.serverTwoInput.text?.toString().orEmpty(),
-                binding.serverThreeInput.text?.toString().orEmpty(),
-            ),
-            fallback = GarlandConfig.defaults.blossomServers,
-        )
-    }
-
     private fun currentRelays(): List<String> {
-        return GarlandConfig.normalizeConfiguredEndpoints(
-            configured = listOf(
-                binding.relayOneInput.text?.toString().orEmpty(),
-                binding.relayTwoInput.text?.toString().orEmpty(),
-                binding.relayThreeInput.text?.toString().orEmpty(),
-            ),
-            fallback = GarlandConfig.defaults.relays,
-        )
-    }
-
-    private fun bindDefaults() {
-        val relays = session.loadRelays()
-        binding.relayOneInput.setText(relays[0])
-        binding.relayTwoInput.setText(relays[1])
-        binding.relayThreeInput.setText(relays[2])
-        val blossomServers = session.loadBlossomServers()
-        binding.serverOneInput.setText(blossomServers[0])
-        binding.serverTwoInput.setText(blossomServers[1])
-        binding.serverThreeInput.setText(blossomServers[2])
+        return session.loadRelays()
     }
 
     private fun updateActiveDocument(record: LocalDocumentRecord?) {

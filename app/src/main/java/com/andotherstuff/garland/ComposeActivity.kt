@@ -9,7 +9,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.andotherstuff.garland.databinding.ActivityComposeBinding
-import org.json.JSONObject
 import kotlin.concurrent.thread
 
 class ComposeActivity : AppCompatActivity() {
@@ -17,6 +16,7 @@ class ComposeActivity : AppCompatActivity() {
     private lateinit var session: GarlandSessionStore
     private lateinit var store: LocalDocumentStore
     private lateinit var uploadExecutor: GarlandUploadExecutor
+    private lateinit var uploadWorkflow: ComposeUploadWorkflow
     private var uploadInFlight = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +46,23 @@ class ComposeActivity : AppCompatActivity() {
         session = GarlandSessionStore(applicationContext)
         store = LocalDocumentStore(applicationContext)
         uploadExecutor = GarlandUploadExecutor(applicationContext)
+        uploadWorkflow = ComposeUploadWorkflow(
+            loadPrivateKeyHex = session::loadPrivateKeyHex,
+            resolveBlossomServers = session::resolvedBlossomServers,
+            resolveRelays = session::resolvedRelays,
+            saveRelays = session::saveRelays,
+            prepareSingleBlockWrite = NativeBridge::prepareSingleBlockWrite,
+            upsertPreparedDocument = { documentId, displayName, mimeType, content, uploadPlanJson ->
+                store.upsertPreparedDocument(
+                    documentId = documentId,
+                    displayName = displayName,
+                    mimeType = mimeType,
+                    content = content,
+                    uploadPlanJson = uploadPlanJson,
+                )
+            },
+            executeDocumentUpload = uploadExecutor::executeDocumentUpload,
+        )
 
         binding.cancelButton.setOnClickListener {
             if (!uploadInFlight) finish()
@@ -56,74 +73,32 @@ class ComposeActivity : AppCompatActivity() {
     private fun save() {
         if (uploadInFlight) return
 
-        val privateKey = session.loadPrivateKeyHex()
-        if (privateKey.isNullOrBlank()) {
-            showStatus(getString(R.string.compose_identity_required))
-            startActivity(ConfigActivity.createIntent(this))
-            return
-        }
-
         val displayName = binding.fileNameInput.text?.toString().orEmpty().ifBlank { "note.txt" }
-        val mimeType = GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE
         val content = binding.contentInput.text?.toString().orEmpty().toByteArray()
-        showStatus(getString(R.string.compose_preparing_upload))
-
-        val response = runCatching {
-            val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
-                privateKeyHex = privateKey,
-                displayName = displayName,
-                mimeType = mimeType,
-                content = content,
-                blossomServers = session.resolvedBlossomServers(),
-                createdAt = System.currentTimeMillis() / 1000,
-            )
-            JSONObject(NativeBridge.prepareSingleBlockWrite(requestJson))
-        }.getOrElse { error ->
-            showStatus(getString(R.string.compose_prepare_error, error.message ?: "unknown error"))
-            return
-        }
-
-        if (!response.optBoolean("ok")) {
-            showStatus(
-                getString(
-                    R.string.compose_prepare_error,
-                    response.optString("error").ifBlank { "unknown error" },
-                )
-            )
-            return
-        }
-
-        val plan = response.optJSONObject("plan")
-        val documentId = plan?.optString("document_id").orEmpty()
-        if (documentId.isBlank()) {
-            showStatus(getString(R.string.compose_prepare_error, "missing document id"))
-            return
-        }
-
-        store.upsertPreparedDocument(
-            documentId = documentId,
-            displayName = displayName,
-            mimeType = mimeType,
-            content = content,
-            uploadPlanJson = response.toString(),
-        )
-        val relays = session.resolvedRelays()
-        session.saveRelays(relays)
         setUploadInFlight(true)
-        showStatus(getString(R.string.compose_uploading))
         thread(name = "garland-compose-upload") {
-            val result = runCatching { uploadExecutor.executeDocumentUpload(documentId, relays) }
+            val result = uploadWorkflow.submit(displayName, content) { stage ->
+                runOnUiThread {
+                    when (stage) {
+                        ComposeUploadStage.PREPARING -> showStatus(getString(R.string.compose_preparing_upload))
+                        ComposeUploadStage.UPLOADING -> showStatus(getString(R.string.compose_uploading))
+                    }
+                }
+            }
             runOnUiThread {
                 setUploadInFlight(false)
-                result.onSuccess { uploadResult ->
-                    if (uploadResult.success) {
+                when (result) {
+                    is ComposeUploadResult.Success -> {
                         setResult(RESULT_OK)
                         finish()
-                    } else {
-                        showStatus(getString(R.string.compose_upload_failure, uploadResult.message))
                     }
-                }.onFailure { error ->
-                    showStatus(getString(R.string.compose_upload_failure, error.message ?: "unknown error"))
+                    is ComposeUploadResult.RequiresIdentity -> {
+                        showStatus(result.message)
+                        startActivity(ConfigActivity.createIntent(this))
+                    }
+                    is ComposeUploadResult.Failure -> {
+                        showStatus(result.message)
+                    }
                 }
             }
         }
