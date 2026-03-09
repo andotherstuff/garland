@@ -1154,7 +1154,7 @@ class GarlandUploadExecutorTest {
                 client = client,
                 relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
                 privateKeyProvider = { "deadbeef".repeat(8) },
-                authEventSigner = BlossomAuthEventSigner { _, shareIdHex, createdAt, expiration ->
+                authEventSigner = BlossomAuthEventSigner { _, shareIdHex, serverUrl, sizeBytes, createdAt, expiration ->
                     SignedRelayEvent(
                         id = "a".repeat(64),
                         pubkey = "b".repeat(64),
@@ -1163,6 +1163,8 @@ class GarlandUploadExecutorTest {
                         tags = listOf(
                             listOf("t", "upload"),
                             listOf("x", shareIdHex),
+                            listOf("server", serverUrl),
+                            listOf("size", sizeBytes.toString()),
                             listOf("expiration", expiration.toString()),
                         ),
                         content = "garland upload authorization",
@@ -1178,6 +1180,8 @@ class GarlandUploadExecutorTest {
             assertEquals(24242, authJson.get("kind").asInt)
             assertEquals("upload", authJson.getAsJsonArray("tags")[0].asJsonArray[1].asString)
             assertEquals(HELLO_SHARE_ID, authJson.getAsJsonArray("tags")[1].asJsonArray[1].asString)
+            assertEquals(harness.blossomBaseUrl(), authJson.getAsJsonArray("tags")[2].asJsonArray[1].asString)
+            assertEquals("5", authJson.getAsJsonArray("tags")[3].asJsonArray[1].asString)
             assertEquals(1, harness.uploadAuthorizationHeaders().size)
             assertFalse(harness.uploadAuthorizationHeaders().single().contains('='))
             assertTrue(store.readUploadPlan(document.documentId)?.contains("\"retrieval_url\":\"${harness.blossomBaseUrl()}/blob/$HELLO_SHARE_ID\"") == true)
@@ -1315,7 +1319,7 @@ class GarlandUploadExecutorTest {
                 client = client,
                 relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
                 privateKeyProvider = { "deadbeef".repeat(8) },
-                authEventSigner = BlossomAuthEventSigner { _, shareIdHex, createdAt, expiration ->
+                authEventSigner = BlossomAuthEventSigner { _, shareIdHex, serverUrl, sizeBytes, createdAt, expiration ->
                     SignedRelayEvent(
                         id = "a".repeat(64),
                         pubkey = "b".repeat(64),
@@ -1324,6 +1328,8 @@ class GarlandUploadExecutorTest {
                         tags = listOf(
                             listOf("t", "upload"),
                             listOf("x", shareIdHex),
+                            listOf("server", serverUrl),
+                            listOf("size", sizeBytes.toString()),
                             listOf("expiration", expiration.toString()),
                         ),
                         content = "garland upload authorization",

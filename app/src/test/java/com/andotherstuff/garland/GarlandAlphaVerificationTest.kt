@@ -197,7 +197,7 @@ class GarlandAlphaVerificationTest {
                 client = client,
                 relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
                 privateKeyProvider = { "deadbeef".repeat(8) },
-                authEventSigner = BlossomAuthEventSigner { _, authShareIdHex, createdAt, expiration ->
+                authEventSigner = BlossomAuthEventSigner { _, authShareIdHex, serverUrl, sizeBytes, createdAt, expiration ->
                     SignedRelayEvent(
                         id = "a".repeat(64),
                         pubkey = "b".repeat(64),
@@ -206,6 +206,8 @@ class GarlandAlphaVerificationTest {
                         tags = listOf(
                             listOf("t", "upload"),
                             listOf("x", authShareIdHex),
+                            listOf("server", serverUrl),
+                            listOf("size", sizeBytes.toString()),
                             listOf("expiration", expiration.toString()),
                         ),
                         content = "garland upload authorization",

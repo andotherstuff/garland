@@ -354,6 +354,8 @@ mod tests {
         let first = sign_blossom_upload_auth_event(
             "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
             &"11".repeat(32),
+            "https://blossom.one",
+            5,
             1_701_907_200,
             1_701_907_500,
         )
@@ -361,6 +363,8 @@ mod tests {
         let second = sign_blossom_upload_auth_event(
             "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a",
             &"22".repeat(32),
+            "https://blossom.two",
+            7,
             1_701_907_200,
             1_701_907_500,
         )
@@ -371,6 +375,15 @@ mod tests {
         assert_eq!(first.tags[0], vec!["t".to_string(), "upload".to_string()]);
         assert_eq!(first.tags[1][0], "x");
         assert_eq!(first.tags[1][1], "11".repeat(32));
+        assert_eq!(
+            first.tags[2],
+            vec!["server".to_string(), "https://blossom.one".to_string()]
+        );
+        assert_eq!(first.tags[3], vec!["size".to_string(), "5".to_string()]);
+        assert_eq!(
+            first.tags[4],
+            vec!["expiration".to_string(), "1701907500".to_string()]
+        );
     }
 
     #[test]

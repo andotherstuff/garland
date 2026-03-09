@@ -79,6 +79,8 @@ pub fn sign_custom_event(
 pub fn sign_blossom_upload_auth_event(
     private_key_hex: &str,
     share_id_hex: &str,
+    server_url: &str,
+    size_bytes: u64,
     created_at: u64,
     expiration: u64,
 ) -> Result<SignedEvent, NostrEventError> {
@@ -89,6 +91,8 @@ pub fn sign_blossom_upload_auth_event(
         tags: vec![
             vec!["t".into(), "upload".into()],
             vec!["x".into(), share_id_hex.to_lowercase()],
+            vec!["server".into(), server_url.to_string()],
+            vec!["size".into(), size_bytes.to_string()],
             vec!["expiration".into(), expiration.to_string()],
         ],
         content: "garland upload authorization".into(),

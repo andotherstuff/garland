@@ -94,6 +94,8 @@ struct SignEventJson {
 struct BlossomUploadAuthJson {
     private_key_hex: String,
     share_id_hex: String,
+    server_url: String,
+    size_bytes: u64,
     created_at: u64,
     expiration: u64,
 }
@@ -462,6 +464,8 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_signBlossomUp
         Ok(request) => match sign_blossom_upload_auth_event(
             &request.private_key_hex,
             &request.share_id_hex,
+            &request.server_url,
+            request.size_bytes,
             request.created_at,
             request.expiration,
         ) {

@@ -242,7 +242,7 @@ internal class GarlandPreparedUploadFactory(
                 requestUrl = requestUrl,
                 body = body,
                 contentType = contentType,
-                authorizationHeader = buildAuthorizationHeader(privateKeyHex, upload.shareIdHex, index),
+                authorizationHeader = buildAuthorizationHeader(privateKeyHex, upload, body, index),
             )
         )
     }
@@ -330,12 +330,19 @@ internal class GarlandPreparedUploadFactory(
         return if (mutated) gson.toJson(root) else rawPlanJson
     }
 
-    private fun buildAuthorizationHeader(privateKeyHex: String?, shareIdHex: String, index: Int): String? {
+    private fun buildAuthorizationHeader(privateKeyHex: String?, upload: UploadBody, body: ByteArray, index: Int): String? {
         if (privateKeyHex.isNullOrBlank()) return null
         val createdAt = clock()
         val expiration = createdAt + 300
         val signedEvent = try {
-            authEventSigner.signUpload(privateKeyHex, shareIdHex, createdAt, expiration)
+            authEventSigner.signUpload(
+                privateKeyHex = privateKeyHex,
+                shareIdHex = upload.shareIdHex,
+                serverUrl = upload.serverUrl,
+                sizeBytes = body.size.toLong(),
+                createdAt = createdAt,
+                expiration = expiration,
+            )
         } catch (error: IllegalStateException) {
             throw error
         } catch (error: Exception) {

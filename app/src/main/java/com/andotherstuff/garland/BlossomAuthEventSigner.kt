@@ -5,16 +5,32 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 
 fun interface BlossomAuthEventSigner {
-    fun signUpload(privateKeyHex: String, shareIdHex: String, createdAt: Long, expiration: Long): SignedRelayEvent
+    fun signUpload(
+        privateKeyHex: String,
+        shareIdHex: String,
+        serverUrl: String,
+        sizeBytes: Long,
+        createdAt: Long,
+        expiration: Long,
+    ): SignedRelayEvent
 }
 
 class NativeBridgeBlossomAuthEventSigner(
     private val gson: Gson = Gson(),
 ) : BlossomAuthEventSigner {
-    override fun signUpload(privateKeyHex: String, shareIdHex: String, createdAt: Long, expiration: Long): SignedRelayEvent {
+    override fun signUpload(
+        privateKeyHex: String,
+        shareIdHex: String,
+        serverUrl: String,
+        sizeBytes: Long,
+        createdAt: Long,
+        expiration: Long,
+    ): SignedRelayEvent {
         val requestJson = JsonObject().apply {
             addProperty("private_key_hex", privateKeyHex)
             addProperty("share_id_hex", shareIdHex)
+            addProperty("server_url", serverUrl)
+            addProperty("size_bytes", sizeBytes)
             addProperty("created_at", createdAt)
             addProperty("expiration", expiration)
         }
