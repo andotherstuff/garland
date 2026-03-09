@@ -19,8 +19,12 @@ class GarlandSyncExecutor(
         GarlandUploadExecutor(context.applicationContext),
     )
 
+    fun listPendingDocumentIds(documentIds: Set<String>? = null): List<String> {
+        return pendingRecords(documentIds).map { it.documentId }
+    }
+
     fun syncPendingDocuments(relayUrls: List<String>, documentIds: Set<String>? = null): SyncExecutionResult {
-        val candidates = store.listDocuments().filter { shouldSync(it, documentIds) }
+        val candidates = pendingRecords(documentIds)
         if (candidates.isEmpty()) {
             return SyncExecutionResult(0, 0, 0, "No pending Garland documents")
         }
@@ -47,10 +51,15 @@ class GarlandSyncExecutor(
         )
     }
 
+    private fun pendingRecords(documentIds: Set<String>?): List<LocalDocumentRecord> {
+        return store.listDocuments().filter { shouldSync(it, documentIds) }
+    }
+
     private fun shouldSync(record: LocalDocumentRecord, documentIds: Set<String>?): Boolean {
         if (documentIds != null && record.documentId !in documentIds) return false
         return record.uploadStatus == "upload-plan-ready" ||
             record.uploadStatus == "sync-queued" ||
+            record.uploadStatus == "sync-running" ||
             record.uploadStatus == "relay-publish-failed" ||
             record.uploadStatus == "relay-published-partial" ||
             record.uploadStatus == "upload-network-failed" ||

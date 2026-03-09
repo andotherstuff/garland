@@ -187,6 +187,29 @@ class GarlandSyncExecutorTest {
         }
     }
 
+    @Test
+    fun listsOnlyPendingDocumentIdsForMixedStatuses() {
+        val tempDir = Files.createTempDirectory("garland-sync-pending-ids-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val queued = store.createDocument("queued.txt", "text/plain")
+        store.updateUploadStatus(queued.documentId, "sync-queued")
+        val partial = store.createDocument("partial.txt", "text/plain")
+        store.updateUploadStatus(partial.documentId, "relay-published-partial")
+        val complete = store.createDocument("complete.txt", "text/plain")
+        store.updateUploadStatus(complete.documentId, "relay-published")
+
+        val syncExecutor = GarlandSyncExecutor(store, GarlandUploadExecutor(store))
+
+        assertEquals(
+            setOf(queued.documentId, partial.documentId),
+            syncExecutor.listPendingDocumentIds().toSet(),
+        )
+        assertEquals(
+            listOf(partial.documentId),
+            syncExecutor.listPendingDocumentIds(setOf(partial.documentId, complete.documentId)),
+        )
+    }
+
     private fun uploadPlanJson(serverUrl: String, documentId: String, shareIdHex: String, bodyBase64: String): String {
         return """
             {

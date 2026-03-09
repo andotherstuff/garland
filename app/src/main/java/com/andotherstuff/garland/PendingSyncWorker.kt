@@ -19,9 +19,11 @@ class PendingSyncWorker(
             sessionRelays = session.resolvedRelays(),
         )
         val documentIds = documentId?.let(::setOf)
+        val pendingDocumentIds = syncExecutor.listPendingDocumentIds(documentIds)
+        markPendingDocumentsRunning(pendingDocumentIds)
         val result = runCatching { syncExecutor.syncPendingDocuments(relayUrls, documentIds) }
             .getOrElse {
-                markTargetedRetryQueued(documentId, it.message)
+                markPendingDocumentsRetryQueued(pendingDocumentIds, it.message)
                 return Result.retry()
             }
         if (result.failedDocuments == 0) return Result.success()
@@ -34,9 +36,18 @@ class PendingSyncWorker(
         return if (documentIds != null) Result.failure() else Result.success()
     }
 
-    private fun markTargetedRetryQueued(documentId: String?, failureMessage: String?) {
-        documentId ?: return
-        store.updateUploadStatus(documentId, "sync-queued", retryMessage(failureMessage))
+    private fun markPendingDocumentsRunning(documentIds: List<String>) {
+        documentIds.forEach { documentId ->
+            store.updateUploadStatus(documentId, "sync-running", "Running Garland sync in background")
+        }
+    }
+
+    private fun markPendingDocumentsRetryQueued(documentIds: List<String>, failureMessage: String?) {
+        documentIds.forEach { documentId ->
+            if (shouldRequeueAfterCrash(store.readRecord(documentId)?.uploadStatus)) {
+                store.updateUploadStatus(documentId, "sync-queued", retryMessage(failureMessage))
+            }
+        }
     }
 
     private fun markFailedRecordsRetryQueued(records: List<LocalDocumentRecord>) {
@@ -62,6 +73,10 @@ class PendingSyncWorker(
 
         internal fun normalizeDocumentId(documentId: String?): String? {
             return documentId?.trim()?.takeIf { it.isNotEmpty() }
+        }
+
+        internal fun shouldRequeueAfterCrash(uploadStatus: String?): Boolean {
+            return uploadStatus == "sync-running"
         }
 
         internal fun retryMessage(failureMessage: String?): String {

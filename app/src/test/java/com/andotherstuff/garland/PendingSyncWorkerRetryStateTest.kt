@@ -1,7 +1,9 @@
 package com.andotherstuff.garland
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PendingSyncWorkerRetryStateTest {
@@ -24,5 +26,11 @@ class PendingSyncWorkerRetryStateTest {
             "Retrying background sync: Background sync failed",
             PendingSyncWorker.retryMessage("   "),
         )
+    }
+
+    @Test
+    fun requeuesOnlyDocumentsStillMarkedRunningAfterCrash() {
+        assertTrue(PendingSyncWorker.shouldRequeueAfterCrash("sync-running"))
+        assertFalse(PendingSyncWorker.shouldRequeueAfterCrash("relay-published"))
     }
 }
