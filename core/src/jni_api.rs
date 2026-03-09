@@ -1,7 +1,7 @@
 use base64::Engine as _;
-use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
+use jni::JNIEnv;
 use serde::{Deserialize, Serialize};
 
 use crate::commit_chain::{
@@ -10,9 +10,9 @@ use crate::commit_chain::{
 };
 use crate::identity::derive_nostr_identity;
 use crate::mvp_write::{
-    PrepareWriteRequest, RecoverReadRequest, prepare_single_block_write, recover_single_block_read,
+    prepare_single_block_write, recover_single_block_read, PrepareWriteRequest, RecoverReadRequest,
 };
-use crate::nostr_event::{UnsignedEvent, sign_blossom_upload_auth_event, sign_custom_event};
+use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, UnsignedEvent};
 
 #[derive(Serialize)]
 struct IdentityResponse {

@@ -4,7 +4,8 @@ use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::packaging::{BLOCK_SIZE, frame_content, unframe_content};
+use crate::erasure::{pad_for_k, rs_encode};
+use crate::packaging::{frame_content, unframe_content, BLOCK_SIZE};
 
 type HmacSha256 = Hmac<Sha256>;
 type ChaCha20Cipher = chacha20::ChaCha20;
@@ -37,6 +38,34 @@ pub struct ReplicationUpload {
 
 pub const REPLICATION_FACTOR: usize = 3;
 
+/// Erasure coding configuration for a block upload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErasureCodingConfig {
+    /// Number of data shards (minimum needed to reconstruct).
+    pub k: usize,
+    /// Number of parity shards.
+    pub parity: usize,
+}
+
+impl ErasureCodingConfig {
+    pub fn new(k: usize, parity: usize) -> Self {
+        Self { k, parity }
+    }
+
+    pub fn total_shards(&self) -> usize {
+        self.k + self.parity
+    }
+}
+
+/// Result of erasure-coded replication upload preparation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErasureReplicationUpload {
+    pub k: usize,
+    pub n: usize,
+    pub share_size: usize,
+    pub shares: Vec<PreparedShare>,
+}
+
 #[derive(Debug, Error)]
 pub enum CryptoError {
     #[error("content packaging failed: {0}")]
@@ -49,6 +78,10 @@ pub enum CryptoError {
     HkdfExpansionFailed,
     #[error("replication upload requires exactly three servers in MVP mode")]
     InvalidReplicationSet,
+    #[error("erasure coding requires exactly {0} servers, got {1}")]
+    ErasureServerCountMismatch(usize, usize),
+    #[error("erasure coding failed: {0}")]
+    ErasureCoding(String),
 }
 
 pub fn encrypt_block(
@@ -161,6 +194,47 @@ pub fn prepare_metadata_replication_upload(
 
     Ok(ReplicationUpload {
         share_size: body.len(),
+        shares,
+    })
+}
+
+/// Encrypt a block and split it into erasure-coded shares using Reed-Solomon.
+///
+/// Each server receives a distinct share. Any `k` shares can reconstruct the
+/// original encrypted block. The number of servers must equal `config.total_shards()`.
+pub fn prepare_erasure_coded_upload(
+    file_key: [u8; 32],
+    block_index: u32,
+    nonce: [u8; 12],
+    content: &[u8],
+    servers: &[BlossomServer],
+    config: &ErasureCodingConfig,
+) -> Result<ErasureReplicationUpload, CryptoError> {
+    let n = config.total_shards();
+    if servers.len() != n {
+        return Err(CryptoError::ErasureServerCountMismatch(n, servers.len()));
+    }
+
+    let encrypted = encrypt_block(&file_key, block_index, &nonce, content)?;
+    let (padded, _original_len) = pad_for_k(&encrypted, config.k);
+    let encoded = rs_encode(&padded, config.k, config.parity)
+        .map_err(|e| CryptoError::ErasureCoding(e.to_string()))?;
+
+    let shares = encoded
+        .shares
+        .into_iter()
+        .zip(servers.iter())
+        .map(|(erasure_share, server)| PreparedShare {
+            server_url: server.server_url.clone(),
+            share_id_hex: erasure_share.share_id_hex,
+            body: erasure_share.body,
+        })
+        .collect();
+
+    Ok(ErasureReplicationUpload {
+        k: config.k,
+        n,
+        share_size: encoded.share_size,
         shares,
     })
 }

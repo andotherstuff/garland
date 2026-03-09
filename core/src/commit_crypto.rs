@@ -1,4 +1,4 @@
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chacha20::cipher::{KeyIvInit, StreamCipher};
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};

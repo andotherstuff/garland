@@ -24,9 +24,10 @@ mod tests {
     use crate::commit_crypto::{decode_commit_content, decrypt_commit_payload};
     use crate::crypto::{
         decrypt_block, decrypt_metadata_block, encrypt_block, encrypt_metadata_block,
-        prepare_metadata_replication_upload, prepare_replication_upload, BlossomServer,
-        REPLICATION_FACTOR,
+        prepare_erasure_coded_upload, prepare_metadata_replication_upload,
+        prepare_replication_upload, BlossomServer, ErasureCodingConfig, REPLICATION_FACTOR,
     };
+    use crate::erasure::rs_reconstruct;
     use crate::identity::derive_nostr_identity;
     use crate::key_hierarchy::{
         derive_blob_auth_private_key, derive_commit_key, derive_file_key, derive_master_key,
@@ -199,6 +200,68 @@ mod tests {
             .shares
             .windows(2)
             .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex));
+    }
+
+    #[test]
+    fn prepares_erasure_coded_upload_and_reconstructs() {
+        let servers: Vec<BlossomServer> = (0..5)
+            .map(|i| BlossomServer::new(&format!("https://blossom{i}.example")))
+            .collect();
+        let config = ErasureCodingConfig::new(3, 2);
+
+        let file_key = [7_u8; 32];
+        let nonce = [5_u8; 12];
+        let content = b"erasure coded upload test content";
+
+        let upload = prepare_erasure_coded_upload(file_key, 0, nonce, content, &servers, &config)
+            .expect("erasure upload should prepare");
+
+        assert_eq!(upload.k, 3);
+        assert_eq!(upload.n, 5);
+        assert_eq!(upload.shares.len(), 5);
+
+        // Each share should have a unique hash (unlike MVP replication)
+        let ids: Vec<&str> = upload
+            .shares
+            .iter()
+            .map(|s| s.share_id_hex.as_str())
+            .collect();
+        for i in 0..ids.len() {
+            for j in (i + 1)..ids.len() {
+                assert_ne!(ids[i], ids[j], "shares {i} and {j} should differ");
+            }
+        }
+
+        // Each share maps to the correct server
+        for (i, share) in upload.shares.iter().enumerate() {
+            assert_eq!(share.server_url, format!("https://blossom{i}.example"));
+        }
+
+        // Reconstruct from any 3 of 5 shares, then decrypt
+        let available: Vec<(usize, &[u8])> = vec![
+            (0, &upload.shares[0].body),
+            (2, &upload.shares[2].body),
+            (4, &upload.shares[4].body),
+        ];
+        let reconstructed = rs_reconstruct(&available, 3, 5).expect("reconstruct should succeed");
+        // The reconstructed data is the padded encrypted block — first BLOCK_SIZE bytes
+        let encrypted_block = &reconstructed[..BLOCK_SIZE];
+        let decrypted =
+            decrypt_block(&file_key, 0, encrypted_block).expect("decrypt should succeed");
+        assert_eq!(decrypted, content);
+    }
+
+    #[test]
+    fn erasure_coded_upload_rejects_wrong_server_count() {
+        let servers: Vec<BlossomServer> = (0..3)
+            .map(|i| BlossomServer::new(&format!("https://blossom{i}.example")))
+            .collect();
+        let config = ErasureCodingConfig::new(3, 2); // expects 5 servers
+
+        let err =
+            prepare_erasure_coded_upload([7_u8; 32], 0, [5_u8; 12], b"test", &servers, &config)
+                .expect_err("should reject wrong server count");
+        assert!(err.to_string().contains("5 servers, got 3"));
     }
 
     #[test]

@@ -48,11 +48,11 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 
 ### Erasure coding layer
 
-- [ ] Add Reed-Solomon GF(2^8) encode/decode in Rust core (k-of-n, systematic, field poly 0x11D)
-- [ ] Ensure block size B is divisible by k (pad to next multiple of k if needed)
+- [x] Add Reed-Solomon GF(2^8) encode/decode in Rust core (k-of-n, systematic, field poly 0x11D)
+- [x] Ensure block size B is divisible by k (pad to next multiple of k if needed)
 - [ ] Replace the MVP 3-copy replication with RS k-of-n share generation in `prepare_replication_upload`
 - [ ] Update restore path to reconstruct from any k shares instead of requiring exact copies
-- [ ] Add RS round-trip tests: encode → drop shares → reconstruct → verify original
+- [x] Add RS round-trip tests: encode → drop shares → reconstruct → verify original
 
 ### Encrypted metadata objects
 
@@ -97,7 +97,7 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 
 ## Test coverage
 
-- [ ] RS encode/decode unit tests in Rust
+- [x] RS encode/decode unit tests in Rust
 - [ ] Inode encrypt/decrypt round-trip tests in Rust
 - [ ] Commit nonce tag generation and parsing tests
 - [ ] Android upload executor tests with RS share plans
