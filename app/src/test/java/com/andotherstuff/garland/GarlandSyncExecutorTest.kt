@@ -151,6 +151,42 @@ class GarlandSyncExecutorTest {
         assertTrue(store.readRecord(pending.documentId)?.lastSyncMessage?.contains("after 3 attempts") == true)
     }
 
+    @Test
+    fun persistsLastCommitEventIdAfterSuccessfulSync() {
+        val tempDir = Files.createTempDirectory("garland-sync-commit-chain-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val pending = store.createDocument("pending.txt", "text/plain")
+        store.updateUploadStatus(pending.documentId, "upload-plan-ready")
+        val harness = FakeGarlandNetworkHarness()
+
+        try {
+            harness.enqueueUploadSuccess()
+            harness.acceptRelayEvents()
+            store.saveUploadPlan(pending.documentId, uploadPlanJson(harness.blossomBaseUrl(), pending.documentId, HELLO_SHARE_ID, "aGVsbG8="))
+            val client = OkHttpClient()
+
+            try {
+                val uploadExecutor = GarlandUploadExecutor(
+                    store = store,
+                    client = client,
+                    relayPublisher = NostrRelayPublisher(client = client, ackTimeoutMillis = 250),
+                )
+                val syncExecutor = GarlandSyncExecutor(store, uploadExecutor)
+
+                assertEquals(null, store.readRecord(pending.documentId)?.lastCommitEventId)
+
+                val result = syncExecutor.syncPendingDocuments(listOf(harness.relayWebSocketUrl()))
+
+                assertEquals(1, result.successfulDocuments)
+                assertEquals("event123", store.readRecord(pending.documentId)?.lastCommitEventId)
+            } finally {
+                closeClient(client)
+            }
+        } finally {
+            harness.close()
+        }
+    }
+
     private fun uploadPlanJson(serverUrl: String, documentId: String, shareIdHex: String, bodyBase64: String): String {
         return """
             {

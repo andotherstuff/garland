@@ -1330,4 +1330,97 @@ class GarlandUploadExecutorTest {
             harness.close()
         }
     }
+
+    @Test
+    fun doesNotPersistCommitEventIdWhenRelayPublishFails() {
+        val tempDir = Files.createTempDirectory("garland-upload-no-commit-on-relay-fail-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        server.start()
+
+        try {
+            val document = store.createDocument("note.txt", "text/plain")
+            val uploadUrl = server.url("").toString().removeSuffix("/")
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(store, client)
+            val result = executor.executeDocumentUpload(document.documentId, listOf("ftp://relay.example"))
+
+            assertFalse(result.success)
+            assertEquals("relay-publish-failed", store.readRecord(document.documentId)?.uploadStatus)
+            assertEquals(null, store.readRecord(document.documentId)?.lastCommitEventId)
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun doesNotPersistCommitEventIdWhenUploadNetworkFails() {
+        val tempDir = Files.createTempDirectory("garland-upload-no-commit-on-network-fail-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val document = store.createDocument("offline.txt", "text/plain")
+        store.saveUploadPlan(
+            document.documentId,
+            """
+            {
+              "ok": true,
+              "plan": {
+                "uploads": [
+                  {"server_url":"http://127.0.0.1:1","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                ],
+                "commit_event": {
+                  "id_hex":"event123",
+                  "pubkey_hex":"pubkey123",
+                  "created_at":1701907200,
+                  "kind":1097,
+                  "tags":[],
+                  "content":"manifest",
+                  "sig_hex":"sig123"
+                }
+              },
+              "error": null
+            }
+            """.trimIndent(),
+        )
+
+        val client = OkHttpClient()
+        val executor = GarlandUploadExecutor(store, client, retrySleep = {})
+        val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+        assertFalse(result.success)
+        assertEquals("upload-network-failed", store.readRecord(document.documentId)?.uploadStatus)
+        assertEquals(null, store.readRecord(document.documentId)?.lastCommitEventId)
+
+        client.dispatcher.cancelAll()
+        client.dispatcher.executorService.shutdown()
+        client.connectionPool.evictAll()
+    }
 }
