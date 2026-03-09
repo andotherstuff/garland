@@ -23,13 +23,13 @@ Rules:
 - Respect existing worktree changes.
 - Update NEXT_WAVE.md only when a todo item is actually complete.
 - If you touch Rust core code, rebuild JNI libs with:
-  ANDROID_NDK_HOME="/home/vibe/Android/ndk/27.2.12479018" cargo ndk -t arm64-v8a -t x86_64 -o app/src/main/jniLibs build --release
+  ANDROID_NDK_HOME="/home/vibe/Android/ndk/27.2.12479018" nice -n 15 cargo ndk -j 2 -t arm64-v8a -t x86_64 -o app/src/main/jniLibs build --release
 - Verify every round with the smallest correct set of commands:
   - use `./automation/gradle_capped.sh ...` for every Gradle invocation so builds run at low priority with a single worker
   - run `./automation/gradle_capped.sh testDebugUnitTest` for Kotlin/Android code changes
   - run `./automation/gradle_capped.sh compileDebugAndroidTestKotlin` when Android test-source compile coverage is enough
   - run `./automation/gradle_capped.sh assembleDebug` only when Android app code, manifest, resources, or Gradle config changed
-  - run cargo test when Rust code changed
+  - run `./automation/cargo_capped.sh test` when Rust code changed (never bare `cargo test`)
 - Fix any failures before ending the round.
 
 Output format at the end:

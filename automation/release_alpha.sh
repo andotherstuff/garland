@@ -89,9 +89,9 @@ EOF
 }
 
 build_release_artifacts() {
-  ANDROID_NDK_HOME="$NDK_DIR" cargo ndk -t arm64-v8a -t x86_64 -o app/src/main/jniLibs build --release
+  ANDROID_NDK_HOME="$NDK_DIR" nice -n 15 cargo ndk -j "${GARLAND_CARGO_JOBS:-2}" -t arm64-v8a -t x86_64 -o app/src/main/jniLibs build --release
   ./automation/verify_alpha_no_device.sh
-  ./gradlew assembleRelease
+  ./automation/gradle_capped.sh assembleRelease
 }
 
 verify_release_apk() {

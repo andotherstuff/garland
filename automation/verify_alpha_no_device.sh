@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GRADLE_RUNNER=(./automation/gradle_capped.sh)
+CARGO_RUNNER=(./automation/cargo_capped.sh)
 
 run_step() {
   local label="$1"
@@ -14,7 +15,7 @@ run_step() {
 
 cd "$ROOT_DIR"
 
-run_step "Rust core tests" cargo test
+run_step "Rust core tests" "${CARGO_RUNNER[@]}" test
 run_step "Android unit tests" "${GRADLE_RUNNER[@]}" testDebugUnitTest
 run_step "Android unit test coverage" "${GRADLE_RUNNER[@]}" jacocoDebugUnitTestReport
 run_step "Android unit coverage summary" python3 automation/report_android_unit_coverage.py

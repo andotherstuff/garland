@@ -36,7 +36,8 @@ This repo is often worked on by multiple agents at the same time. Default to a w
 
 - Prefer the smallest correct verification set for the files you changed.
 - Do not run `./gradlew assembleDebug` by default for every app change; Garland builds are expensive and can bog down the machine.
-- Default to targeted tests such as `./gradlew testDebugUnitTest`, focused Gradle test targets, `./gradlew compileDebugAndroidTestKotlin`, and `cargo test` when they cover the change.
+- Default to targeted tests such as `./gradlew testDebugUnitTest`, focused Gradle test targets, `./gradlew compileDebugAndroidTestKotlin`, and `./automation/cargo_capped.sh test` when they cover the change.
+- **Never run bare `cargo build` or `cargo test`** — always use `./automation/cargo_capped.sh` which applies nice/ionice and parallelism limits. The machine has 0 swap; uncapped Cargo builds hang it.
 - Escalate to `./gradlew assembleDebug` or `automation/verify_alpha_no_device.sh` only for release prep, packaging/build-system changes, manifest/resource changes that need APK validation, JNI integration changes, or bugs that reproduce only in a built app.
 - Keep thorough no-device verification for release candidates and explicit sign-off passes, not routine iteration.
 - Use verification as the trigger for commit cadence: once the relevant checks pass for the current chunk, commit it and push it to `main`.

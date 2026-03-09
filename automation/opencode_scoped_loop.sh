@@ -84,6 +84,7 @@ Verification rules:
 - If tests fail, fix them before ending the round.
 - Prefer empirical verification over code inspection.
 - Use `./automation/gradle_capped.sh ...` for every Gradle command so builds stay on the repo's low-priority single-worker path.
+- Use `./automation/cargo_capped.sh ...` for every Cargo command (test, build, etc.) — never bare `cargo test` or `cargo build`. The machine has 0 swap; uncapped Cargo builds hang it.
 - If a capped Gradle run still fails because of daemon/process instability, retry the same verification once with `./automation/gradle_capped.sh ...` before declaring failure.
 - Before running `connectedDebugAndroidTest`, check whether a device is available with `adb devices`.
 - If no device is connected, do not fail the round for that alone; run compile-time Android test verification instead and record the device block clearly.

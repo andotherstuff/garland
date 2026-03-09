@@ -1,0 +1,13 @@
+# Limit Rust build parallelism to prevent system hangs.
+# This machine has 15 GB RAM / 8 CPUs / 0 swap.
+# Unrestricted cargo builds pull 131 crates and can easily OOM-hang.
+# Two parallel rustc jobs + two codegen units keeps peak RSS well under 4 GB.
+
+[build]
+jobs = 2
+
+[profile.dev]
+codegen-units = 2
+
+[profile.release]
+codegen-units = 2
