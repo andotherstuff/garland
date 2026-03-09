@@ -17,58 +17,39 @@ This repo intentionally targets the smallest Android MVP that can:
 - restore locally tracked files from Garland shares
 - expose uploaded files through Android's Storage Access Framework
 
-## Current MVP
+## Current state
 
-- native Android screen for identity, upload prep, upload retry, remote restore, and local document selection
-- dedicated diagnostics screen for tester-facing per-document upload and relay triage
-- multi-block upload planning and multi-block restore support
-- local Garland document store with upload status tracking
-- `DocumentsProvider` integration with recent document, search, path lookup, write, delete, restore-on-read, and image thumbnail support
-- Blossom uploads now sign kind `24242` authorization events with the loaded identity when a server requires auth
-- WorkManager-backed background sync and restore with duplicate-job protection and retry classification for permanent vs transient failures
-- restore jobs read the loaded identity from session state instead of persisting the private key in WorkManager input
-- per-document upload and relay diagnostics preserved across queued and running status transitions
-- dedicated diagnostics reports now include recent per-document history and a copyable tester report
-- transient upload and download requests now retry in-place before Garland gives up on a document
-- background retry classification now stops malformed upload responses and missing-share restores from looping forever
-- manifest validation now rejects duplicate or invalid server entries across upload and restore paths
-- restore now prefers server-returned retrieval URLs and explains downloaded-share mismatches before crypto recovery
-- provider MIME fallback naming now covers wildcard non-image creates such as `text/*` and `application/*`
-- Rust core for identity derivation, multi-block write planning, and block recovery
+Latest release: **v0.0.3-alpha** (2026-03-09)
 
-## Verified Status
+- Custom PBKDF2+HKDF identity derivation with `garland-v1` key hierarchy
+- Commit chain snapshots, directory entry reading, head resolution with fork/cycle rejection
+- Encrypted commit payloads protecting sync metadata at rest
+- Blossom upload auth (kind 24242) with per-share blob auth key derivation
+- Upload resume, retry hardening, partial replica handling
+- Background sync crash recovery
+- DocumentsProvider with recent, search, delete, write, restore-on-read, thumbnails
+- WorkManager sync/restore with duplicate-job protection and failure classification
+- Diagnostics screen with per-document history and copyable reports
+- 27 Rust core tests, full Android unit test suite passing
 
-- release target is `v0.0.2-alpha`
-- `automation/verify_alpha_no_device.sh` passes and freezes the repo-side alpha sign-off path for release candidates
-- `./gradlew testDebugUnitTest` passes for the Android unit-test suite
-- `./gradlew jacocoDebugUnitTestReport` generates the Android JVM coverage report
-- `python3 automation/report_android_unit_coverage.py` prints the current Android JVM coverage summary
-- `./gradlew compileDebugAndroidTestKotlin` passes for the Android instrumentation source compile gate
-- `./gradlew assembleDebug` builds the debug APK successfully when we do an explicit release/build validation pass
-- `./gradlew assembleRelease` builds the signed release APK when Garland release signing is configured
-- `automation/release_alpha.sh v0.0.2-alpha` rebuilds JNI libs, verifies the repo, and publishes the signed alpha release
-- `./gradlew lintDebug` passes for the Android static quality gate
-- `cargo test` passes for the Rust core
-- no-device release gates are closed for `v0.0.2-alpha`; GitHub test-release validation and manual device smoke testing remain deferred post-release follow-through
+See [TODO.md](TODO.md) for the roadmap and current work.
 
-## Verification Policy
+## Verification
 
-- For routine development, prefer the smallest correct verification command instead of building the whole app.
-- Default to targeted checks like `./gradlew testDebugUnitTest`, focused Gradle test targets, `./gradlew compileDebugAndroidTestKotlin`, and `cargo test`.
-- Avoid running `./gradlew assembleDebug` on every change; Garland app builds can drag the server to a crawl.
-- Save `./gradlew assembleDebug` and `automation/verify_alpha_no_device.sh` for release prep, packaging/build-system changes, JNI integration validation, manifest/resource changes that need APK verification, or suspected build-only regressions.
+Routine:
 
-## Resource-safe Gradle usage
+```bash
+./automation/cargo_capped.sh test     # Rust (never bare cargo test — 0 swap machine)
+./gradlew testDebugUnitTest           # Android unit tests
+```
 
-- Use `./automation/gradle_capped.sh <tasks...>` for Garland Gradle work when possible.
-- The wrapper forces low-priority single-worker Gradle runs with `nice`, `ionice`, `--no-daemon`, and `ActiveProcessorCount=1` so builds are less likely to stall the machine.
-- Repo automation already uses the capped wrapper for no-device verification and agent loops.
+Release prep only:
 
-## Deferred Post-Release Validation
-
-- publish a GitHub test release and smoke-test it on a real Android device
-- finish the post-release sign-off items in `docs/ALPHA_RELEASE_CHECKLIST.md`
-- feed results and any fallout back into `docs/RELEASE_TODO.md`
+```bash
+./gradlew assembleDebug
+./gradlew lintDebug
+automation/verify_alpha_no_device.sh
+```
 
 ## License
 

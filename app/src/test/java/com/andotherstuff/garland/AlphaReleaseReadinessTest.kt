@@ -18,10 +18,8 @@ class AlphaReleaseReadinessTest {
     fun releaseDocsMentionCoverageGate() {
         val expectedCommand = "./gradlew jacocoDebugUnitTestReport"
 
-        assertTrue(repoFile("README.md").readText().contains(expectedCommand))
-        assertTrue(repoFile("docs/CURRENT_STATUS.md").readText().contains(expectedCommand))
-        assertTrue(repoFile("docs/ALPHA_RELEASE_CHECKLIST.md").readText().contains(expectedCommand))
-        assertTrue(repoFile("NEXT_WAVE.md").readText().contains(expectedCommand))
+        // All task tracking consolidated in TODO.md — old docs redirect there
+        assertTrue(repoFile("TODO.md").readText().contains(expectedCommand))
     }
 
     @Test

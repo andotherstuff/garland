@@ -1,0 +1,162 @@
+# Garland TODO
+
+**This is the single canonical task file for Garland.** All agents must update this file instead of creating new task, status, or checklist documents. If you are an agent and you are about to create a new TODO, STATUS, CHECKLIST, or NEXT_WAVE file: stop and update this file instead.
+
+Current target: `v0.0.4-alpha`
+
+Status markers: `[ ]` pending · `[-]` in progress · `[x]` done
+
+---
+
+## Shipped
+
+### v0.0.3-alpha (2026-03-09)
+
+- Custom PBKDF2+HKDF identity derivation (`garland-v1` key hierarchy)
+- Commit chain snapshots with directory entry reading and head resolution
+- Encrypted commit payloads
+- Per-share blob auth key derivation and Blossom kind 24242 upload auth
+- Upload resume from saved share targets, retry hardening, partial replica handling
+- Background sync crash recovery (sync-running requeue on next wake)
+- Simpler UI (PR #1)
+- Capped Cargo/Gradle parallelism for low-memory builds
+- JNI .so libraries rebuilt with all 8 native bridge functions
+
+### v0.0.2-alpha (2026-03-08)
+
+- Signed release workflow via `automation/release_alpha.sh`
+- `rust-nostr` for NIP-06 identity derivation and event signing
+
+### v0.0.1-alpha (2026-03-08)
+
+- Android MVP: identity import, upload, retry, restore, local document browsing
+- DocumentsProvider with recent, search, delete, write, restore-on-read, thumbnails
+- WorkManager sync/restore with duplicate-job protection and failure classification
+- Diagnostics screen with per-document history and copyable reports
+- Manifest validation, wildcard MIME fallback naming
+- Fake Blossom/relay test harness
+
+---
+
+## v0.0.4-alpha goals
+
+Close the gap between the MVP replication model and the v0.1 protocol spec. The MVP currently copies the same encrypted block to N servers (simple replication). The spec calls for Reed-Solomon erasure coding, proper inode structures, and encrypted metadata objects. This release also needs to clean up accumulated doc sprawl and keep the test suite tight.
+
+---
+
+## Protocol alignment (Rust core)
+
+### Erasure coding layer
+
+- [ ] Add Reed-Solomon GF(2^8) encode/decode in Rust core (k-of-n, systematic, field poly 0x11D)
+- [ ] Ensure block size B is divisible by k (pad to next multiple of k if needed)
+- [ ] Replace the MVP 3-copy replication with RS k-of-n share generation in `prepare_replication_upload`
+- [ ] Update restore path to reconstruct from any k shares instead of requiring exact copies
+- [ ] Add RS round-trip tests: encode → drop shares → reconstruct → verify original
+
+### Encrypted metadata objects
+
+- [ ] Define inode JSON structure (type, file_id, blocks, size, mime_type) matching v0.1 spec §7
+- [ ] Encrypt inode with `metadata_key` + random 12-byte nonce (per spec finding 1.1)
+- [ ] Store nonce in parent reference (directory entry or commit root_inode field)
+- [ ] Add inode encrypt/decrypt round-trip tests
+
+### Commit content encryption
+
+- [ ] Add random nonce to commit content encryption (per spec finding 1.2)
+- [ ] Store nonce in a `nonce` tag on the commit event (plaintext, not secret)
+- [ ] Update `decode_commit_content` / `decrypt_commit_payload` to read nonce from event tags
+- [ ] Update commit chain snapshot builder to generate and attach nonce tags
+- [ ] Verify existing commit chain tests still pass after nonce migration
+
+### Block encryption hardening
+
+- [ ] Switch from ChaCha20 + zero nonce to ChaCha20 + random nonce per block (defense-in-depth)
+- [ ] Store block nonce in inode block reference
+- [ ] Consider ChaCha20-Poly1305 (AEAD) for tamper detection before full decryption
+- [ ] Update encrypt_block / decrypt_block and all callers
+
+---
+
+## Android integration
+
+### Wire RS shares through upload/restore
+
+- [ ] Update `GarlandUploadPlanDecoder` to handle RS share descriptors (share_id_hex per share, not per block copy)
+- [ ] Update `GarlandDownloadExecutor` restore path to fetch k-of-n and reconstruct
+- [ ] Update upload plan JSON contract between Rust and Kotlin
+- [ ] Add Android unit tests for RS-based upload plans and restore flows
+
+### Inode-aware document model
+
+- [ ] Update `LocalDocumentRecord` to store inode metadata (file_id, block count, nonce)
+- [ ] Update provider write flow to produce inode + encrypted blocks instead of raw block copies
+- [ ] Update provider read flow to decrypt inode, then fetch and decrypt blocks
+
+---
+
+## Test coverage
+
+- [ ] RS encode/decode unit tests in Rust
+- [ ] Inode encrypt/decrypt round-trip tests in Rust
+- [ ] Commit nonce tag generation and parsing tests
+- [ ] Android upload executor tests with RS share plans
+- [ ] Android restore executor tests with RS reconstruction
+- [ ] End-to-end write → upload → restore round-trip through new inode model
+
+---
+
+## Docs and cleanup
+
+- [x] Consolidate RELEASE_TODO, CURRENT_STATUS, ALPHA_RELEASE_CHECKLIST, NEXT_WAVE into this file
+- [ ] Update README.md verified status section after each milestone
+- [ ] Keep release notes in `docs/RELEASE_NOTES_v0.0.4-alpha.md` (create at release time, not before)
+
+---
+
+## Deferred (not blocking v0.0.4-alpha)
+
+These items are real work but not part of this release:
+
+- Real-device validation (no Android device available on this VPS)
+- Encrypted `prev` tag in commit events (spec finding 4.4 — low priority)
+- Separate storage identifier from passphrase (spec finding 4.3)
+- k=1 replication hash correlation mitigation (spec finding 4.1)
+- Garbage collection (spec §13)
+- Multi-user access control
+- Pack files / inline content for small files (spec finding 5.1)
+
+---
+
+## Verification commands
+
+Routine iteration:
+
+```bash
+./automation/cargo_capped.sh test          # Rust core (27+ tests)
+./gradlew testDebugUnitTest                # Android unit tests
+```
+
+Release prep only:
+
+```bash
+./gradlew assembleDebug                    # full APK build
+./gradlew lintDebug                        # static analysis
+./gradlew jacocoDebugUnitTestReport        # JVM coverage report
+python3 automation/report_android_unit_coverage.py  # coverage summary
+./gradlew compileDebugAndroidTestKotlin    # instrumentation compile gate
+automation/verify_alpha_no_device.sh       # full no-device release gate
+```
+
+**Never run bare `cargo build` or `cargo test`** — always use `./automation/cargo_capped.sh`. The machine has 0 swap; uncapped Cargo builds hang it.
+
+---
+
+## Release workflow
+
+```bash
+# from a fresh worktree aligned with origin/main:
+automation/release_alpha.sh v0.0.4-alpha
+```
+
+The script rebuilds JNI libraries, runs verification, builds a signed APK, and publishes a GitHub prerelease.

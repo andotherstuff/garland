@@ -42,6 +42,12 @@ This repo is often worked on by multiple agents at the same time. Default to a w
 - Keep thorough no-device verification for release candidates and explicit sign-off passes, not routine iteration.
 - Use verification as the trigger for commit cadence: once the relevant checks pass for the current chunk, commit it and push it to `main`.
 
+## Task tracking
+
+- **`TODO.md` is the single canonical task file.** Read it before starting work. Update it when you finish work.
+- Do not create new TODO, STATUS, CHECKLIST, or NEXT_WAVE files. If a task needs tracking, add it to `TODO.md`.
+- Old docs in `docs/RELEASE_TODO.md`, `docs/CURRENT_STATUS.md`, `docs/ALPHA_RELEASE_CHECKLIST.md`, and `NEXT_WAVE.md` redirect to `TODO.md`. Do not revive them.
+
 ## Delivery expectation
 
 - Default finish line for this repo: verified changes committed and pushed to `origin/main`.
