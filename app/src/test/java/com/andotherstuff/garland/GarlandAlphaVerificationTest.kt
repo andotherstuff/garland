@@ -18,6 +18,7 @@ class GarlandAlphaVerificationTest {
         try {
             val shareOne = sha256Hex("hello".toByteArray())
             val shareTwo = shareOne
+            harness.requireUploadContentType(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE)
             harness.enqueueUploadSuccess(times = 2)
             harness.acceptRelayEvents()
             val document = store.upsertPreparedDocument(
@@ -43,6 +44,7 @@ class GarlandAlphaVerificationTest {
             assertEquals("status=${store.readRecord(document.documentId)?.uploadStatus} message=${store.readRecord(document.documentId)?.lastSyncMessage}", 1, result.successfulDocuments)
             assertEquals("relay-published", store.readRecord(document.documentId)?.uploadStatus)
             assertEquals(listOf(shareOne, shareTwo), harness.uploadedShareIds())
+            assertEquals(listOf(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE, GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE), harness.uploadContentTypes())
             assertEquals(listOf("event123"), harness.receivedRelayEventIds())
 
             client.dispatcher.cancelAll()

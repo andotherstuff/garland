@@ -21,7 +21,7 @@ class GarlandUploadPlanningTest {
     )
 
     @Test
-    fun decodeFallsBackToRecordMimeTypeWhenManifestMimeTypeIsMissing() {
+    fun decodeAlwaysUsesEncryptedBinaryMimeType() {
         val bodyBase64 = Base64.getEncoder().encodeToString("hello".toByteArray())
         val shareIdHex = sha256Hex("hello".toByteArray())
         val rawPlanJson = """
@@ -44,8 +44,48 @@ class GarlandUploadPlanningTest {
 
         assertTrue(result is GarlandUploadPlanDecodeResult.Success)
         result as GarlandUploadPlanDecodeResult.Success
-        assertEquals("text/plain", result.decodedPlan.uploadContentType)
+        assertEquals(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE, result.decodedPlan.uploadContentType)
         assertEquals(1, result.decodedPlan.uploads.size)
+    }
+
+    @Test
+    fun decodeIgnoresManifestMimeTypeForEncryptedUploads() {
+        val bodyBase64 = Base64.getEncoder().encodeToString("hello".toByteArray())
+        val shareIdHex = sha256Hex("hello".toByteArray())
+        val rawPlanJson = """
+            {
+              "ok": true,
+              "plan": {
+                "manifest": {
+                  "document_id": "doc123",
+                  "mime_type": "text/plain",
+                  "size_bytes": 5,
+                  "sha256_hex": "$shareIdHex",
+                  "blocks": [
+                    {
+                      "index": 0,
+                      "share_id_hex": "$shareIdHex",
+                      "servers": ["https://one.example"]
+                    }
+                  ]
+                },
+                "uploads": [
+                  {
+                    "server_url": "https://one.example",
+                    "share_id_hex": "$shareIdHex",
+                    "body_b64": "$bodyBase64"
+                  }
+                ]
+              },
+              "error": null
+            }
+        """.trimIndent()
+
+        val result = decoder.decode(rawPlanJson, "text/plain")
+
+        assertTrue(result is GarlandUploadPlanDecodeResult.Success)
+        result as GarlandUploadPlanDecodeResult.Success
+        assertEquals(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE, result.decodedPlan.uploadContentType)
     }
 
     @Test
@@ -102,7 +142,7 @@ class GarlandUploadPlanningTest {
             ),
             index = 1,
             privateKeyHex = null,
-            contentType = "text/plain",
+            contentType = GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE,
         )
 
         assertEquals("Upload plan entry 1 share body does not match share ID", result.errorMessage)

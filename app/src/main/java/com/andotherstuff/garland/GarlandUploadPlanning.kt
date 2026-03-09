@@ -146,10 +146,7 @@ internal class GarlandUploadPlanDecoder(
     }
 
     private fun resolveUploadContentType(manifestMimeType: String?, recordMimeType: String?): String {
-        val manifestType = manifestMimeType?.trim()?.takeIf { it.isNotEmpty() }
-        if (manifestType != null) return manifestType
-        val recordType = recordMimeType?.trim()?.takeIf { it.isNotEmpty() }
-        return recordType ?: "application/octet-stream"
+        return GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE
     }
 }
 

@@ -993,7 +993,7 @@ class GarlandUploadExecutorTest {
             assertEquals(1, harness.uploadAuthorizationHeaders().size)
             assertFalse(harness.uploadAuthorizationHeaders().single().contains('='))
             assertTrue(store.readUploadPlan(document.documentId)?.contains("\"retrieval_url\":\"${harness.blossomBaseUrl()}/blob/$HELLO_SHARE_ID\"") == true)
-            assertEquals(listOf("text/plain"), harness.uploadContentTypes())
+            assertEquals(listOf(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE), harness.uploadContentTypes())
 
             client.dispatcher.cancelAll()
             client.dispatcher.executorService.shutdown()
@@ -1077,14 +1077,14 @@ class GarlandUploadExecutorTest {
     }
 
     @Test
-    fun usesManifestMimeTypeForUploadRequest() {
+    fun forcesEncryptedBinaryMimeTypeForUploadRequest() {
         val tempDir = Files.createTempDirectory("garland-upload-content-type-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val harness = FakeGarlandNetworkHarness()
 
         try {
             harness.requireUploadAuthorization()
-            harness.requireUploadContentType("text/plain")
+            harness.requireUploadContentType(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE)
             harness.enqueueUploadSuccess()
             harness.enqueueUploadDescriptor(HELLO_SHARE_ID, "/blob/$HELLO_SHARE_ID")
             harness.acceptRelayEvents()
@@ -1147,7 +1147,7 @@ class GarlandUploadExecutorTest {
             val result = executor.executeDocumentUpload(document.documentId, listOf(harness.relayWebSocketUrl()))
 
             assertTrue(result.success)
-            assertEquals(listOf("text/plain"), harness.uploadContentTypes())
+            assertEquals(listOf(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE), harness.uploadContentTypes())
 
             client.dispatcher.cancelAll()
             client.dispatcher.executorService.shutdown()
