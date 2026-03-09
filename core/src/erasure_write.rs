@@ -21,7 +21,8 @@ use thiserror::Error;
 
 use crate::crypto::{prepare_erasure_coded_upload, BlossomServer, ErasureCodingConfig};
 use crate::inode::{
-    build_file_inode, encrypt_inode, FileInode, InodeBlock, InodeErasure, InodeError, InodeShare,
+    build_file_inode_with_id, encrypt_inode, FileInode, InodeBlock, InodeErasure, InodeError,
+    InodeShare,
 };
 use crate::key_hierarchy::{
     derive_file_key, derive_master_key, derive_metadata_key, KeyHierarchyError,
@@ -136,12 +137,13 @@ pub fn plan_erasure_write(
     };
 
     let master_key = derive_master_key(&private_key_bytes)?;
-    let document_id_bytes = hex::decode(&document_id)
-        .ok()
-        .and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok())
-        .ok_or(ErasureWriteError::InvalidPrivateKey)?;
-    let file_key = derive_file_key(&master_key, &document_id_bytes)?;
     let metadata_key = derive_metadata_key(&master_key)?;
+
+    // Generate the file_id first — this drives file_key derivation per spec §7.
+    // The file_id is stored in the inode and used to derive the encryption key.
+    let mut file_id_bytes = [0_u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut file_id_bytes);
+    let file_key = derive_file_key(&master_key, &file_id_bytes)?;
 
     let servers: Vec<BlossomServer> = request
         .servers
@@ -193,7 +195,8 @@ pub fn plan_erasure_write(
         }
     }
 
-    let inode = build_file_inode(
+    let inode = build_file_inode_with_id(
+        &file_id_bytes,
         content.len() as u64,
         request.created_at,
         request.created_at,
@@ -361,11 +364,15 @@ mod tests {
         let reconstructed = rs_reconstruct(&available, 3, 5).unwrap();
         let encrypted_block = &reconstructed[..BLOCK_SIZE];
 
-        // Derive the file key to decrypt
+        // Derive the file key from the inode's file_id (per spec §7)
         let pk_bytes: [u8; 32] = hex::decode(TEST_KEY).unwrap().try_into().unwrap();
         let master_key = derive_master_key(&pk_bytes).unwrap();
-        let doc_id_bytes: [u8; 32] = hex::decode(&plan.document_id).unwrap().try_into().unwrap();
-        let file_key = derive_file_key(&master_key, &doc_id_bytes).unwrap();
+        let file_id_bytes: [u8; 32] = STANDARD
+            .decode(&plan.inode.file_id)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let file_key = derive_file_key(&master_key, &file_id_bytes).unwrap();
 
         let decrypted = decrypt_block(&file_key, 0, encrypted_block).unwrap();
         assert_eq!(decrypted, content);

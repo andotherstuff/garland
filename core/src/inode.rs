@@ -102,7 +102,7 @@ impl From<CryptoError> for InodeError {
     }
 }
 
-/// Build a file inode for a single-block or multi-block file using MVP replication.
+/// Build a file inode with a randomly generated file_id.
 pub fn build_file_inode(
     size: u64,
     created: u64,
@@ -112,6 +112,19 @@ pub fn build_file_inode(
 ) -> FileInode {
     let mut file_id_bytes = [0_u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut file_id_bytes);
+    build_file_inode_with_id(&file_id_bytes, size, created, modified, blocks, erasure)
+}
+
+/// Build a file inode with a caller-provided file_id (32 bytes).
+/// Use this when the file_id must match the key derivation used to encrypt blocks.
+pub fn build_file_inode_with_id(
+    file_id_bytes: &[u8; 32],
+    size: u64,
+    created: u64,
+    modified: u64,
+    blocks: Vec<InodeBlock>,
+    erasure: InodeErasure,
+) -> FileInode {
     FileInode {
         version: 1,
         inode_type: "file".into(),
