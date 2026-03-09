@@ -105,6 +105,10 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 - [ ] Update upload plan JSON contract between Rust and Kotlin
 - [ ] Add Android unit tests for RS-based upload plans and restore flows
 
+### UX polish
+
+- [x] Replace the launcher icon with an adaptive black flower mark so homescreen masks no longer add a white halo or extra whitespace
+
 ### Inode-aware document model
 
 - [ ] Update `LocalDocumentRecord` to store inode metadata (file_id, block count, nonce)
