@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+
 use super::crypto::{
     decode_private_key, decrypt_commit_payload, derive_branch_key, derive_master_key,
 };
@@ -7,6 +9,7 @@ use super::{
     CommitChainError, DecryptedCommit, ResolveCommitChainHeadRequest,
     ResolveCommitChainHeadResponse,
 };
+use crate::nostr_event::SignedEvent;
 
 pub fn resolve_commit_chain_head(
     request: &ResolveCommitChainHeadRequest,
@@ -39,9 +42,11 @@ fn collect_decrypted_commits(
     request
         .events
         .iter()
-        .filter(|event| event.kind == 1097 && event.tags.is_empty())
+        .filter(|event| event.kind == 1097)
         .filter_map(|event| {
-            let payload = decrypt_commit_payload(commit_key, &event.content).ok()?;
+            let nonce = extract_nonce_from_tags(event);
+            let payload =
+                decrypt_commit_payload(commit_key, &event.content, nonce.as_ref()).ok()?;
             Some((
                 event.id_hex.clone(),
                 DecryptedCommit {
@@ -53,6 +58,16 @@ fn collect_decrypted_commits(
             ))
         })
         .collect()
+}
+
+/// Extract the 12-byte nonce from a `["nonce", "<base64>"]` tag, if present.
+fn extract_nonce_from_tags(event: &SignedEvent) -> Option<[u8; 12]> {
+    event
+        .tags
+        .iter()
+        .find(|tag| tag.len() >= 2 && tag[0] == "nonce")
+        .and_then(|tag| STANDARD.decode(&tag[1]).ok())
+        .and_then(|bytes| <[u8; 12]>::try_from(bytes.as_slice()).ok())
 }
 
 fn collect_valid_ids(decrypted: &HashMap<String, DecryptedCommit>) -> Vec<String> {

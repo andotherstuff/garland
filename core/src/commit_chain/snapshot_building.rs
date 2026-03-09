@@ -32,14 +32,15 @@ pub fn prepare_commit_chain_snapshot(
     let root_inode = build_single_inode_reference(&encrypted_directory, &request.servers);
     let uploads = build_uploads(&encrypted_directory, &request.servers);
     let payload = build_commit_payload(request, root_inode.clone());
-    let commit_content = encrypt_commit_payload(&commit_key, &payload)?;
+    let encrypted = encrypt_commit_payload(&commit_key, &payload)?;
+    let nonce_b64 = STANDARD.encode(encrypted.nonce);
     let commit_event = sign_custom_event(
         &request.private_key_hex,
         &UnsignedEvent {
             created_at: request.created_at,
             kind: 1097,
-            tags: vec![],
-            content: commit_content,
+            tags: vec![vec!["nonce".into(), nonce_b64]],
+            content: encrypted.content_b64,
         },
     )
     .map_err(|err| CommitChainError::EventSigning(err.to_string()))?;

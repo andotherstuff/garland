@@ -586,7 +586,13 @@ mod tests {
         assert_eq!(snapshot.root_directory.entries.len(), 2);
         assert_eq!(snapshot.uploads.len(), 3);
         assert_eq!(snapshot.commit_event.kind, 1097);
-        assert_eq!(snapshot.commit_event.tags.len(), 0);
+        assert_eq!(snapshot.commit_event.tags.len(), 1);
+        assert_eq!(snapshot.commit_event.tags[0][0], "nonce");
+        // Nonce tag value should be valid base64 encoding of 12 bytes
+        let nonce_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&snapshot.commit_event.tags[0][1])
+            .expect("nonce tag should be valid base64");
+        assert_eq!(nonce_bytes.len(), 12);
         assert_eq!(snapshot.root_inode.format, "single");
         assert_eq!(snapshot.root_inode.erasure.k, 1);
         assert_eq!(snapshot.root_inode.erasure.n, 3);

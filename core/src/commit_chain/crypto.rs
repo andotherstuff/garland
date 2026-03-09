@@ -101,10 +101,19 @@ pub(super) fn decrypt_metadata_blob(
     unframe_content(&plaintext).map_err(|_| CommitChainError::DecryptionFailed)
 }
 
+/// Result of encrypting a commit payload. The nonce is returned separately so
+/// it can be stored in a `nonce` tag on the Nostr event.
+pub(super) struct EncryptedCommitPayload {
+    /// Base64-encoded `ciphertext || HMAC-SHA256 tag` (nonce NOT embedded).
+    pub content_b64: String,
+    /// The 12-byte random nonce used for encryption.
+    pub nonce: [u8; 12],
+}
+
 pub(super) fn encrypt_commit_payload(
     commit_key: &[u8; 32],
     payload: &CommitPayload,
-) -> Result<String, CommitChainError> {
+) -> Result<EncryptedCommitPayload, CommitChainError> {
     let plaintext =
         serde_json::to_vec(payload).map_err(|_| CommitChainError::CommitSerialization)?;
     let mut nonce = [0_u8; 12];
@@ -119,28 +128,57 @@ pub(super) fn encrypt_commit_payload(
     mac.update(&nonce);
     mac.update(&ciphertext);
     let tag = mac.finalize().into_bytes();
-    let mut encoded = Vec::with_capacity(12 + ciphertext.len() + 32);
-    encoded.extend_from_slice(&nonce);
+    // New format: content is ciphertext || tag (no embedded nonce).
+    // The nonce is stored externally in a Nostr event tag.
+    let mut encoded = Vec::with_capacity(ciphertext.len() + 32);
     encoded.extend_from_slice(&ciphertext);
     encoded.extend_from_slice(&tag);
-    Ok(STANDARD.encode(encoded))
+    Ok(EncryptedCommitPayload {
+        content_b64: STANDARD.encode(encoded),
+        nonce,
+    })
 }
 
+/// Decrypt a commit payload. If `external_nonce` is provided (from a `nonce`
+/// event tag), it is used and the content is `ciphertext || tag`. Otherwise,
+/// the legacy format `nonce || ciphertext || tag` is assumed.
 pub(super) fn decrypt_commit_payload(
     commit_key: &[u8; 32],
     encoded: &str,
+    external_nonce: Option<&[u8; 12]>,
 ) -> Result<CommitPayload, CommitChainError> {
     let payload = STANDARD
         .decode(encoded)
         .map_err(|_| CommitChainError::DecryptionFailed)?;
-    if payload.len() < 12 + 32 {
-        return Err(CommitChainError::DecryptionFailed);
-    }
-    let nonce: [u8; 12] = payload[..12]
-        .try_into()
-        .map_err(|_| CommitChainError::DecryptionFailed)?;
-    let ciphertext = &payload[12..payload.len() - 32];
-    let tag = &payload[payload.len() - 32..];
+
+    let (nonce, ciphertext, tag) = match external_nonce {
+        Some(n) => {
+            // New format: nonce from event tag, content = ciphertext || tag
+            if payload.len() < 32 {
+                return Err(CommitChainError::DecryptionFailed);
+            }
+            (
+                *n,
+                &payload[..payload.len() - 32],
+                &payload[payload.len() - 32..],
+            )
+        }
+        None => {
+            // Legacy format: nonce || ciphertext || tag embedded in content
+            if payload.len() < 12 + 32 {
+                return Err(CommitChainError::DecryptionFailed);
+            }
+            let n: [u8; 12] = payload[..12]
+                .try_into()
+                .map_err(|_| CommitChainError::DecryptionFailed)?;
+            (
+                n,
+                &payload[12..payload.len() - 32],
+                &payload[payload.len() - 32..],
+            )
+        }
+    };
+
     let (enc_key, mac_key) = split_enc_mac_key(commit_key)?;
     let mut mac =
         HmacSha256::new_from_slice(&mac_key).map_err(|_| CommitChainError::DecryptionFailed)?;
