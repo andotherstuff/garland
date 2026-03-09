@@ -3,6 +3,7 @@ pub mod commit_crypto;
 pub mod crypto;
 pub mod erasure;
 pub mod identity;
+pub mod inode;
 pub mod jni_api;
 pub mod key_hierarchy;
 pub mod mvp_write;
