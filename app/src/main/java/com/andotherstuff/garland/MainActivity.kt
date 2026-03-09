@@ -53,23 +53,6 @@ class MainActivity : AppCompatActivity() {
             configLauncher.launch(ConfigActivity.createIntent(this))
         }
 
-        binding.syncDocumentsButton.setOnClickListener {
-            val relays = currentRelays()
-            session.saveRelays(relays)
-            workScheduler.enqueuePendingSync(relays)
-            refreshDocumentList(selectedDocumentId)
-            binding.statusText.text = getString(R.string.sync_documents_queued)
-        }
-
-        binding.openDiagnosticsButton.setOnClickListener {
-            startActivity(DiagnosticsActivity.createIntent(this, selectedDocumentId ?: store.latestDocument()?.documentId))
-        }
-
-        binding.refreshDocumentsButton.setOnClickListener {
-            refreshDocumentList(selectedDocumentId)
-            updateActiveDocument(selectedDocumentId?.let { store.readRecord(it) } ?: store.latestDocument())
-        }
-
         binding.retryUploadButton.setOnClickListener {
             val documentId = selectedDocumentId
             if (documentId.isNullOrBlank()) {
@@ -78,24 +61,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             executeUpload(documentId, getString(R.string.upload_retry_running, documentId))
-        }
-
-        binding.restoreDocumentButton.setOnClickListener {
-            val documentId = selectedDocumentId
-            if (documentId.isNullOrBlank()) {
-                binding.statusText.text = getString(R.string.document_delete_requires_selection)
-                return@setOnClickListener
-            }
-            val privateKey = session.loadPrivateKeyHex()
-            if (privateKey.isNullOrBlank()) {
-                binding.statusText.text = getString(R.string.restore_requires_identity)
-                configLauncher.launch(ConfigActivity.createIntent(this))
-                return@setOnClickListener
-            }
-
-            workScheduler.enqueueRestore(documentId, privateKey)
-            selectDocument(store.readRecord(documentId), false)
-            binding.statusText.text = getString(R.string.restore_queued, documentId)
         }
 
         binding.deleteDocumentButton.setOnClickListener {
@@ -140,19 +105,15 @@ class MainActivity : AppCompatActivity() {
         val planDecode = record?.let { GarlandPlanInspector.decodeResult(store.readUploadPlan(it.documentId)) }
         val summary = planDecode?.summary
         val selectedNoteState = MainScreenSelectedNotePresenter.build(record, summary)
+        val actionState = MainScreenActionPresenter.build(record, summary)
 
         bindMainStatus(record)
 
         binding.activeDocumentText.text = selectedNoteState.title
         binding.activeDocumentDetailText.text = selectedNoteState.detail
-        binding.retryUploadButton.visibility = if (selectedNoteState.retryVisible) View.VISIBLE else View.GONE
-        binding.activeDocumentProgressLabel.visibility = View.GONE
-        binding.activeDocumentProgressContainer.visibility = View.GONE
-        binding.activeDocumentDiagnosticsText.visibility = View.GONE
-        binding.activeDocumentUploadsLabel.visibility = View.GONE
-        binding.activeDocumentUploadsText.visibility = View.GONE
-        binding.activeDocumentRelaysLabel.visibility = View.GONE
-        binding.activeDocumentRelaysText.visibility = View.GONE
+        binding.retryUploadButton.visibility = if (actionState.primaryVisible) View.VISIBLE else View.GONE
+        binding.retryUploadButton.text = actionState.primaryLabel
+        binding.deleteDocumentButton.visibility = if (actionState.deleteVisible) View.VISIBLE else View.GONE
     }
 
     private fun bindMainStatus(record: LocalDocumentRecord?) {
@@ -195,104 +156,6 @@ class MainActivity : AppCompatActivity() {
                 record.displayName,
                 DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus),
             )
-        }
-    }
-
-    private fun bindDiagnosticSection(labelView: TextView, textView: TextView, label: String?, content: String?) {
-        val visible = !content.isNullOrBlank()
-        labelView.visibility = if (visible) View.VISIBLE else View.GONE
-        textView.visibility = if (visible) View.VISIBLE else View.GONE
-        if (visible) {
-            labelView.text = label
-            textView.text = content
-        }
-    }
-
-    private fun renderProgressSection(
-        labelView: TextView,
-        container: LinearLayout,
-        label: String?,
-        steps: List<DocumentDiagnosticsFormatter.ProgressStep>,
-    ) {
-        val visible = steps.isNotEmpty()
-        labelView.visibility = if (visible) View.VISIBLE else View.GONE
-        container.visibility = if (visible) View.VISIBLE else View.GONE
-        container.removeAllViews()
-        if (!visible) return
-
-        labelView.text = label
-        steps.forEach { step ->
-            container.addView(buildProgressRow(step))
-        }
-    }
-
-    private fun buildProgressRow(step: DocumentDiagnosticsFormatter.ProgressStep): LinearLayout {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).also { params ->
-                params.bottomMargin = resources.getDimensionPixelSize(R.dimen.garland_tight_gap)
-            }
-        }
-        val chip = TextView(this).apply {
-            text = progressChipLabel(step.state)
-            setTextAppearance(R.style.TextAppearance_Garland_StatusChip)
-            setPaddingRelative(
-                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_horizontal),
-                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_vertical),
-                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_horizontal),
-                resources.getDimensionPixelSize(R.dimen.garland_status_chip_padding_vertical),
-            )
-            background = ContextCompat.getDrawable(context, R.drawable.bg_status_chip)?.mutate()
-            backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, progressChipBackgroundColor(step.state)))
-            setTextColor(ContextCompat.getColor(context, progressChipTextColor(step.state)))
-        }
-        val body = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { params ->
-                params.marginStart = resources.getDimensionPixelSize(R.dimen.garland_content_gap)
-            }
-        }
-        val title = TextView(this).apply {
-            text = step.label
-            setTextAppearance(R.style.TextAppearance_Garland_BodyStrong)
-        }
-        val detail = TextView(this).apply {
-            text = step.detail
-            setTextAppearance(R.style.TextAppearance_Garland_BodySupport)
-        }
-        body.addView(title)
-        body.addView(detail)
-        row.addView(chip)
-        row.addView(body)
-        return row
-    }
-
-    private fun progressChipLabel(state: String): String {
-        return when (state) {
-            "done" -> "DONE"
-            "active" -> "LIVE"
-            "failed" -> "FAIL"
-            else -> "WAIT"
-        }
-    }
-
-    private fun progressChipBackgroundColor(state: String): Int {
-        return when (state) {
-            "done" -> R.color.garland_leaf
-            "active" -> R.color.garland_gold
-            "failed" -> R.color.garland_error
-            else -> R.color.garland_surface_strong
-        }
-    }
-
-    private fun progressChipTextColor(state: String): Int {
-        return when (state) {
-            "done", "active", "failed" -> R.color.garland_bg
-            else -> R.color.garland_ink
         }
     }
 

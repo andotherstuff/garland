@@ -1,7 +1,6 @@
 package com.andotherstuff.garland
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -12,7 +11,6 @@ class MainScreenSelectedNotePresenterTest {
 
         assertEquals("No note selected yet.", state.title)
         assertTrue(state.detail.contains("Create a note"))
-        assertFalse(state.retryVisible)
     }
 
     @Test
@@ -26,7 +24,6 @@ class MainScreenSelectedNotePresenterTest {
         assertTrue(state.detail.contains("Upload plan ready - 12 byte(s)"))
         assertTrue(state.detail.contains("1 block(s) ready across 2 server(s)"))
         assertTrue(state.detail.contains("Prepared locally and ready for upload."))
-        assertTrue(state.retryVisible)
     }
 
     @Test
@@ -50,7 +47,6 @@ class MainScreenSelectedNotePresenterTest {
         )
 
         assertTrue(state.detail.contains("Last result: Published to 2/2 relays"))
-        assertFalse(state.retryVisible)
     }
 
     private fun record(uploadStatus: String, lastSyncMessage: String?): LocalDocumentRecord {

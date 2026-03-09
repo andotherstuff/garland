@@ -35,8 +35,10 @@ class UiThemeContractTest {
         assertTrue(mainLayout.contains("@+id/mainStatusHeadlineText"))
         assertTrue(mainLayout.contains("@+id/mainStatusSummaryText"))
         assertTrue(mainLayout.contains("@+id/mainNextStepsText"))
-        assertTrue(mainLayout.indexOf("@+id/openDiagnosticsButton") < mainLayout.indexOf("@+id/activeDocumentText"))
-        assertTrue(mainLayout.indexOf("@+id/activeDocumentDiagnosticsText") > mainLayout.indexOf("@+id/serverThreeInput"))
+        assertTrue(mainLayout.indexOf("@+id/createFileButton") < mainLayout.indexOf("@+id/documentListContainer"))
+        assertTrue(mainLayout.indexOf("@+id/documentListContainer") < mainLayout.indexOf("@+id/activeDocumentText"))
+        assertFalse(mainLayout.contains("@+id/openDiagnosticsButton"))
+        assertFalse(mainLayout.contains("@+id/serverThreeInput"))
     }
 
     @Test
@@ -123,13 +125,8 @@ class UiThemeContractTest {
         val diagnosticsLayout = projectFile("app", "src", "main", "res", "layout", "activity_diagnostics.xml")
 
         assertTrue(stylesXml.contains("TextAppearance.Garland.DiagnosticsBody"))
-        assertTrue(mainLayout.contains("@style/TextAppearance.Garland.DiagnosticsBody"))
         assertTrue(stylesXml.contains("TextAppearance.Garland.DebugCode"))
         assertTrue(diagnosticsLayout.contains("@style/TextAppearance.Garland.DebugCode"))
-        assertTrue(mainLayout.contains("@+id/activeDocumentDiagnosticsText"))
-        assertTrue(mainLayout.contains("@+id/activeDocumentProgressContainer"))
-        assertTrue(mainLayout.contains("@+id/activeDocumentUploadsText"))
-        assertTrue(mainLayout.contains("@+id/activeDocumentRelaysText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsOverviewText"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsPipelineContainer"))
         assertTrue(diagnosticsLayout.contains("@+id/diagnosticsUploadsText"))

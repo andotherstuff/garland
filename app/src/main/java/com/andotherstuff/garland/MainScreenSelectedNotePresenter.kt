@@ -3,7 +3,6 @@ package com.andotherstuff.garland
 data class MainScreenSelectedNoteState(
     val title: String,
     val detail: String,
-    val retryVisible: Boolean,
 )
 
 object MainScreenSelectedNotePresenter {
@@ -26,7 +25,6 @@ object MainScreenSelectedNotePresenter {
             return MainScreenSelectedNoteState(
                 title = "No note selected yet.",
                 detail = "Create a note, then tap it here to review its latest local or upload state.",
-                retryVisible = false,
             )
         }
 
@@ -39,7 +37,6 @@ object MainScreenSelectedNotePresenter {
         return MainScreenSelectedNoteState(
             title = record.displayName,
             detail = detailLines.joinToString("\n"),
-            retryVisible = shouldShowRetry(record, summary),
         )
     }
 
@@ -82,14 +79,5 @@ object MainScreenSelectedNotePresenter {
             ?.trim()
             ?.replace("\n", " ")
             ?.takeIf { it.isNotEmpty() }
-    }
-
-    private fun shouldShowRetry(record: LocalDocumentRecord, summary: GarlandPlanSummary?): Boolean {
-        if (summary == null) return false
-        return record.uploadStatus !in setOf(
-            "relay-published",
-            "sync-queued",
-            "sync-running",
-        )
     }
 }

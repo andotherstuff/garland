@@ -36,6 +36,23 @@ object MainScreenStatusPresenter {
         }
 
         val message = record.lastSyncMessage?.trim().orEmpty()
+        val uploadNeedsIdentity = record.uploadStatus == "upload-plan-ready" ||
+            record.uploadStatus == "relay-publish-failed" ||
+            record.uploadStatus == "relay-published-partial" ||
+            record.uploadStatus == "upload-network-failed" ||
+            record.uploadStatus.startsWith("upload-http-")
+        if (!identityLoaded && uploadNeedsIdentity) {
+            return MainScreenStatusState(
+                tone = "warning",
+                label = "Identity missing",
+                headline = "Reload your identity before uploading this note.",
+                summary = "This note is saved locally, but Garland cannot upload or retry it until you generate or import the document identity again.",
+                nextSteps = listOf(
+                    "Open Identity.",
+                    "Generate or import your seed, then try the note action again.",
+                ),
+            )
+        }
         return when (record.uploadStatus) {
             "relay-published" -> MainScreenStatusState(
                 tone = "success",

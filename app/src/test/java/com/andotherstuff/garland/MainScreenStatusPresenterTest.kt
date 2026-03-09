@@ -26,6 +26,18 @@ class MainScreenStatusPresenterTest {
     }
 
     @Test
+    fun showsIdentityBlockedStateWhenPreparedNoteExistsButIdentityIsMissing() {
+        val state = MainScreenStatusPresenter.build(
+            record = record(uploadStatus = "upload-plan-ready"),
+            identityLoaded = false,
+        )
+
+        assertEquals("Identity missing", state.label)
+        assertEquals("Reload your identity before uploading this note.", state.headline)
+        assertTrue(state.summary.contains("saved locally"))
+    }
+
+    @Test
     fun explainsPartialRelayFailureInPlainLanguage() {
         val state = MainScreenStatusPresenter.build(
             record = record(
@@ -56,7 +68,7 @@ class MainScreenStatusPresenterTest {
         assertTrue(state.summary.contains("Published to 2/2 relays"))
     }
 
-    private fun record(uploadStatus: String, lastSyncMessage: String?): LocalDocumentRecord {
+    private fun record(uploadStatus: String, lastSyncMessage: String? = null): LocalDocumentRecord {
         return LocalDocumentRecord(
             documentId = "doc-1",
             displayName = "note.txt",
