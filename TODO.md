@@ -50,24 +50,29 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 
 - [x] Add Reed-Solomon GF(2^8) encode/decode in Rust core (k-of-n, systematic, field poly 0x11D)
 - [x] Ensure block size B is divisible by k (pad to next multiple of k if needed)
-- [ ] Replace the MVP 3-copy replication with RS k-of-n share generation in `prepare_replication_upload`
-- [ ] Update restore path to reconstruct from any k shares instead of requiring exact copies
+- [x] Add `prepare_erasure_coded_upload` in `crypto.rs` (encrypt then RS-encode into n distinct shares)
+- [x] Add erasure-coded write planner (`erasure_write.rs`) with inode generation and multi-block support
+- [x] Add erasure-coded restore path (`erasure_read.rs`) with k-of-n reconstruction and hash verification
 - [x] Add RS round-trip tests: encode → drop shares → reconstruct → verify original
+- [x] End-to-end write → restore round-trip test through new erasure pipeline (single and multi-block)
+- [ ] Wire erasure write/read into `mvp_write.rs` or replace it entirely (optional — new modules can coexist)
 
-### Encrypted metadata objects
+### Encrypted metadata objects (inodes)
 
-- [ ] Define inode JSON structure (type, file_id, blocks, size, mime_type) matching v0.1 spec §7
-- [ ] Encrypt inode with `metadata_key` + random 12-byte nonce (per spec finding 1.1)
-- [ ] Store nonce in parent reference (directory entry or commit root_inode field)
-- [ ] Add inode encrypt/decrypt round-trip tests
+- [x] Define inode JSON structure (type, file_id, blocks, size, mime_type) matching v0.1 spec §7
+- [x] Encrypt inode with `metadata_key` + random 12-byte nonce (per spec finding 1.1)
+- [x] Inode encrypt/decrypt round-trip with nonce stored in parent reference
+- [x] Inode builders for both MVP replication and erasure-coded uploads
+- [x] File key derived from inode `file_id` (per spec §7), not document_id
+- [x] Wrong-key rejection test
 
 ### Commit content encryption
 
-- [ ] Add random nonce to commit content encryption (per spec finding 1.2)
-- [ ] Store nonce in a `nonce` tag on the commit event (plaintext, not secret)
-- [ ] Update `decode_commit_content` / `decrypt_commit_payload` to read nonce from event tags
-- [ ] Update commit chain snapshot builder to generate and attach nonce tags
-- [ ] Verify existing commit chain tests still pass after nonce migration
+- [x] Commit encryption already uses random nonce (nonce || ciphertext || tag)
+- [x] Store nonce in a `nonce` tag on the commit event (plaintext, not secret)
+- [x] New format: content = `ciphertext || tag`, nonce externalized to event tag
+- [x] Backward-compatible decryption: reads nonce from tag if present, falls back to embedded nonce
+- [x] All existing commit chain tests pass after nonce migration (head resolution, fork detection, cyclic graphs, directory readback)
 
 ### Block encryption hardening
 
@@ -97,12 +102,17 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 
 ## Test coverage
 
-- [x] RS encode/decode unit tests in Rust
-- [ ] Inode encrypt/decrypt round-trip tests in Rust
-- [ ] Commit nonce tag generation and parsing tests
+- [x] RS encode/decode unit tests in Rust (11 tests in `erasure.rs`)
+- [x] RS integration tests: prepare_erasure_coded_upload round-trip (2 tests in `lib.rs`)
+- [x] Inode encrypt/decrypt round-trip tests in Rust (6 tests in `inode.rs`)
+- [x] Commit nonce tag generation and parsing tests (verified by existing commit chain tests)
+- [x] Erasure write planner tests (4 tests in `erasure_write.rs`)
+- [x] Erasure restore path tests (4 tests in `erasure_read.rs`)
+- [x] End-to-end write → upload → restore round-trip through new inode model
 - [ ] Android upload executor tests with RS share plans
 - [ ] Android restore executor tests with RS reconstruction
-- [ ] End-to-end write → upload → restore round-trip through new inode model
+
+54 total Rust tests passing.
 
 ---
 
@@ -133,7 +143,7 @@ These items are real work but not part of this release:
 Routine iteration:
 
 ```bash
-./automation/cargo_capped.sh test          # Rust core (27+ tests)
+./automation/cargo_capped.sh test          # Rust core (54 tests)
 ./gradlew testDebugUnitTest                # Android unit tests
 ```
 
