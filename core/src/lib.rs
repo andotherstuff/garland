@@ -1,6 +1,7 @@
 pub mod commit_chain;
 pub mod commit_crypto;
 pub mod crypto;
+pub mod erasure;
 pub mod identity;
 pub mod jni_api;
 pub mod key_hierarchy;
@@ -22,8 +23,9 @@ mod tests {
     };
     use crate::commit_crypto::{decode_commit_content, decrypt_commit_payload};
     use crate::crypto::{
-        BlossomServer, REPLICATION_FACTOR, decrypt_block, decrypt_metadata_block, encrypt_block,
-        encrypt_metadata_block, prepare_metadata_replication_upload, prepare_replication_upload,
+        decrypt_block, decrypt_metadata_block, encrypt_block, encrypt_metadata_block,
+        prepare_metadata_replication_upload, prepare_replication_upload, BlossomServer,
+        REPLICATION_FACTOR,
     };
     use crate::identity::derive_nostr_identity;
     use crate::key_hierarchy::{
@@ -31,12 +33,12 @@ mod tests {
         derive_metadata_key,
     };
     use crate::mvp_write::{
-        PrepareWriteRequest, RecoverReadRequest, prepare_single_block_write,
-        recover_single_block_read,
+        prepare_single_block_write, recover_single_block_read, PrepareWriteRequest,
+        RecoverReadRequest,
     };
-    use crate::nostr_event::{UnsignedEvent, sign_blossom_upload_auth_event, sign_custom_event};
+    use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, UnsignedEvent};
     use crate::packaging::{
-        BLOCK_SIZE, CONTENT_CAPACITY, FRAME_SIZE, frame_content, unframe_content,
+        frame_content, unframe_content, BLOCK_SIZE, CONTENT_CAPACITY, FRAME_SIZE,
     };
 
     #[test]
@@ -151,12 +153,10 @@ mod tests {
 
         assert_eq!(upload.shares.len(), REPLICATION_FACTOR);
         assert_eq!(upload.share_size, BLOCK_SIZE);
-        assert!(
-            upload
-                .shares
-                .windows(2)
-                .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex)
-        );
+        assert!(upload
+            .shares
+            .windows(2)
+            .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex));
         assert_eq!(upload.shares[0].server_url, "https://cdn.nostrcheck.me");
         assert_eq!(upload.shares[1].server_url, "https://blossom.nostr.build");
         assert_eq!(upload.shares[2].server_url, "https://blossom.yakihonne.com");
@@ -195,12 +195,10 @@ mod tests {
 
         assert_eq!(upload.shares.len(), REPLICATION_FACTOR);
         assert_eq!(upload.share_size, BLOCK_SIZE);
-        assert!(
-            upload
-                .shares
-                .windows(2)
-                .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex)
-        );
+        assert!(upload
+            .shares
+            .windows(2)
+            .all(|pair| pair[0].share_id_hex == pair[1].share_id_hex));
     }
 
     #[test]
@@ -354,12 +352,10 @@ mod tests {
         assert_eq!(plan.commit_event.id_hex.len(), 64);
         assert_eq!(plan.commit_event.sig_hex.len(), 128);
         assert_eq!(plan.manifest.document_id.len(), 64);
-        assert!(
-            !plan
-                .commit_event
-                .content
-                .contains(&plan.manifest.document_id)
-        );
+        assert!(!plan
+            .commit_event
+            .content
+            .contains(&plan.manifest.document_id));
         assert!(!plan.commit_event.content.contains("note.txt"));
         let encrypted_content = decode_commit_content(&plan.commit_event.content)
             .expect("commit content should decode");
