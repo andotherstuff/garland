@@ -8,6 +8,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 base64 = "0.22.1"
+bip39 = { version = "2.1", default-features = false }
 chacha20 = "0.9.1"
 hex = "0.4.3"
 hkdf = "0.12.4"

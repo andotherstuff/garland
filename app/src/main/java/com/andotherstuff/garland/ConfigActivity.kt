@@ -35,28 +35,17 @@ class ConfigActivity : AppCompatActivity() {
 
         binding.cancelButton.setOnClickListener { finish() }
 
+        binding.generateIdentityButton.setOnClickListener {
+            val passphrase = binding.passphraseInput.text?.toString().orEmpty()
+            val response = JSONObject(NativeBridge.generateIdentity(passphrase))
+            handleIdentityResponse(response, response.optString("mnemonic"))
+        }
+
         binding.loadIdentityButton.setOnClickListener {
             val mnemonic = binding.mnemonicInput.text?.toString().orEmpty()
             val passphrase = binding.passphraseInput.text?.toString().orEmpty()
             val response = JSONObject(NativeBridge.deriveIdentity(mnemonic, passphrase))
-            val statusText = if (response.optBoolean("ok")) {
-                val derivedPrivateKey = GarlandSessionStore.normalizePrivateKeyHex(response.optString("private_key_hex"))
-                if (derivedPrivateKey != null) {
-                    session.savePrivateKeyHex(derivedPrivateKey)
-                    session.savePassphrase(passphrase)
-                    getString(R.string.identity_loaded, response.optString("nsec"))
-                } else {
-                    session.clearPrivateKeyHex()
-                    session.clearPassphrase()
-                    getString(R.string.identity_error, "missing private key")
-                }
-            } else {
-                session.clearPrivateKeyHex()
-                session.clearPassphrase()
-                getString(R.string.identity_error, response.optString("error"))
-            }
-            binding.identityStatusText.text = statusText
-            binding.identityStatusText.visibility = View.VISIBLE
+            handleIdentityResponse(response)
         }
 
         binding.deriveButton.setOnClickListener {
@@ -83,6 +72,30 @@ class ConfigActivity : AppCompatActivity() {
             binding.identityStatusText.text = getString(R.string.identity_already_loaded)
             binding.identityStatusText.visibility = View.VISIBLE
         }
+    }
+
+    private fun handleIdentityResponse(response: JSONObject, generatedMnemonic: String? = null) {
+        val passphrase = binding.passphraseInput.text?.toString().orEmpty()
+        val statusText = if (response.optBoolean("ok")) {
+            val derivedPrivateKey = GarlandSessionStore.normalizePrivateKeyHex(response.optString("private_key_hex"))
+            if (derivedPrivateKey != null) {
+                session.savePrivateKeyHex(derivedPrivateKey)
+                session.savePassphrase(passphrase)
+                val mnemonic = generatedMnemonic?.trim().orEmpty()
+                if (mnemonic.isNotEmpty()) {
+                    binding.mnemonicInput.setText(mnemonic)
+                    getString(R.string.identity_generated, mnemonic, response.optString("nsec"))
+                } else {
+                    getString(R.string.identity_loaded, response.optString("nsec"))
+                }
+            } else {
+                getString(R.string.identity_error, "missing private key")
+            }
+        } else {
+            getString(R.string.identity_error, response.optString("error"))
+        }
+        binding.identityStatusText.text = statusText
+        binding.identityStatusText.visibility = View.VISIBLE
     }
 
     private fun currentBlossomServers(): List<String> {

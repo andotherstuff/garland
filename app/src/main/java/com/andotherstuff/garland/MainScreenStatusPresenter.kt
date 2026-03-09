@@ -9,16 +9,28 @@ data class MainScreenStatusState(
 )
 
 object MainScreenStatusPresenter {
-    fun build(record: LocalDocumentRecord?): MainScreenStatusState {
+    fun build(record: LocalDocumentRecord?, identityLoaded: Boolean): MainScreenStatusState {
         if (record == null) {
+            if (identityLoaded) {
+                return MainScreenStatusState(
+                    tone = "active",
+                    label = "Identity ready",
+                    headline = "Write a note and upload it.",
+                    summary = "Your identity is ready. From here the main flow is simple: create a note, upload it, then watch it appear in the list.",
+                    nextSteps = listOf(
+                        "Tap New text file.",
+                        "Write a note and use Upload now.",
+                    ),
+                )
+            }
             return MainScreenStatusState(
                 tone = "warning",
-                label = "Identity required",
-                headline = "Load an identity, then prepare a document.",
-                summary = "Garland is ready, but it cannot prepare uploads or restores until you load the 12-word identity.",
+                label = "Set up identity",
+                headline = "Open Identity, then create a note.",
+                summary = "Garland cannot upload notes until you generate or import a 12-word identity.",
                 nextSteps = listOf(
-                    "Load the document identity from the identity section.",
-                    "Prepare a document to generate the first Garland plan.",
+                    "Open Identity.",
+                    "Generate a new identity or import an existing seed.",
                 ),
             )
         }
@@ -99,10 +111,10 @@ object MainScreenStatusPresenter {
                 tone = "active",
                 label = "Ready to upload",
                 headline = "The document is prepared for network sync.",
-                summary = "Garland finished the local plan. The next step is sending shares and publishing the commit event.",
+                summary = "Garland saved the note locally and it is ready to upload.",
                 nextSteps = listOf(
-                    "Use Upload prepared shares to send the payload.",
-                    "Open diagnostics if you want to inspect the plan first.",
+                    "Use Retry upload to send the payload again.",
+                    "Keep writing notes if you want another upload.",
                 ),
             )
             else -> MainScreenStatusState(

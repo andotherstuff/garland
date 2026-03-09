@@ -31,7 +31,7 @@ mod tests {
         prepare_replication_upload, BlossomServer, ErasureCodingConfig, REPLICATION_FACTOR,
     };
     use crate::erasure::rs_reconstruct;
-    use crate::identity::derive_nostr_identity;
+    use crate::identity::{derive_nostr_identity, generate_identity};
     use crate::key_hierarchy::{
         derive_blob_auth_private_key, derive_commit_key, derive_file_key, derive_master_key,
         derive_metadata_key,
@@ -83,6 +83,28 @@ mod tests {
         assert_eq!(identity.private_key_hex.len(), 64);
         assert!(identity.nsec.starts_with("nsec1"));
         assert_ne!(identity.private_key_hex, empty.private_key_hex);
+    }
+
+    #[test]
+    fn generates_identity_with_valid_mnemonic() {
+        let generated = generate_identity("").expect("identity should generate");
+        let words: Vec<&str> = generated.mnemonic.split_whitespace().collect();
+        assert_eq!(words.len(), 12);
+        assert_eq!(generated.private_key_hex.len(), 64);
+        assert!(generated.nsec.starts_with("nsec1"));
+
+        let rederived = derive_nostr_identity(&generated.mnemonic, "")
+            .expect("generated mnemonic should re-derive");
+        assert_eq!(rederived.private_key_hex, generated.private_key_hex);
+        assert_eq!(rederived.nsec, generated.nsec);
+    }
+
+    #[test]
+    fn generates_unique_identities() {
+        let first = generate_identity("").expect("first identity should generate");
+        let second = generate_identity("").expect("second identity should generate");
+        assert_ne!(first.mnemonic, second.mnemonic);
+        assert_ne!(first.private_key_hex, second.private_key_hex);
     }
 
     #[test]

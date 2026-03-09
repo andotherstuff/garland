@@ -255,6 +255,7 @@ name = "garland_core"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "bip39",
  "chacha20",
  "hex",
  "hkdf",

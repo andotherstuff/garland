@@ -78,12 +78,20 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/loadIdentityButton"
+                    android:id="@+id/generateIdentityButton"
                     style="@style/Widget.Garland.ActionButton.Primary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_content_gap"
-                    android:text="@string/derive_button" />
+                    android:text="@string/generate_identity_button" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/loadIdentityButton"
+                    style="@style/Widget.Garland.ActionButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/garland_button_gap"
+                    android:text="@string/load_identity_button" />
 
                 <TextView
                     android:id="@+id/identityStatusText"

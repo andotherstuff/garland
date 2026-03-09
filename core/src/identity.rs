@@ -16,6 +16,13 @@ pub struct NostrIdentity {
     pub nsec: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GeneratedIdentity {
+    pub mnemonic: String,
+    pub private_key_hex: String,
+    pub nsec: String,
+}
+
 #[derive(Debug, Error)]
 pub enum IdentityError {
     #[error("mnemonic is invalid: {0}")]
@@ -24,6 +31,22 @@ pub enum IdentityError {
     StorageIdentityDerivation,
     #[error("bech32 encoding failed")]
     Bech32Encoding,
+    #[error("mnemonic generation failed")]
+    MnemonicGeneration,
+}
+
+pub fn generate_identity(passphrase: &str) -> Result<GeneratedIdentity, IdentityError> {
+    let mut entropy = [0_u8; 16]; // 128 bits = 12-word mnemonic
+    rand::Rng::fill(&mut rand::thread_rng(), &mut entropy);
+    let mnemonic = bip39::Mnemonic::from_entropy(&entropy)
+        .map_err(|_| IdentityError::MnemonicGeneration)?;
+    let mnemonic_str = mnemonic.to_string();
+    let identity = derive_nostr_identity(&mnemonic_str, passphrase)?;
+    Ok(GeneratedIdentity {
+        mnemonic: mnemonic_str,
+        private_key_hex: identity.private_key_hex,
+        nsec: identity.nsec,
+    })
 }
 
 pub fn derive_nostr_identity(

@@ -62,6 +62,14 @@
                 android:scrollbars="vertical" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <TextView
+            android:id="@+id/composeStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/garland_content_gap"
+            android:textAppearance="@style/TextAppearance.Garland.BodySupport"
+            android:visibility="gone" />
+
     </LinearLayout>
 
     <!-- Bottom action bar -->
@@ -74,10 +82,20 @@
         android:paddingTop="12dp">
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/cancelButton"
+            style="@style/Widget.Garland.ActionButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/compose_cancel_button" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/saveButton"
             style="@style/Widget.Garland.ActionButton.Primary"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/garland_button_gap"
+            android:layout_weight="1"
             android:text="@string/compose_save_button" />
 
     </LinearLayout>

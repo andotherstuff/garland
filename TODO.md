@@ -85,6 +85,15 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 
 ## Android integration
 
+### Alpha recovery UX
+
+- [x] Add native mnemonic generation and expose it through JNI
+- [x] Add a visible generate/import identity flow in the settings UI
+- [x] Fix the prepare-write JSON contract to include `display_name` and `mime_type`
+- [x] Upload new notes in the foreground from compose with visible prepare/upload errors
+- [-] Simplify the main screen by hiding advanced actions until the basic note flow is proven (notes list carries the selected-note summary, the hero now drops branding/dashboard chrome, and the top copy reads identity-first; keep trimming toward a cleaner identity + new note + notes list hierarchy)
+- [ ] Run a real-device smoke test: generate identity -> create note -> upload note
+
 ### Wire RS shares through upload/restore
 
 - [ ] Update `GarlandUploadPlanDecoder` to handle RS share descriptors (share_id_hex per share, not per block copy)
@@ -112,7 +121,7 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 - [ ] Android upload executor tests with RS share plans
 - [ ] Android restore executor tests with RS reconstruction
 
-54 total Rust tests passing.
+56 total Rust tests passing.
 
 ---
 

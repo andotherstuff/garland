@@ -7,12 +7,22 @@ import org.junit.Test
 class MainScreenStatusPresenterTest {
     @Test
     fun showsIdentityWarningWhenNoDocumentExists() {
-        val state = MainScreenStatusPresenter.build(record = null)
+        val state = MainScreenStatusPresenter.build(record = null, identityLoaded = false)
 
-        assertEquals("Identity required", state.label)
-        assertEquals("Load an identity, then prepare a document.", state.headline)
-        assertTrue(state.summary.contains("12-word"))
-        assertTrue(state.nextSteps.contains("Load the document identity from the identity section."))
+        assertEquals("Set up identity", state.label)
+        assertEquals("Open Identity, then create a note.", state.headline)
+        assertTrue(state.summary.contains("generate or import"))
+        assertTrue(state.nextSteps.contains("Open Identity."))
+    }
+
+    @Test
+    fun showsReadyStateWhenIdentityExistsButNoDocumentExists() {
+        val state = MainScreenStatusPresenter.build(record = null, identityLoaded = true)
+
+        assertEquals("Identity ready", state.label)
+        assertEquals("Write a note and upload it.", state.headline)
+        assertTrue(state.summary.contains("identity is ready"))
+        assertTrue(state.nextSteps.contains("Tap New text file."))
     }
 
     @Test
@@ -21,7 +31,8 @@ class MainScreenStatusPresenterTest {
             record = record(
                 uploadStatus = "relay-published-partial",
                 lastSyncMessage = "Published to 1/2 relays; failed: wss://relay.two (timeout)",
-            )
+            ),
+            identityLoaded = true,
         )
 
         assertEquals("Relay attention", state.label)
@@ -36,7 +47,8 @@ class MainScreenStatusPresenterTest {
             record = record(
                 uploadStatus = "relay-published",
                 lastSyncMessage = "Published to 2/2 relays",
-            )
+            ),
+            identityLoaded = true,
         )
 
         assertEquals("Healthy", state.label)

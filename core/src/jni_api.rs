@@ -8,7 +8,7 @@ use crate::commit_chain::{
     prepare_commit_chain_snapshot, read_directory_entries, resolve_commit_chain_head,
     PrepareCommitChainRequest, ReadDirectoryEntriesRequest, ResolveCommitChainHeadRequest,
 };
-use crate::identity::derive_nostr_identity;
+use crate::identity::{derive_nostr_identity, generate_identity};
 use crate::mvp_write::{
     prepare_single_block_write, recover_single_block_read, PrepareWriteRequest, RecoverReadRequest,
 };
@@ -17,6 +17,15 @@ use crate::nostr_event::{sign_blossom_upload_auth_event, sign_custom_event, Unsi
 #[derive(Serialize)]
 struct IdentityResponse {
     ok: bool,
+    nsec: Option<String>,
+    private_key_hex: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct GeneratedIdentityResponse {
+    ok: bool,
+    mnemonic: Option<String>,
     nsec: Option<String>,
     private_key_hex: Option<String>,
     error: Option<String>,
@@ -123,6 +132,46 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_deriveIdentit
     let payload = serde_json::to_string(&response).unwrap_or_else(|err| {
         format!(
             "{{\"ok\":false,\"nsec\":null,\"private_key_hex\":null,\"error\":\"{}\"}}",
+            err
+        )
+    });
+
+    env.new_string(payload)
+        .expect("JNI should allocate response string")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_generateIdentity(
+    mut env: JNIEnv,
+    _class: JClass,
+    passphrase: JString,
+) -> jstring {
+    let passphrase: String = env
+        .get_string(&passphrase)
+        .map(|value| value.into())
+        .unwrap_or_default();
+
+    let response = match generate_identity(&passphrase) {
+        Ok(identity) => GeneratedIdentityResponse {
+            ok: true,
+            mnemonic: Some(identity.mnemonic),
+            nsec: Some(identity.nsec),
+            private_key_hex: Some(identity.private_key_hex),
+            error: None,
+        },
+        Err(error) => GeneratedIdentityResponse {
+            ok: false,
+            mnemonic: None,
+            nsec: None,
+            private_key_hex: None,
+            error: Some(error.to_string()),
+        },
+    };
+
+    let payload = serde_json::to_string(&response).unwrap_or_else(|err| {
+        format!(
+            "{{\"ok\":false,\"mnemonic\":null,\"nsec\":null,\"private_key_hex\":null,\"error\":\"{}\"}}",
             err
         )
     });

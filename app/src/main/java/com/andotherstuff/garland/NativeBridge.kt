@@ -5,6 +5,7 @@ object NativeBridge {
         System.loadLibrary("garland_core")
     }
 
+    external fun generateIdentity(passphrase: String): String
     external fun deriveIdentity(mnemonic: String, passphrase: String): String
     external fun prepareSingleBlockWrite(requestJson: String): String
     external fun recoverSingleBlockRead(requestJson: String): String

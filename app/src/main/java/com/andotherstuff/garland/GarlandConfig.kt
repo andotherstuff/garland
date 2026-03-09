@@ -13,6 +13,7 @@ data class GarlandDefaults(
 
 object GarlandConfig {
     private val gson = Gson()
+    const val ENCRYPTED_PAYLOAD_MIME_TYPE = "application/octet-stream"
 
     val defaults = GarlandDefaults(
         relays = listOf(
@@ -29,6 +30,8 @@ object GarlandConfig {
 
     fun buildPrepareWriteRequestJson(
         privateKeyHex: String,
+        displayName: String,
+        mimeType: String,
         content: ByteArray,
         blossomServers: List<String>,
         createdAt: Long,
@@ -38,6 +41,8 @@ object GarlandConfig {
         val normalizedServers = normalizeConfiguredEndpoints(blossomServers, defaults.blossomServers)
         val payload = JsonObject().apply {
             addProperty("private_key_hex", privateKeyHex)
+            addProperty("display_name", displayName)
+            addProperty("mime_type", ENCRYPTED_PAYLOAD_MIME_TYPE)
             addProperty("created_at", createdAt)
             addProperty("content_b64", Base64.getEncoder().encodeToString(content))
             add("servers", JsonArray().apply {

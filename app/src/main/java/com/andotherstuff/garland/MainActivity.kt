@@ -168,70 +168,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActiveDocument(record: LocalDocumentRecord?) {
-        bindMainStatus(record)
         val planDecode = record?.let { GarlandPlanInspector.decodeResult(store.readUploadPlan(it.documentId)) }
         val summary = planDecode?.summary
-        val diagnostics = DocumentDiagnosticsFormatter.detailSections(record, summary, planMalformed = planDecode?.malformed == true)
+        val selectedNoteState = MainScreenSelectedNotePresenter.build(record, summary)
 
-        binding.activeDocumentText.text = if (record == null) {
-            getString(R.string.active_document_none)
-        } else {
-            getString(
-                R.string.active_document_loaded,
-                record.displayName,
-                DocumentDiagnosticsFormatter.statusLabel(record.uploadStatus),
-            )
-        }
+        bindMainStatus(record)
 
-        binding.activeDocumentDetailText.text = if (record == null) {
-            getString(R.string.active_document_details_none)
-        } else {
-            val localBytes = runCatching { store.contentFile(record.documentId).takeIf { it.exists() }?.length() ?: 0L }
-                .getOrDefault(0L)
-            val detailText = if (summary == null) {
-                getString(R.string.active_document_details_none)
-            } else {
-                getString(
-                    R.string.active_document_details,
-                    summary.documentId.take(12),
-                    summary.mimeType ?: record.mimeType,
-                    summary.sizeBytes,
-                    summary.blockCount,
-                    summary.serverCount,
-                    summary.sha256Hex.take(12),
-                )
-            }
-            val storageText = getString(
-                R.string.active_document_storage,
-                localBytes,
-                if (summary == null) "missing" else "ready",
-            )
-            val serverText = currentBlossomServers()
-                .takeIf { it.isNotEmpty() }
-                ?.joinToString(", ") { it.removePrefix("https://").removePrefix("wss://") }
-                ?.let { getString(R.string.active_document_servers, it) }
-                .orEmpty()
-            val diagnosticText = record.lastSyncMessage?.takeIf { it.isNotBlank() }
-                ?.let { getString(R.string.active_document_diagnostic, it) }
-                .orEmpty()
-            listOf(detailText, storageText, serverText, diagnosticText)
-                .filter { it.isNotBlank() }
-                .joinToString("\n")
-        }
-
-        binding.activeDocumentDiagnosticsText.text = diagnostics.overview
-        renderProgressSection(
-            binding.activeDocumentProgressLabel,
-            binding.activeDocumentProgressContainer,
-            diagnostics.progressLabel,
-            diagnostics.progressSteps,
-        )
-        bindDiagnosticSection(binding.activeDocumentUploadsLabel, binding.activeDocumentUploadsText, diagnostics.uploadsLabel, diagnostics.uploads)
-        bindDiagnosticSection(binding.activeDocumentRelaysLabel, binding.activeDocumentRelaysText, diagnostics.relaysLabel, diagnostics.relays)
+        binding.activeDocumentText.text = selectedNoteState.title
+        binding.activeDocumentDetailText.text = selectedNoteState.detail
+        binding.retryUploadButton.visibility = if (selectedNoteState.retryVisible) View.VISIBLE else View.GONE
+        binding.activeDocumentProgressLabel.visibility = View.GONE
+        binding.activeDocumentProgressContainer.visibility = View.GONE
+        binding.activeDocumentDiagnosticsText.visibility = View.GONE
+        binding.activeDocumentUploadsLabel.visibility = View.GONE
+        binding.activeDocumentUploadsText.visibility = View.GONE
+        binding.activeDocumentRelaysLabel.visibility = View.GONE
+        binding.activeDocumentRelaysText.visibility = View.GONE
     }
 
     private fun bindMainStatus(record: LocalDocumentRecord?) {
-        val state = MainScreenStatusPresenter.build(record)
+        val state = MainScreenStatusPresenter.build(record, !session.loadPrivateKeyHex().isNullOrBlank())
         binding.mainStatusChip.text = state.label
         binding.mainStatusHeadlineText.text = state.headline
         binding.mainStatusSummaryText.text = state.summary
@@ -406,11 +362,10 @@ class MainActivity : AppCompatActivity() {
                     resources.getDimensionPixelSize(R.dimen.garland_content_gap),
                 )
                 setLineSpacing(resources.getDimension(R.dimen.garland_tight_gap), 1f)
-                text = DocumentDiagnosticsFormatter.listLabel(
+                text = MainScreenSelectedNotePresenter.listLabel(
                     record = record,
                     summary = planDecode.summary,
                     isSelected = record.documentId == selectedDocumentId,
-                    planMalformed = planDecode.malformed,
                 )
                 styleDocumentButton(this, record.documentId == selectedDocumentId)
                 setOnClickListener { selectDocument(record, true) }

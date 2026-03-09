@@ -126,7 +126,7 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         val resolvedDisplayName = ProviderMimePolicy.resolveDisplayName(displayName, resolvedMimeType)
         val record = store.createDocument(
             displayName = resolvedDisplayName,
-            mimeType = resolvedMimeType
+            mimeType = GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE
         )
         return record.documentId
     }
@@ -245,6 +245,8 @@ class GarlandDocumentsProvider : DocumentsProvider() {
         val content = store.contentFile(documentId).readBytes()
         val requestJson = GarlandConfig.buildPrepareWriteRequestJson(
             privateKeyHex = privateKeyHex,
+            displayName = record.displayName,
+            mimeType = GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE,
             content = content,
             blossomServers = session.resolvedBlossomServers(),
             createdAt = System.currentTimeMillis() / 1000,
