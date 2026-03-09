@@ -170,15 +170,17 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     private fun relayResponse(): MockResponse {
         return MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
-                parseEventId(text)?.let(relayEventIds::add)
+                val eventId = parseEventId(text)
+                eventId?.let(relayEventIds::add)
+                val ackEventId = eventId ?: "event123"
                 when (val mode = relayMode) {
                     is RelayMode.Accept -> {
-                        webSocket.send("[\"OK\",\"event123\",true,\"${mode.reason}\"]")
+                        webSocket.send("[\"OK\",\"$ackEventId\",true,\"${mode.reason}\"]")
                         webSocket.close(1000, null)
                     }
 
                     is RelayMode.Reject -> {
-                        webSocket.send("[\"OK\",\"event123\",false,\"${mode.reason}\"]")
+                        webSocket.send("[\"OK\",\"$ackEventId\",false,\"${mode.reason}\"]")
                         webSocket.close(1000, null)
                     }
 
