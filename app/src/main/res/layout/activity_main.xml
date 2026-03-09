@@ -25,15 +25,15 @@
                 android:layout_width="88dp"
                 android:layout_height="88dp"
                 android:contentDescription="@string/app_name"
-                android:src="@drawable/garland_logo"
-                android:visibility="gone" />
+                android:src="@drawable/garland_logo" />
 
             <TextView
                 android:id="@+id/titleText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_section_label"
-                android:textAppearance="@style/TextAppearance.Garland.SectionEyebrow" />
+                android:layout_marginTop="@dimen/garland_content_gap"
+                android:text="@string/app_name"
+                android:textAppearance="@style/TextAppearance.Garland.DisplayTitle" />
 
             <TextView
                 android:id="@+id/mainStatusChip"
@@ -46,14 +46,13 @@
                 android:paddingRight="@dimen/garland_status_chip_padding_horizontal"
                 android:paddingBottom="@dimen/garland_status_chip_padding_vertical"
                 android:text="Status"
-                android:textAppearance="@style/TextAppearance.Garland.StatusChip"
-                android:visibility="gone" />
+                android:textAppearance="@style/TextAppearance.Garland.StatusChip" />
 
             <TextView
                 android:id="@+id/mainStatusHeadlineText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/garland_tight_gap"
+                android:layout_marginTop="@dimen/garland_section_gap"
                 android:gravity="center"
                 android:text="Garland status headline"
                 android:textAppearance="@style/TextAppearance.Garland.DisplayTitle" />
@@ -74,8 +73,7 @@
                 android:layout_marginTop="@dimen/garland_content_gap"
                 android:gravity="center"
                 android:text="Next steps"
-                android:textAppearance="@style/TextAppearance.Garland.BodySupport"
-                android:visibility="gone" />
+                android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
             <TextView
                 android:id="@+id/statusText"
@@ -159,7 +157,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/garland_tight_gap"
-                android:text="Tap a note to keep moving. Each row shows its latest local or upload state."
+                android:text="Tap a file to inspect it and target retry or delete actions."
                 android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
             <LinearLayout

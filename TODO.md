@@ -108,6 +108,7 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 ### UX polish
 
 - [x] Replace the launcher icon with an adaptive black flower mark so homescreen masks no longer add a white halo or extra whitespace
+- [x] Restore the PR #1 olive-on-black UI language on the current app without regressing the newer note upload flow
 
 ### Inode-aware document model
 

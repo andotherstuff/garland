@@ -8,7 +8,7 @@
     <string name="compose_subtitle">Write and encrypt a plain text file.</string>
     <string name="compose_file_name_hint">File name</string>
     <string name="compose_content_hint">Content</string>
-    <string name="compose_save_button">Upload now</string>
+    <string name="compose_save_button">Save &amp; upload</string>
     <string name="compose_cancel_button">Cancel</string>
     <string name="compose_identity_required">Load or generate an identity before uploading a note.</string>
     <string name="compose_preparing_upload">Preparing encrypted note…</string>
@@ -16,8 +16,8 @@
     <string name="compose_prepare_error">Could not prepare the note: %s</string>
     <string name="compose_upload_success">Uploaded %1$d/%2$d shares. %3$s</string>
     <string name="compose_upload_failure">Upload failed: %s</string>
-    <string name="config_button">Identity</string>
-    <string name="config_title">Identity &amp; settings</string>
+    <string name="config_button">Settings</string>
+    <string name="config_title">Settings</string>
     <string name="config_subtitle">Generate a new identity or import an existing one. Network defaults are optional.</string>
     <string name="config_save_button">Save</string>
     <string name="config_saved">Settings saved.</string>
@@ -33,7 +33,7 @@
     <string name="identity_generated">New identity ready\nSave these 12 words:\n%1$s\n\n%2$s</string>
     <string name="identity_error">Import failed: %s</string>
     <string name="active_document_none">No prepared document loaded yet.</string>
-    <string name="current_document_label">Selected note</string>
+    <string name="current_document_label">Current document</string>
     <string name="active_document_loaded">Active document: %1$s (%2$s)</string>
     <string name="active_document_details_none">No Garland plan details yet.</string>
     <string name="active_document_details">Doc %1$s
@@ -65,8 +65,8 @@ sha256 %6$s</string>
     <string name="diagnostics_agent_report_label">Agent handoff report</string>
     <string name="diagnostics_agent_report_placeholder">No report yet.</string>
     <string name="diagnostics_troubleshooting_label">Troubleshooting</string>
-    <string name="primary_actions_label">Identity + new note</string>
-    <string name="primary_actions_note">Start here: open Identity to generate or import your seed, then tap New text file.</string>
+    <string name="primary_actions_label">Primary actions</string>
+    <string name="primary_actions_note">Start here: open Settings to generate or import your seed, then tap New text file.</string>
     <string name="troubleshooting_actions_label">Troubleshooting actions</string>
     <string name="action_group_quick_checks_label">Quick checks</string>
     <string name="action_group_quick_checks_note">Refresh the current view, queue pending sync work, or open the deeper report.</string>
@@ -77,7 +77,7 @@ sha256 %6$s</string>
     <string name="action_safety_note">Safe order: create a note, check its status, retry only if upload failed, delete only when you want to discard the local copy.</string>
     <string name="identity_section_label">Identity</string>
     <string name="network_section_label">Network defaults</string>
-    <string name="local_documents_label">Notes on this device</string>
+    <string name="local_documents_label">Local Garland documents</string>
     <string name="refresh_documents_button">Refresh</string>
     <string name="sync_documents_button">Sync pending</string>
     <string name="retry_upload_button">Retry upload</string>

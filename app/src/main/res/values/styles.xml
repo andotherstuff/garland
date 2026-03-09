@@ -1,41 +1,50 @@
 <resources>
     <style name="Widget.Garland.Card" parent="Widget.Material3.CardView.Elevated">
         <item name="cardBackgroundColor">@color/garland_surface</item>
-        <item name="strokeColor">@color/garland_outline_soft</item>
-        <item name="strokeWidth">1dp</item>
-        <item name="cardCornerRadius">28dp</item>
-        <item name="cardElevation">2dp</item>
+        <item name="strokeColor">@android:color/transparent</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="cardCornerRadius">0dp</item>
+        <item name="cardElevation">0dp</item>
     </style>
-
-    <style name="Widget.Garland.Section" parent="Widget.Garland.Card" />
 
     <style name="Widget.Garland.Panel" parent="">
         <item name="android:background">@drawable/bg_panel_inset</item>
         <item name="android:padding">@dimen/garland_panel_padding</item>
-        <item name="android:layout_margin">@dimen/garland_screen_padding</item>
     </style>
 
-    <style name="Widget.Garland.DebugPanel" parent="Widget.Garland.Panel" />
+    <style name="Widget.Garland.DebugPanel" parent="Widget.Garland.Panel">
+        <item name="android:padding">20dp</item>
+    </style>
+
+    <style name="Widget.Garland.Section" parent="">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:paddingLeft">@dimen/garland_screen_padding</item>
+        <item name="android:paddingTop">24dp</item>
+        <item name="android:paddingRight">@dimen/garland_screen_padding</item>
+        <item name="android:paddingBottom">24dp</item>
+    </style>
 
     <style name="Widget.Garland.ActionButton" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="strokeColor">@color/garland_outline</item>
-        <item name="android:textColor">@color/garland_ink</item>
-        <item name="backgroundTint">@color/garland_surface_soft</item>
+        <item name="strokeColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
+        <item name="backgroundTint">#FFFFFF</item>
         <item name="cornerRadius">20dp</item>
-        <item name="android:minHeight">52dp</item>
+        <item name="android:minHeight">64dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:elevation">8dp</item>
     </style>
 
     <style name="Widget.Garland.ActionButton.Primary" parent="Widget.Material3.Button">
         <item name="backgroundTint">@color/garland_leaf</item>
-        <item name="android:textColor">@color/garland_bg</item>
+        <item name="android:textColor">@color/garland_ink</item>
         <item name="cornerRadius">20dp</item>
-        <item name="android:minHeight">52dp</item>
+        <item name="android:minHeight">64dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:elevation">8dp</item>
     </style>
 
     <style name="Widget.Garland.DocumentPickerButton" parent="Widget.Material3.Button.OutlinedButton">
@@ -59,12 +68,13 @@
         <item name="strokeColor">@color/garland_error</item>
         <item name="android:textColor">@color/garland_error</item>
         <item name="backgroundTint">@color/garland_danger_surface</item>
+        <item name="cornerRadius">14dp</item>
     </style>
 
     <style name="Widget.Garland.PrimaryButton" parent="Widget.Material3.Button">
         <item name="backgroundTint">@color/garland_leaf</item>
         <item name="android:textColor">@color/garland_bg</item>
-        <item name="cornerRadius">20dp</item>
+        <item name="cornerRadius">14dp</item>
         <item name="android:minHeight">52dp</item>
     </style>
 
@@ -96,17 +106,11 @@
         <item name="android:textStyle">bold</item>
     </style>
 
-    <style name="TextAppearance.Garland.DebugTitle" parent="TextAppearance.Garland.SectionTitle">
-        <item name="android:fontFamily">monospace</item>
-    </style>
-
     <style name="TextAppearance.Garland.DisplayTitle" parent="TextAppearance.Material3.HeadlineMedium">
         <item name="android:textColor">@color/garland_ink</item>
         <item name="android:textStyle">bold</item>
         <item name="android:lineSpacingExtra">2dp</item>
     </style>
-
-    <style name="TextAppearance.Garland.HomeTitle" parent="TextAppearance.Garland.DisplayTitle" />
 
     <style name="TextAppearance.Garland.HeroTitle" parent="TextAppearance.Material3.HeadlineSmall">
         <item name="android:textColor">@color/garland_ink</item>
@@ -130,14 +134,28 @@
 
     <style name="TextAppearance.Garland.DiagnosticsBody" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/garland_muted</item>
-        <item name="android:fontFamily">monospace</item>
+        <item name="android:fontFamily">sans-serif</item>
         <item name="android:lineSpacingExtra">4dp</item>
     </style>
 
-    <style name="TextAppearance.Garland.DebugCode" parent="TextAppearance.Garland.DiagnosticsBody" />
-
     <style name="TextAppearance.Garland.BodyStrong" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textColor">@color/garland_ink</item>
+    </style>
+
+    <style name="TextAppearance.Garland.HomeTitle" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Garland.DebugTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Garland.DebugCode" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/garland_ink</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:lineSpacingExtra">5dp</item>
     </style>
 
     <style name="TextAppearance.Garland.StatusChip" parent="TextAppearance.Material3.LabelLarge">

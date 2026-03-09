@@ -141,7 +141,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun mainStatusTextColor(tone: String): Int {
         return when (tone) {
-            "success", "warning", "danger" -> R.color.garland_bg
+            "success", "warning", "danger" -> R.color.garland_ink
             else -> R.color.garland_ink
         }
     }

@@ -42,11 +42,12 @@ class UiThemeContractTest {
     }
 
     @Test
-    fun appUsesBundledGarlandLogoForLauncherAndHeroImage() {
+    fun appUsesAdaptiveLauncherIconAndBundledHeroImage() {
         val manifestXml = projectFile("app", "src", "main", "AndroidManifest.xml")
         val mainLayout = projectFile("app", "src", "main", "res", "layout", "activity_main.xml")
 
-        assertTrue(manifestXml.contains("@drawable/garland_logo"))
+        assertTrue(manifestXml.contains("@mipmap/ic_launcher"))
+        assertTrue(manifestXml.contains("@mipmap/ic_launcher_round"))
         assertTrue(mainLayout.contains("@drawable/garland_logo"))
     }
 
