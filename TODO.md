@@ -94,6 +94,7 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 - [-] Simplify the main screen by hiding advanced actions until the basic note flow is proven (notes list carries the selected-note summary, the hero now drops branding/dashboard chrome, and the top copy reads identity-first; keep trimming toward a cleaner identity + new note + notes list hierarchy)
 - [x] Add a no-device host-side integration harness for real Rust prepare -> fake Blossom upload -> fake relay publish
 - [x] Make selected-note upload/delete actions visible on the main screen and route them through explicit action/state presenters
+- [x] Require successful Blossom uploads to return a valid Blob Descriptor before treating the share as uploaded
 - [ ] Run a real-device smoke test: generate identity -> create note -> upload note
 
 ### Wire RS shares through upload/restore

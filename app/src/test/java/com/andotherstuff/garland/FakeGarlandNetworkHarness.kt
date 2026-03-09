@@ -14,7 +14,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     private val server = MockWebServer()
     private val uploadStatusCodes = ArrayDeque<Int>()
     private val downloadBodies = mutableMapOf<String, ByteArray>()
-    private val uploadResponseBodies = mutableMapOf<String, String>()
+    private val uploadResponsePaths = mutableMapOf<String, String>()
     private val uploadedShareIds = mutableListOf<String>()
     private val uploadedBodies = mutableListOf<ByteArray>()
     private val uploadContentTypes = mutableListOf<String>()
@@ -72,12 +72,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
 
     fun enqueueUploadDescriptor(shareIdHex: String, downloadPath: String = "/$shareIdHex") {
         val normalizedPath = if (downloadPath.startsWith('/')) downloadPath else "/$downloadPath"
-        uploadResponseBodies[shareIdHex] = """
-            {
-              "url": "${server.url(normalizedPath)}",
-              "sha256": "$shareIdHex"
-            }
-        """.trimIndent()
+        uploadResponsePaths[shareIdHex] = normalizedPath
     }
 
     fun requireUploadAuthorization() {
@@ -140,17 +135,32 @@ class FakeGarlandNetworkHarness : AutoCloseable {
             return MockResponse().setResponseCode(400).setBody("{\"error\":\"file type not allowed\"}")
         }
         val statusCode = uploadStatusCodes.removeFirstOrNull() ?: 200
-        val responseBody = shareId?.let(uploadResponseBodies::get)
-            ?: shareId?.let { defaultUploadDescriptor(it) }
+        val responseBody = shareId?.let {
+            val path = uploadResponsePaths[it]
+            defaultUploadDescriptor(
+                shareIdHex = it,
+                downloadPath = path ?: "/$it",
+                contentType = request.getHeader("Content-Type") ?: GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE,
+                uploaded = request.body.size,
+            )
+        }
             ?: "{}"
         return MockResponse().setResponseCode(statusCode).setBody(responseBody)
     }
 
-    private fun defaultUploadDescriptor(shareIdHex: String): String {
+    private fun defaultUploadDescriptor(
+        shareIdHex: String,
+        downloadPath: String,
+        contentType: String,
+        uploaded: Long,
+    ): String {
         return """
             {
-              "url": "${server.url("/$shareIdHex")}",
-              "sha256": "$shareIdHex"
+              "url": "${server.url(downloadPath)}",
+              "sha256": "$shareIdHex",
+              "size": $uploaded,
+              "type": "$contentType",
+              "uploaded": 1701907200
             }
         """.trimIndent()
     }

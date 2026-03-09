@@ -460,11 +460,11 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-missing-commit-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
         server.start()
 
         val document = store.createDocument("note.txt", "text/plain")
         val uploadUrl = server.url("").toString().removeSuffix("/")
+        server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
         store.saveUploadPlan(
             document.documentId,
             """
@@ -501,9 +501,11 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        server.start()
+        val uploadUrl = server.url("").toString().removeSuffix("/")
+        repeat(3) {
+            server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
+        }
         server.enqueue(
             MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -512,10 +514,7 @@ class GarlandUploadExecutorTest {
                 }
             })
         )
-        server.start()
-
         val document = store.createDocument("note.txt", "text/plain")
-        val uploadUrl = server.url("").toString().removeSuffix("/")
         val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
         store.saveUploadPlan(
             document.documentId,
@@ -567,8 +566,10 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-retry-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
+        server.start()
+        val uploadUrl = server.url("").toString().removeSuffix("/")
         server.enqueue(MockResponse().setResponseCode(503))
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
         server.enqueue(
             MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -577,11 +578,8 @@ class GarlandUploadExecutorTest {
                 }
             })
         )
-        server.start()
-
         try {
             val document = store.createDocument("retry.txt", "text/plain")
-            val uploadUrl = server.url("").toString().removeSuffix("/")
             val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
             store.saveUploadPlan(
                 document.documentId,
@@ -631,13 +629,18 @@ class GarlandUploadExecutorTest {
         val firstServer = MockWebServer()
         val secondServer = MockWebServer()
         val relayServer = MockWebServer()
+        firstServer.start()
+        secondServer.start()
+        relayServer.start()
+        val firstUploadUrl = firstServer.url("").toString().removeSuffix("/")
+        val secondUploadUrl = secondServer.url("").toString().removeSuffix("/")
         firstServer.enqueue(
             MockResponse()
                 .setResponseCode(400)
                 .setHeader("X-Reason", "Filetype not allowed")
                 .setBody("{\"error\":\"file type not detected or not allowed\"}")
         )
-        secondServer.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        secondServer.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(secondUploadUrl, HELLO_SHARE_ID)))
         relayServer.enqueue(
             MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -646,14 +649,8 @@ class GarlandUploadExecutorTest {
                 }
             })
         )
-        firstServer.start()
-        secondServer.start()
-        relayServer.start()
-
         try {
             val document = store.createDocument("note.txt", "text/plain")
-            val firstUploadUrl = firstServer.url("").toString().removeSuffix("/")
-            val secondUploadUrl = secondServer.url("").toString().removeSuffix("/")
             val relayUrl = relayServer.url("/").toString().replaceFirst("http", "ws")
             store.saveUploadPlan(
                 document.documentId,
@@ -750,9 +747,11 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-partial-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        server.start()
+        val uploadUrl = server.url("").toString().removeSuffix("/")
+        repeat(3) {
+            server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
+        }
         server.enqueue(
             MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -761,10 +760,7 @@ class GarlandUploadExecutorTest {
                 }
             })
         )
-        server.start()
-
         val document = store.createDocument("note.txt", "text/plain")
-        val uploadUrl = server.url("").toString().removeSuffix("/")
         val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
         store.saveUploadPlan(
             document.documentId,
@@ -816,11 +812,11 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-invalid-relay-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
         server.start()
 
         val document = store.createDocument("note.txt", "text/plain")
         val uploadUrl = server.url("").toString().removeSuffix("/")
+        server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
         store.saveUploadPlan(
             document.documentId,
             """
@@ -865,8 +861,11 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-multi-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
+        server.start()
+        val uploadUrl = server.url("").toString().removeSuffix("/")
         repeat(6) {
-            server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+            val shareId = if (it < 3) HELLO_SHARE_ID else WORLD_SHARE_ID
+            server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, shareId)))
         }
         server.enqueue(
             MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
@@ -876,10 +875,7 @@ class GarlandUploadExecutorTest {
                 }
             })
         )
-        server.start()
-
         val document = store.createDocument("big.txt", "text/plain")
-        val uploadUrl = server.url("").toString().removeSuffix("/")
         val relayUrl = server.url("/").toString().replaceFirst("http", "ws")
         store.saveUploadPlan(
             document.documentId,
@@ -1162,12 +1158,12 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-cross-origin-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
+        server.start()
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
-                .setBody("{\"url\":\"https://evil.example/blob/$HELLO_SHARE_ID\",\"sha256\":\"$HELLO_SHARE_ID\"}")
+                .setBody("{\"url\":\"https://evil.example/blob/$HELLO_SHARE_ID\",\"sha256\":\"$HELLO_SHARE_ID\",\"size\":5,\"type\":\"application/octet-stream\",\"uploaded\":1701907200}")
         )
-        server.start()
 
         try {
             val document = store.createDocument("note.txt", "text/plain")
@@ -1336,12 +1332,12 @@ class GarlandUploadExecutorTest {
         val tempDir = Files.createTempDirectory("garland-upload-no-commit-on-relay-fail-test").toFile()
         val store = LocalDocumentStoreImpl(tempDir)
         val server = MockWebServer()
-        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
         server.start()
 
         try {
             val document = store.createDocument("note.txt", "text/plain")
             val uploadUrl = server.url("").toString().removeSuffix("/")
+            server.enqueue(MockResponse().setResponseCode(200).setBody(uploadDescriptorJson(uploadUrl, HELLO_SHARE_ID)))
             store.saveUploadPlan(
                 document.documentId,
                 """
@@ -1422,5 +1418,129 @@ class GarlandUploadExecutorTest {
         client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
+    }
+
+    @Test
+    fun rejectsBlankBlobDescriptorBodyOnUploadSuccess() {
+        val tempDir = Files.createTempDirectory("garland-upload-blank-descriptor-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.start()
+
+        try {
+            val document = store.createDocument("note.txt", "text/plain")
+            val uploadUrl = server.url("").toString().removeSuffix("/")
+            server.enqueue(MockResponse().setResponseCode(200).setBody(""))
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(store, client)
+            val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+            assertFalse(result.success)
+            assertEquals("upload-response-invalid", store.readRecord(document.documentId)?.uploadStatus)
+            assertTrue(result.message.contains("did not return a Blob Descriptor body"))
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun rejectsDescriptorWithoutUrlOnUploadSuccess() {
+        val tempDir = Files.createTempDirectory("garland-upload-missing-url-descriptor-test").toFile()
+        val store = LocalDocumentStoreImpl(tempDir)
+        val server = MockWebServer()
+        server.start()
+
+        try {
+            val document = store.createDocument("note.txt", "text/plain")
+            val uploadUrl = server.url("").toString().removeSuffix("/")
+            server.enqueue(
+                MockResponse().setResponseCode(200).setBody(
+                    "{\"sha256\":\"$HELLO_SHARE_ID\",\"size\":5,\"type\":\"application/octet-stream\",\"uploaded\":1701907200}"
+                )
+            )
+            store.saveUploadPlan(
+                document.documentId,
+                """
+                {
+                  "ok": true,
+                  "plan": {
+                    "uploads": [
+                      {"server_url":"$uploadUrl","share_id_hex":"$HELLO_SHARE_ID","body_b64":"aGVsbG8="}
+                    ],
+                    "commit_event": {
+                      "id_hex":"event123",
+                      "pubkey_hex":"pubkey123",
+                      "created_at":1701907200,
+                      "kind":1097,
+                      "tags":[],
+                      "content":"manifest",
+                      "sig_hex":"sig123"
+                    }
+                  },
+                  "error": null
+                }
+                """.trimIndent(),
+            )
+
+            val client = OkHttpClient()
+            val executor = GarlandUploadExecutor(store, client)
+            val result = executor.executeDocumentUpload(document.documentId, listOf("wss://relay.example"))
+
+            assertFalse(result.success)
+            assertEquals("upload-response-invalid", store.readRecord(document.documentId)?.uploadStatus)
+            assertTrue(result.message.contains("missing descriptor url"))
+
+            client.dispatcher.cancelAll()
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    private fun uploadDescriptorJson(
+        uploadUrl: String,
+        shareIdHex: String,
+        retrievalPath: String = "/$shareIdHex",
+        contentType: String = GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE,
+        uploaded: Int = 5,
+    ): String {
+        return """
+            {
+              "url": "${uploadUrl.trimEnd('/')}$retrievalPath",
+              "sha256": "$shareIdHex",
+              "size": $uploaded,
+              "type": "$contentType",
+              "uploaded": 1701907200
+            }
+        """.trimIndent()
     }
 }

@@ -248,18 +248,44 @@ internal class GarlandPreparedUploadFactory(
     }
 
     fun parseUploadResponse(upload: UploadBody, responseBodyText: String): ResolvedUploadTarget? {
-        if (responseBodyText.isBlank()) return null
+        if (responseBodyText.isBlank()) {
+            throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} did not return a Blob Descriptor body"
+            )
+        }
         val payload = runCatching { JsonParser.parseString(responseBodyText) }.getOrNull()
             ?.takeIf { it.isJsonObject }
             ?.asJsonObject
-            ?: return null
+            ?: throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} did not return a valid Blob Descriptor JSON object"
+            )
         val sha256 = payload.optionalString("sha256")
-        if (!sha256.isNullOrBlank() && !sha256.equals(upload.shareIdHex, ignoreCase = true)) {
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} is missing descriptor sha256"
+            )
+        if (!sha256.equals(upload.shareIdHex, ignoreCase = true)) {
             throw IllegalStateException(
                 "Upload response from ${upload.serverUrl} returned sha256 $sha256 for share ${upload.shareIdHex}"
             )
         }
-        val retrievalUrl = payload.optionalString("url")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val retrievalUrl = payload.optionalString("url")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} is missing descriptor url"
+            )
+        payload.optionalString("type")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} is missing descriptor type"
+            )
+        payload.optionalLong("size")
+            ?: throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} is missing descriptor size"
+            )
+        payload.optionalLong("uploaded")
+            ?: throw IllegalStateException(
+                "Upload response from ${upload.serverUrl} is missing descriptor uploaded timestamp"
+            )
         runCatching { Request.Builder().url(retrievalUrl).build() }
             .getOrElse {
                 throw IllegalStateException(
@@ -349,6 +375,12 @@ internal class GarlandPreparedUploadFactory(
         val field = get(fieldName) ?: return null
         if (!field.isJsonPrimitive || !field.asJsonPrimitive.isString) return null
         return field.asString
+    }
+
+    private fun JsonObject.optionalLong(fieldName: String): Long? {
+        val field = get(fieldName) ?: return null
+        if (!field.isJsonPrimitive || !field.asJsonPrimitive.isNumber) return null
+        return runCatching { field.asLong }.getOrNull()
     }
 
     private companion object {
