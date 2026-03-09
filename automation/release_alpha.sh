@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TAG="${1:-v0.0.2-alpha}"
+TAG="${1:-v0.0.3-alpha}"
 VERSION="${TAG#v}"
 RELEASE_HOME="${GARLAND_RELEASE_HOME:-$HOME/.config/garland/release}"
 SIGNING_PROPERTIES="${GARLAND_RELEASE_PROPERTIES:-$RELEASE_HOME/signing.properties}"
