@@ -2,6 +2,7 @@ pub mod commit_chain;
 pub mod commit_crypto;
 pub mod crypto;
 pub mod erasure;
+pub mod erasure_write;
 pub mod identity;
 pub mod inode;
 pub mod jni_api;
