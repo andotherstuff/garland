@@ -45,7 +45,7 @@
                 android:paddingTop="@dimen/garland_status_chip_padding_vertical"
                 android:paddingRight="@dimen/garland_status_chip_padding_horizontal"
                 android:paddingBottom="@dimen/garland_status_chip_padding_vertical"
-                android:text="Status"
+                android:text="@string/main_status_placeholder"
                 android:textAppearance="@style/TextAppearance.Garland.StatusChip" />
 
             <TextView
@@ -54,7 +54,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/garland_section_gap"
                 android:gravity="center"
-                android:text="Garland status headline"
+                android:text="@string/main_status_headline_placeholder"
                 android:textAppearance="@style/TextAppearance.Garland.DisplayTitle" />
 
             <TextView
@@ -72,7 +72,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/garland_content_gap"
                 android:gravity="center"
-                android:text="Next steps"
+                android:text="@string/main_next_steps_placeholder"
                 android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
             <TextView
@@ -157,7 +157,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/garland_tight_gap"
-                android:text="Tap a file to inspect it and target retry or delete actions."
+                android:text="@string/local_documents_note"
                 android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
             <LinearLayout
@@ -190,7 +190,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/garland_tight_gap"
-                android:text="No note selected yet."
+                android:text="@string/current_document_placeholder_title"
                 android:textAppearance="@style/TextAppearance.Garland.SectionTitle" />
 
             <TextView
@@ -198,7 +198,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/garland_tight_gap"
-                android:text="Select a note from the list to review its latest state."
+                android:text="@string/current_document_placeholder_detail"
                 android:textAppearance="@style/TextAppearance.Garland.BodySupport" />
 
             <LinearLayout

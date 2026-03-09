@@ -29,7 +29,8 @@
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:layout_marginTop="@dimen/garland_section_gap"
             android:clipToPadding="false">
 
@@ -114,7 +115,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_content_gap"
-                    android:hint="Relay 1">
+                    android:hint="@string/relay_one_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/relayOneInput"
@@ -128,7 +129,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_button_gap"
-                    android:hint="Relay 2">
+                    android:hint="@string/relay_two_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/relayTwoInput"
@@ -142,7 +143,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_button_gap"
-                    android:hint="Relay 3">
+                    android:hint="@string/relay_three_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/relayThreeInput"
@@ -164,7 +165,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_content_gap"
-                    android:hint="Blossom server 1">
+                    android:hint="@string/blossom_server_one_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/serverOneInput"
@@ -178,7 +179,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_button_gap"
-                    android:hint="Blossom server 2">
+                    android:hint="@string/blossom_server_two_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/serverTwoInput"
@@ -192,7 +193,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/garland_button_gap"
-                    android:hint="Blossom server 3">
+                    android:hint="@string/blossom_server_three_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/serverThreeInput"

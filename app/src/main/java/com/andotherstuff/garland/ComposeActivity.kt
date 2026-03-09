@@ -73,7 +73,9 @@ class ComposeActivity : AppCompatActivity() {
     private fun save() {
         if (uploadInFlight) return
 
-        val displayName = binding.fileNameInput.text?.toString().orEmpty().ifBlank { "note.txt" }
+        val displayName = binding.fileNameInput.text?.toString().orEmpty().ifBlank {
+            getString(R.string.compose_default_file_name)
+        }
         val content = binding.contentInput.text?.toString().orEmpty().toByteArray()
         setUploadInFlight(true)
         thread(name = "garland-compose-upload") {

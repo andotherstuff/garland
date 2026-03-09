@@ -110,19 +110,19 @@ class DiagnosticsActivity : AppCompatActivity() {
 
     private fun statusTextColor(tone: String): Int {
         return when (tone) {
-            "success", "warning", "danger" -> R.color.garland_bg
+            "success", "warning", "danger" -> R.color.garland_ink
             else -> R.color.garland_ink
         }
     }
 
     private fun copyDiagnosticsReport() {
         val report = binding.copyDiagnosticsButton.tag as? String ?: return
-        copyText("Garland diagnostics", report)
+        copyText(getString(R.string.diagnostics_clipboard_label), report)
     }
 
     private fun copySelectedDocumentId() {
         val documentId = selectedDocumentId ?: return
-        copyText("Garland document ID", documentId)
+        copyText(getString(R.string.document_id_clipboard_label), documentId)
     }
 
     private fun renderDocumentOptions(options: List<DocumentDiagnosticsOption>) {
@@ -130,6 +130,7 @@ class DiagnosticsActivity : AppCompatActivity() {
         if (options.isEmpty()) {
             binding.diagnosticsDocumentListContainer.addView(TextView(this).apply {
                 text = getString(R.string.document_list_empty)
+                setTextColor(ContextCompat.getColor(context, R.color.garland_muted))
             })
             return
         }
@@ -260,10 +261,10 @@ class DiagnosticsActivity : AppCompatActivity() {
 
     private fun progressChipLabel(state: String): String {
         return when (state) {
-            "done" -> "DONE"
-            "active" -> "LIVE"
-            "failed" -> "FAIL"
-            else -> "WAIT"
+            "done" -> getString(R.string.progress_chip_done)
+            "active" -> getString(R.string.progress_chip_live)
+            "failed" -> getString(R.string.progress_chip_fail)
+            else -> getString(R.string.progress_chip_wait)
         }
     }
 
@@ -278,7 +279,7 @@ class DiagnosticsActivity : AppCompatActivity() {
 
     private fun progressChipTextColor(state: String): Int {
         return when (state) {
-            "done", "active", "failed" -> R.color.garland_bg
+            "done", "active", "failed" -> R.color.garland_ink
             else -> R.color.garland_ink
         }
     }
@@ -286,7 +287,7 @@ class DiagnosticsActivity : AppCompatActivity() {
     private fun copyText(label: String, text: String) {
         val clipboard = getSystemService(ClipboardManager::class.java) ?: return
         clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-        Toast.makeText(this, "$label copied", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.clipboard_copied_toast, label), Toast.LENGTH_SHORT).show()
     }
 
     companion object {

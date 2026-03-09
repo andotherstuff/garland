@@ -2,11 +2,15 @@
     <string name="app_name">Garland</string>
     <string name="app_description">Encrypted file backup over Nostr and Blossom. Your files, your keys.</string>
     <string name="app_boot_status">Generate or import an identity, then upload a note.</string>
+    <string name="main_status_placeholder">Status</string>
+    <string name="main_status_headline_placeholder">Garland status headline</string>
+    <string name="main_next_steps_placeholder">Next steps</string>
     <string name="upload_file_button">Upload file</string>
     <string name="create_file_button">New text file</string>
     <string name="compose_title">New file</string>
     <string name="compose_subtitle">Write and encrypt a plain text file.</string>
     <string name="compose_file_name_hint">File name</string>
+    <string name="compose_default_file_name">note.txt</string>
     <string name="compose_content_hint">Content</string>
     <string name="compose_save_button">Save &amp; upload</string>
     <string name="compose_cancel_button">Cancel</string>
@@ -34,6 +38,9 @@
     <string name="identity_error">Import failed: %s</string>
     <string name="active_document_none">No prepared document loaded yet.</string>
     <string name="current_document_label">Current document</string>
+    <string name="local_documents_note">Tap a file to inspect it and target retry or delete actions.</string>
+    <string name="current_document_placeholder_title">No note selected yet.</string>
+    <string name="current_document_placeholder_detail">Select a note from the list to review its latest state.</string>
     <string name="active_document_loaded">Active document: %1$s (%2$s)</string>
     <string name="active_document_details_none">No Garland plan details yet.</string>
     <string name="active_document_details">Doc %1$s
@@ -100,6 +107,12 @@ sha256 %6$s</string>
     <string name="restore_error">Restore failed: %s</string>
     <string name="relay_defaults_label">Default relays</string>
     <string name="blossom_defaults_label">Default Blossom servers</string>
+    <string name="relay_one_hint">Relay 1</string>
+    <string name="relay_two_hint">Relay 2</string>
+    <string name="relay_three_hint">Relay 3</string>
+    <string name="blossom_server_one_hint">Blossom server 1</string>
+    <string name="blossom_server_two_hint">Blossom server 2</string>
+    <string name="blossom_server_three_hint">Blossom server 3</string>
     <string name="manual_upload_label">Manual Garland test draft</string>
     <string name="manual_upload_note">Write test content here, then prepare it. Upload uses the last prepared snapshot, not the live editor text.</string>
     <string name="prepared_snapshot_label">Prepared snapshot</string>
@@ -116,4 +129,11 @@ sha256 %6$s</string>
     <string name="upload_result">Uploaded %1$d/%2$d shares\n%3$s</string>
     <string name="upload_execution_error">Upload failed: %s</string>
     <string name="upload_retry_running">Retrying upload for %s</string>
+    <string name="diagnostics_clipboard_label">Garland diagnostics</string>
+    <string name="document_id_clipboard_label">Garland document ID</string>
+    <string name="clipboard_copied_toast">%1$s copied</string>
+    <string name="progress_chip_done">DONE</string>
+    <string name="progress_chip_live">LIVE</string>
+    <string name="progress_chip_fail">FAIL</string>
+    <string name="progress_chip_wait">WAIT</string>
 </resources>

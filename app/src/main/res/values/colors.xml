@@ -1,7 +1,7 @@
 <resources>
     <color name="garland_bg">#000000</color>
-    <color name="garland_bg_top">#000000</color>
-    <color name="garland_bg_bottom">#000000</color>
+    <color name="garland_bg_top">#040503</color>
+    <color name="garland_bg_bottom">#0A0F06</color>
     <color name="garland_surface">#0D0D0D</color>
     <color name="garland_surface_alt">#111111</color>
     <color name="garland_surface_soft">#0F0F0F</color>
