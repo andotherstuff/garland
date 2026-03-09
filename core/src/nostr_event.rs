@@ -1,5 +1,8 @@
+use core::str::FromStr;
+
 use nostr::event::{Kind, Tag, UnsignedEvent as NostrUnsignedEvent};
-use nostr::{Keys, SecretKey, Timestamp};
+use nostr::secp256k1::schnorr::Signature;
+use nostr::{Event, EventId, Keys, PublicKey, SecretKey, Timestamp};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -76,6 +79,12 @@ pub fn sign_custom_event(
     })
 }
 
+pub fn verify_signed_event(event: &SignedEvent) -> bool {
+    signed_event_to_nostr_event(event)
+        .map(|nostr_event| nostr_event.verify().is_ok())
+        .unwrap_or(false)
+}
+
 pub fn sign_blossom_upload_auth_event(
     private_key_hex: &str,
     share_id_hex: &str,
@@ -120,4 +129,59 @@ fn derive_blob_auth_private_key_hex(
 
     SecretKey::from_slice(&blob_auth_private_key).map_err(|_| NostrEventError::SigningFailed)?;
     Ok(hex::encode(blob_auth_private_key))
+}
+
+fn signed_event_to_nostr_event(event: &SignedEvent) -> Result<Event, NostrEventError> {
+    let id = EventId::from_hex(&event.id_hex).map_err(|_| NostrEventError::InvalidTags)?;
+    let pubkey =
+        PublicKey::from_hex(&event.pubkey_hex).map_err(|_| NostrEventError::InvalidTags)?;
+    let kind = u16::try_from(event.kind).map_err(|_| NostrEventError::InvalidKind)?;
+    let tags = event
+        .tags
+        .iter()
+        .map(|tag| Tag::parse(tag.clone()).map_err(|_| NostrEventError::InvalidTags))
+        .collect::<Result<Vec<_>, _>>()?;
+    let sig = Signature::from_str(&event.sig_hex).map_err(|_| NostrEventError::SigningFailed)?;
+
+    Ok(Event::new(
+        id,
+        pubkey,
+        Timestamp::from_secs(event.created_at),
+        Kind::from(kind),
+        tags,
+        event.content.clone(),
+        sig,
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_PRIVATE_KEY_HEX: &str =
+        "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a";
+
+    #[test]
+    fn verifies_signed_events_and_rejects_tampering() {
+        let event = sign_custom_event(
+            TEST_PRIVATE_KEY_HEX,
+            &UnsignedEvent {
+                created_at: 1_701_907_200,
+                kind: 10_97,
+                tags: vec![vec!["d".into(), "doc-id".into()]],
+                content: "encrypted-content".into(),
+            },
+        )
+        .expect("event should sign");
+
+        assert!(verify_signed_event(&event));
+
+        let mut tampered_content = event.clone();
+        tampered_content.content = "tampered-content".into();
+        assert!(!verify_signed_event(&tampered_content));
+
+        let mut tampered_id = event.clone();
+        tampered_id.id_hex = "0".repeat(64);
+        assert!(!verify_signed_event(&tampered_id));
+    }
 }

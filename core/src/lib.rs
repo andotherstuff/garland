@@ -834,4 +834,39 @@ mod tests {
 
         assert_eq!(error.to_string(), "no valid commit head found");
     }
+
+    #[test]
+    fn rejects_commit_events_with_tampered_signed_wrappers() {
+        let private_key_hex =
+            "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a".to_string();
+        let passphrase = "bucket-passphrase".to_string();
+        let mut snapshot = prepare_commit_chain_snapshot(&PrepareCommitChainRequest {
+            private_key_hex: private_key_hex.clone(),
+            passphrase: passphrase.clone(),
+            created_at: 1_701_907_200,
+            prev_event_id: None,
+            prev_seq: None,
+            servers: vec![
+                "https://cdn.nostrcheck.me".into(),
+                "https://blossom.nostr.build".into(),
+                "https://blossom.yakihonne.com".into(),
+            ],
+            entry_names: vec!["note.txt".into()],
+            message: Some("genesis".into()),
+        })
+        .expect("snapshot should build");
+
+        snapshot.commit_event.id_hex = "0".repeat(64);
+
+        let error = resolve_commit_chain_head(&ResolveCommitChainHeadRequest {
+            private_key_hex,
+            passphrase,
+            events: vec![snapshot.commit_event],
+            trusted_event_id: None,
+            trusted_seq: None,
+        })
+        .expect_err("tampered wrapper should be rejected");
+
+        assert_eq!(error.to_string(), "no valid commit head found");
+    }
 }

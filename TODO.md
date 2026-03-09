@@ -73,6 +73,7 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 - [x] New format: content = `ciphertext || tag`, nonce externalized to event tag
 - [x] Backward-compatible decryption: reads nonce from tag if present, falls back to embedded nonce
 - [x] All existing commit chain tests pass after nonce migration (head resolution, fork detection, cyclic graphs, directory readback)
+- [x] Verify signed Nostr event wrappers before trusting relay-sourced commit payloads
 
 ### Block encryption hardening
 
@@ -132,7 +133,7 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 - [ ] Android upload executor tests with RS share plans
 - [ ] Android restore executor tests with RS reconstruction
 
-56 total Rust tests passing.
+58 total Rust tests passing.
 
 ---
 

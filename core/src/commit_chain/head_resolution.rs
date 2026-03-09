@@ -9,7 +9,7 @@ use super::{
     CommitChainError, DecryptedCommit, ResolveCommitChainHeadRequest,
     ResolveCommitChainHeadResponse,
 };
-use crate::nostr_event::SignedEvent;
+use crate::nostr_event::{verify_signed_event, SignedEvent};
 
 pub fn resolve_commit_chain_head(
     request: &ResolveCommitChainHeadRequest,
@@ -43,6 +43,7 @@ fn collect_decrypted_commits(
         .events
         .iter()
         .filter(|event| event.kind == 1097)
+        .filter(|event| verify_signed_event(event))
         .filter_map(|event| {
             let nonce = extract_nonce_from_tags(event);
             let payload =
