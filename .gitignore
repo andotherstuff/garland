@@ -1,6 +1,8 @@
 /.gradle/
 /.kotlin/
 /.autoloop-logs/
+/.loop-logs/
+/.loop-state*.md
 /build/
 /local.properties
 /app/build/
