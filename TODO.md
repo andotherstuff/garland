@@ -97,7 +97,10 @@ Close the gap between the MVP replication model and the v0.1 protocol spec. The 
 - [x] Make selected-note upload/delete actions visible on the main screen and route them through explicit action/state presenters
 - [x] Require successful Blossom uploads to return a valid Blob Descriptor before treating the share as uploaded
 - [x] Honor Blossom `Retry-After` backoff hints for retryable 429/503 upload responses
-- [x] Scope Blossom upload auth events with server and size tags while keeping per-share auth keys
+- [x] Replace the custom production Blossom upload/auth path with native `rust-nostr` upload execution while keeping Kotlin diagnostics and upload-plan persistence
+- [x] Restore per-share blob auth key derivation in the native `rust-nostr` upload path after migration
+- [x] Validate native Blossom upload migration against public servers and confirm `application/octet-stream` is still rejected by the tested public endpoints
+- [x] Keep `application/octet-stream` and switch Garland's default Blossom suggestions to public servers verified to accept opaque binary blobs
 - [ ] Run a real-device smoke test: generate identity -> create note -> upload note
 
 ### Wire RS shares through upload/restore

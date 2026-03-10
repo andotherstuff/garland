@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import java.security.MessageDigest
 import java.util.Base64
 import okio.Buffer
 
@@ -120,9 +121,10 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     }
 
     private fun handleUpload(request: RecordedRequest): MockResponse {
-        val shareId = request.getHeader("X-SHA-256")
-        shareId?.let(uploadedShareIds::add)
-        uploadedBodies += request.body.readByteArray()
+        val body = request.body.readByteArray()
+        val shareId = request.getHeader("X-SHA-256") ?: sha256Hex(body)
+        uploadedShareIds += shareId
+        uploadedBodies += body
         request.getHeader("Content-Type")?.let(uploadContentTypes::add)
         request.getHeader("Authorization")?.let(uploadAuthorizationHeaders::add)
         val authPayload = parseAuthorizationJson(request.getHeader("Authorization"), shareId)
@@ -141,7 +143,7 @@ class FakeGarlandNetworkHarness : AutoCloseable {
                 shareIdHex = it,
                 downloadPath = path ?: "/$it",
                 contentType = request.getHeader("Content-Type") ?: GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE,
-                uploaded = request.body.size,
+                uploaded = body.size.toLong(),
             )
         }
             ?: "{}"
@@ -219,11 +221,10 @@ class FakeGarlandNetworkHarness : AutoCloseable {
         if (header.isNullOrBlank() || !header.startsWith("Nostr ")) return null
         return runCatching {
             val encoded = header.removePrefix("Nostr ").trim()
-            if (encoded.isEmpty() || encoded.contains('=') || encoded.any { it == '+' || it == '/' || it.isWhitespace() }) {
+            if (encoded.isEmpty() || encoded.any { it.isWhitespace() }) {
                 return null
             }
-            val padded = encoded.padEnd(((encoded.length + 3) / 4) * 4, '=')
-            val payload = Base64.getUrlDecoder().decode(padded).toString(Charsets.UTF_8)
+            val payload = decodeAuthorizationPayload(encoded).toString(Charsets.UTF_8)
             val json = JsonParser.parseString(payload).asJsonObject
             if (json.get("kind")?.asInt != 24242) return null
             val tags = json.getAsJsonArray("tags") ?: return null
@@ -242,6 +243,19 @@ class FakeGarlandNetworkHarness : AutoCloseable {
             if (!hasUploadTag || !hasExpiration || !hasMatchingBlob) return null
             payload
         }.getOrNull()
+    }
+
+    private fun decodeAuthorizationPayload(encoded: String): ByteArray {
+        return runCatching { Base64.getDecoder().decode(encoded) }
+            .getOrElse {
+                val padded = encoded.padEnd(((encoded.length + 3) / 4) * 4, '=')
+                Base64.getUrlDecoder().decode(padded)
+            }
+    }
+
+    private fun sha256Hex(body: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(body)
+        return digest.joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
     }
 
     private sealed interface RelayMode {

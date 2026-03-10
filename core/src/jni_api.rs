@@ -4,6 +4,7 @@ use jni::sys::jstring;
 use jni::JNIEnv;
 use serde::{Deserialize, Serialize};
 
+use crate::blossom_upload::{execute_blossom_upload, BlossomUploadRequest};
 use crate::commit_chain::{
     prepare_commit_chain_snapshot, read_directory_entries, resolve_commit_chain_head,
     PrepareCommitChainRequest, ReadDirectoryEntriesRequest, ResolveCommitChainHeadRequest,
@@ -49,6 +50,13 @@ struct ReadRecoveryResponse {
 struct SignEventResponse {
     ok: bool,
     event: Option<serde_json::Value>,
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct BlossomUploadResponseEnvelope {
+    ok: bool,
+    result: Option<serde_json::Value>,
     error: Option<String>,
 }
 
@@ -489,6 +497,45 @@ pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_signBlossomUp
 
     let payload = serde_json::to_string(&response)
         .unwrap_or_else(|err| format!("{{\"ok\":false,\"event\":null,\"error\":\"{}\"}}", err));
+
+    env.new_string(payload)
+        .expect("JNI should allocate response string")
+        .into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_andotherstuff_garland_NativeBridge_executeBlossomUpload(
+    mut env: JNIEnv,
+    _class: JClass,
+    request_json: JString,
+) -> jstring {
+    let request_json: String = env
+        .get_string(&request_json)
+        .map(|value| value.into())
+        .unwrap_or_default();
+
+    let response = match serde_json::from_str::<BlossomUploadRequest>(&request_json) {
+        Ok(request) => match execute_blossom_upload(&request) {
+            Ok(result) => BlossomUploadResponseEnvelope {
+                ok: true,
+                result: serde_json::to_value(result).ok(),
+                error: None,
+            },
+            Err(error) => BlossomUploadResponseEnvelope {
+                ok: false,
+                result: None,
+                error: Some(error.to_string()),
+            },
+        },
+        Err(error) => BlossomUploadResponseEnvelope {
+            ok: false,
+            result: None,
+            error: Some(format!("invalid request json: {}", error)),
+        },
+    };
+
+    let payload = serde_json::to_string(&response)
+        .unwrap_or_else(|err| format!("{{\"ok\":false,\"result\":null,\"error\":\"{}\"}}", err));
 
     env.new_string(payload)
         .expect("JNI should allocate response string")

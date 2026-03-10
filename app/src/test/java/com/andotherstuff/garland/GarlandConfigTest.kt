@@ -13,6 +13,14 @@ class GarlandConfigTest {
         assertEquals(3, GarlandConfig.defaults.blossomServers.size)
         assertTrue(GarlandConfig.defaults.relays.all { it.startsWith("wss://") })
         assertTrue(GarlandConfig.defaults.blossomServers.all { it.startsWith("https://") })
+        assertEquals(
+            listOf(
+                "https://blossom.primal.net",
+                "https://nostr.download",
+                "https://cdn.hzrd149.com",
+            ),
+            GarlandConfig.defaults.blossomServers,
+        )
     }
 
     @Test

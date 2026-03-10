@@ -22,9 +22,9 @@ object GarlandConfig {
             "wss://relay.primal.net",
         ),
         blossomServers = listOf(
-            "https://cdn.nostrcheck.me",
-            "https://blossom.nostr.build",
-            "https://blossom.yakihonne.com",
+            "https://blossom.primal.net",
+            "https://nostr.download",
+            "https://cdn.hzrd149.com",
         ),
     )
 

@@ -1,3 +1,4 @@
+pub mod blossom_upload;
 pub mod commit_chain;
 pub mod commit_crypto;
 pub mod crypto;

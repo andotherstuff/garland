@@ -14,4 +14,5 @@ object NativeBridge {
     external fun resolveCommitChainHead(requestJson: String): String
     external fun readDirectoryEntries(requestJson: String): String
     external fun signBlossomUploadAuth(requestJson: String): String
+    external fun executeBlossomUpload(requestJson: String): String
 }

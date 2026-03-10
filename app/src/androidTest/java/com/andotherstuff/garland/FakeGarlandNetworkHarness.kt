@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import java.security.MessageDigest
 import java.util.Base64
 import okio.Buffer
 
@@ -107,8 +108,9 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     }
 
     private fun handleUpload(request: RecordedRequest): MockResponse {
-        val shareId = request.getHeader("X-SHA-256")
-        shareId?.let(uploadedShareIds::add)
+        val body = request.body.readByteArray()
+        val shareId = request.getHeader("X-SHA-256") ?: sha256Hex(body)
+        uploadedShareIds += shareId
         val authPayload = parseAuthorizationJson(request.getHeader("Authorization"))
         authPayload?.let(uploadAuthorizationJsons::add)
         if (requireUploadAuthorization && authPayload == null) {
@@ -170,8 +172,16 @@ class FakeGarlandNetworkHarness : AutoCloseable {
     }
 
     private fun decodeAuthorizationPayload(encoded: String): ByteArray {
-        return runCatching { Base64.getUrlDecoder().decode(encoded) }
-            .getOrElse { Base64.getDecoder().decode(encoded) }
+        return runCatching { Base64.getDecoder().decode(encoded) }
+            .getOrElse {
+                val padded = encoded.padEnd(((encoded.length + 3) / 4) * 4, '=')
+                Base64.getUrlDecoder().decode(padded)
+            }
+    }
+
+    private fun sha256Hex(body: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(body)
+        return digest.joinToString(separator = "") { "%02x".format(it.toInt() and 0xff) }
     }
 
     private sealed interface RelayMode {

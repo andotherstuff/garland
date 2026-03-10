@@ -1183,7 +1183,7 @@ class GarlandUploadExecutorTest {
             assertEquals(harness.blossomBaseUrl(), authJson.getAsJsonArray("tags")[2].asJsonArray[1].asString)
             assertEquals("5", authJson.getAsJsonArray("tags")[3].asJsonArray[1].asString)
             assertEquals(1, harness.uploadAuthorizationHeaders().size)
-            assertFalse(harness.uploadAuthorizationHeaders().single().contains('='))
+            assertTrue(harness.uploadAuthorizationHeaders().single().startsWith("Nostr "))
             assertTrue(store.readUploadPlan(document.documentId)?.contains("\"retrieval_url\":\"${harness.blossomBaseUrl()}/blob/$HELLO_SHARE_ID\"") == true)
             assertEquals(listOf(GarlandConfig.ENCRYPTED_PAYLOAD_MIME_TYPE), harness.uploadContentTypes())
 

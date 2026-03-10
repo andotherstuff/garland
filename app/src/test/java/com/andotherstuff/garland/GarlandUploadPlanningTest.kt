@@ -14,9 +14,6 @@ class GarlandUploadPlanningTest {
     private val decoder = GarlandUploadPlanDecoder(gson)
     private val factory = GarlandPreparedUploadFactory(
         gson = gson,
-        authEventSigner = BlossomAuthEventSigner { _, _, _, _, _, _ ->
-            throw AssertionError("Auth signer should not be used in this test")
-        },
         clock = { 123L },
     )
 

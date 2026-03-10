@@ -45,8 +45,11 @@ internal data class PreparedUploadRequest(
     val upload: UploadBody,
     val requestUrl: String,
     val body: ByteArray,
+    val bodyBase64: String,
     val contentType: String,
-    val authorizationHeader: String?,
+    val privateKeyHex: String?,
+    val authCreatedAt: Long?,
+    val authExpiration: Long?,
 )
 
 internal data class PreparedUploadResult(
@@ -152,7 +155,6 @@ internal class GarlandUploadPlanDecoder(
 
 internal class GarlandPreparedUploadFactory(
     private val gson: Gson = Gson(),
-    private val authEventSigner: BlossomAuthEventSigner,
     private val clock: () -> Long = { System.currentTimeMillis() / 1000 },
 ) {
     fun prepare(upload: UploadBody, index: Int, privateKeyHex: String?, contentType: String): PreparedUploadResult {
@@ -236,13 +238,19 @@ internal class GarlandPreparedUploadFactory(
             )
         }
 
+        val authCreatedAt = privateKeyHex?.let { clock() }
+        val authExpiration = authCreatedAt?.plus(300)
+
         return PreparedUploadResult(
             request = PreparedUploadRequest(
                 upload = upload,
                 requestUrl = requestUrl,
                 body = body,
+                bodyBase64 = upload.bodyBase64,
                 contentType = contentType,
-                authorizationHeader = buildAuthorizationHeader(privateKeyHex, upload, body, index),
+                privateKeyHex = privateKeyHex,
+                authCreatedAt = authCreatedAt,
+                authExpiration = authExpiration,
             )
         )
     }
@@ -328,30 +336,6 @@ internal class GarlandPreparedUploadFactory(
             }
         }
         return if (mutated) gson.toJson(root) else rawPlanJson
-    }
-
-    private fun buildAuthorizationHeader(privateKeyHex: String?, upload: UploadBody, body: ByteArray, index: Int): String? {
-        if (privateKeyHex.isNullOrBlank()) return null
-        val createdAt = clock()
-        val expiration = createdAt + 300
-        val signedEvent = try {
-            authEventSigner.signUpload(
-                privateKeyHex = privateKeyHex,
-                shareIdHex = upload.shareIdHex,
-                serverUrl = upload.serverUrl,
-                sizeBytes = body.size.toLong(),
-                createdAt = createdAt,
-                expiration = expiration,
-            )
-        } catch (error: IllegalStateException) {
-            throw error
-        } catch (error: Exception) {
-            throw IllegalStateException(
-                "Failed to sign Blossom auth for upload plan entry $index: ${error.message ?: "unknown error"}"
-            )
-        }
-        val authJson = gson.toJson(signedEvent.toRelayEventPayload())
-        return "Nostr ${Base64.getUrlEncoder().withoutPadding().encodeToString(authJson.toByteArray(Charsets.UTF_8))}"
     }
 
     private fun invalidBlossomServerUrlMessage(index: Int, error: IllegalArgumentException): String {

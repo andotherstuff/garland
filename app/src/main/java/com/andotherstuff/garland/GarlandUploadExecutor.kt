@@ -2,10 +2,7 @@ package com.andotherstuff.garland
 
 import android.content.Context
 import com.google.gson.Gson
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -18,13 +15,14 @@ data class UploadExecutionResult(
     val message: String,
 )
 
-open class GarlandUploadExecutor(
+open class GarlandUploadExecutor internal constructor(
     private val store: LocalDocumentStoreImpl,
     private val client: OkHttpClient = OkHttpClient(),
     private val gson: Gson = Gson(),
     private val relayPublisher: NostrRelayPublisher = NostrRelayPublisher(client, gson),
     private val privateKeyProvider: (() -> String?)? = null,
     private val authEventSigner: BlossomAuthEventSigner = NativeBridgeBlossomAuthEventSigner(gson),
+    private val uploadClient: BlossomUploadClient = OkHttpBlossomUploadClient(client, gson, authEventSigner),
     private val clock: () -> Long = { System.currentTimeMillis() / 1000 },
     private val retrySleep: (Long) -> Unit = { Thread.sleep(it) },
 ) {
@@ -34,7 +32,7 @@ open class GarlandUploadExecutor(
     }
 
     private val planDecoder = GarlandUploadPlanDecoder(gson)
-    private val preparedUploadFactory = GarlandPreparedUploadFactory(gson, authEventSigner, clock)
+    private val preparedUploadFactory = GarlandPreparedUploadFactory(gson, clock)
 
     private data class UploadAttemptResult(
         val successDiagnostic: DocumentEndpointDiagnostic? = null,
@@ -55,6 +53,7 @@ open class GarlandUploadExecutor(
         relayPublisher = NostrRelayPublisher(client, gson),
         privateKeyProvider = GarlandSessionStore(context.applicationContext)::loadPrivateKeyHex,
         authEventSigner = NativeBridgeBlossomAuthEventSigner(gson),
+        uploadClient = NativeBridgeBlossomUploadClient(gson),
     )
 
     open fun executeDocumentUpload(documentId: String, relayUrls: List<String>): UploadExecutionResult {
@@ -220,60 +219,50 @@ open class GarlandUploadExecutor(
     private fun executeUploadWithRetry(preparedUpload: PreparedUploadRequest, attemptedAuth: Boolean): UploadAttemptResult {
         val upload = preparedUpload.upload
         for (attempt in 1..MAX_UPLOAD_ATTEMPTS) {
-            val requestBuilder = Request.Builder()
-                .url(preparedUpload.requestUrl)
-                .header("X-SHA-256", upload.shareIdHex)
-                .header("X-Content-Length", preparedUpload.body.size.toString())
-                .header("X-Content-Type", preparedUpload.contentType)
-                .put(preparedUpload.body.toRequestBody(preparedUpload.contentType.toMediaType()))
-            preparedUpload.authorizationHeader?.let { requestBuilder.header("Authorization", it) }
-            val request = requestBuilder.build()
-
             try {
-                client.newCall(request).execute().use { responseBody ->
-                    if (!responseBody.isSuccessful) {
-                        val baseMessage = uploadFailureMessage(
-                            serverUrl = upload.serverUrl,
-                            statusCode = responseBody.code,
-                            attemptedAuth = attemptedAuth,
-                            rejectionReason = responseBody.header("X-Reason"),
-                            responseBodyText = responseBody.body?.string(),
-                        )
-                        if (shouldRetryUploadResponse(responseBody.code) && attempt < MAX_UPLOAD_ATTEMPTS) {
-                            retryDelay(attempt, responseBody.header("Retry-After"))
-                            return@use
-                        }
-                        val message = uploadAttemptSummary(baseMessage, attempt)
-                        return UploadAttemptResult(
-                            failureStatus = "upload-http-${responseBody.code}",
-                            failureDiagnostic = DocumentEndpointDiagnostic(upload.serverUrl, "http-${responseBody.code}", message),
-                            failureMessage = message,
-                        )
+                val response = uploadClient.upload(preparedUpload)
+                if (response.statusCode !in 200..299) {
+                    val baseMessage = uploadFailureMessage(
+                        serverUrl = upload.serverUrl,
+                        statusCode = response.statusCode,
+                        attemptedAuth = attemptedAuth,
+                        rejectionReason = response.rejectionReason,
+                        responseBodyText = response.responseBodyText,
+                    )
+                    if (shouldRetryUploadResponse(response.statusCode) && attempt < MAX_UPLOAD_ATTEMPTS) {
+                        retryDelay(attempt, response.retryAfterHeader)
+                        continue
                     }
-
-                    val resolvedTarget = runCatching {
-                        preparedUploadFactory.parseUploadResponse(
-                            upload = upload,
-                            responseBodyText = responseBody.body?.string().orEmpty(),
-                        )
-                    }.getOrElse { error ->
-                        val message = uploadAttemptSummary(error.message ?: "Upload response validation failed", attempt)
-                        return UploadAttemptResult(
-                            failureStatus = "upload-response-invalid",
-                            failureDiagnostic = DocumentEndpointDiagnostic(upload.serverUrl, "response-invalid", message),
-                            failureMessage = message,
-                        )
-                    }
-                    val successMessage = if (attempt == 1) {
-                        "Uploaded share ${upload.shareIdHex}"
-                    } else {
-                        "Uploaded share ${upload.shareIdHex} after $attempt attempts"
-                    }
+                    val message = uploadAttemptSummary(baseMessage, attempt)
                     return UploadAttemptResult(
-                        successDiagnostic = DocumentEndpointDiagnostic(upload.serverUrl, "ok", successMessage),
-                        resolvedTarget = resolvedTarget,
+                        failureStatus = "upload-http-${response.statusCode}",
+                        failureDiagnostic = DocumentEndpointDiagnostic(upload.serverUrl, "http-${response.statusCode}", message),
+                        failureMessage = message,
                     )
                 }
+
+                val resolvedTarget = runCatching {
+                    preparedUploadFactory.parseUploadResponse(
+                        upload = upload,
+                        responseBodyText = response.responseBodyText,
+                    )
+                }.getOrElse { error ->
+                    val message = uploadAttemptSummary(error.message ?: "Upload response validation failed", attempt)
+                    return UploadAttemptResult(
+                        failureStatus = "upload-response-invalid",
+                        failureDiagnostic = DocumentEndpointDiagnostic(upload.serverUrl, "response-invalid", message),
+                        failureMessage = message,
+                    )
+                }
+                val successMessage = if (attempt == 1) {
+                    "Uploaded share ${upload.shareIdHex}"
+                } else {
+                    "Uploaded share ${upload.shareIdHex} after $attempt attempts"
+                }
+                return UploadAttemptResult(
+                    successDiagnostic = DocumentEndpointDiagnostic(upload.serverUrl, "ok", successMessage),
+                    resolvedTarget = resolvedTarget,
+                )
             } catch (error: IOException) {
                 if (attempt < MAX_UPLOAD_ATTEMPTS) {
                     retryDelay(attempt, null)
